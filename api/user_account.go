@@ -2,6 +2,7 @@ package api
 
 import (
 	"crypto/ed25519"
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/mail"
@@ -9,20 +10,21 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/go-jose/go-jose/v3"
 	"github.com/go-playground/validator/v10"
-	"github.com/mailio/go-mailio-server/repository"
+	"github.com/mailio/go-mailio-server/global"
+	"github.com/mailio/go-mailio-server/services"
 	"github.com/mailio/go-mailio-server/types"
 	"github.com/mailio/go-mailio-server/util"
 )
 
 type UserAccountApi struct {
-	repo     repository.Repository
-	validate *validator.Validate
+	userService *services.UserService
+	validate    *validator.Validate
 }
 
-func NewUserAccountApi(repo repository.Repository) *UserAccountApi {
+func NewUserAccountApi(userService *services.UserService) *UserAccountApi {
 	return &UserAccountApi{
-		repo:     repo,
-		validate: validator.New(),
+		userService: userService,
+		validate:    validator.New(),
 	}
 }
 
@@ -87,30 +89,48 @@ func (ua *UserAccountApi) Login(c *gin.Context) {
 // @Router /api/v1/register [post]
 func (ua *UserAccountApi) Register(c *gin.Context) {
 
-	var emailPassword types.InputEmailPassword
-	if err := c.ShouldBindJSON(&emailPassword); err != nil {
+	var inputRegister types.InputRegister
+	if err := c.ShouldBindJSON(&inputRegister); err != nil {
 		ApiErrorf(c, http.StatusBadRequest, "invalid email or password")
 		return
 	}
 
-	err := ua.validate.Struct(emailPassword)
+	err := ua.validate.Struct(inputRegister)
 	if err != nil {
 		msg := ValidatorErrorToUser(err.(validator.ValidationErrors))
 		ApiErrorf(c, http.StatusBadRequest, msg)
 		return
 	}
 
-	emailAddr, err := mail.ParseAddress(emailPassword.Email)
+	emailAddr, err := mail.ParseAddress(inputRegister.Email)
 	if err != nil {
 		ApiErrorf(c, http.StatusBadRequest, "invalid email address")
 		return
 	}
-	// resp, err := c.restClient.R().SetBody(map[string]interface{}{"name": user, "password": password, "roles": []string{}, "type": "user"}).Put(fmt.Sprintf("/_users/org.couchdb.user:%s", user))
-	// if err != nil {
-	// 	global.Logger.Log(err, "Failed to register user")
-	// 	return nil, err
-	// }
-	hexUser := "userdb-" + util.HexEncodeToString(emailAddr.Address)
 
-	c.JSON(http.StatusOK, gin.H{"token": hexUser})
+	scryptedEmail, sErr := util.ScryptEmail(emailAddr.Address)
+	if sErr != nil {
+		ApiErrorf(c, http.StatusInternalServerError, "Failed to scrypt email")
+		return
+	}
+
+	user := &types.User{
+		Email:          emailAddr.Address,
+		EncryptedEmail: base64.StdEncoding.EncodeToString(scryptedEmail),
+		Address:        inputRegister.Address,
+		Created:        util.GetTimestamp(),
+	}
+	output, err := ua.userService.CreateUser(user, inputRegister.Password)
+	if err != nil {
+		ApiErrorf(c, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	token, tErr := generateJWSToken(global.PrivateKey, []byte(output.Email))
+	if tErr != nil {
+		ApiErrorf(c, http.StatusInternalServerError, "Failed to sign token")
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"token": token})
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/metrics"
 	"github.com/mailio/go-mailio-server/repository"
+	"github.com/mailio/go-mailio-server/services"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -56,8 +57,12 @@ func ConfigRoutes(router *gin.Engine) *gin.Engine {
 		panic(repoErr)
 	}
 
+	// SERVICE definitions
+	userService := services.NewUserService(repository)
+
+	// API definitions
 	handshakeApi := api.NewHandshakeApi()
-	accountApi := api.NewUserAccountApi(repository)
+	accountApi := api.NewUserAccountApi(userService)
 
 	publicApi := router.Group("/api", metrics.MetricsMiddleware())
 	{

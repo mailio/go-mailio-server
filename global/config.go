@@ -36,8 +36,11 @@ type AwsSmtpConfig struct {
 }
 
 type MailioConfig struct {
-	Domain         string `yaml:"domain"`
-	ServerKeysPath string `yaml:"serverKeysPath"`
+	Domain             string                `yaml:"domain"`
+	ServerKeysPath     string                `yaml:"serverKeysPath"`
+	EmailSaltHex       string                `yaml:"emailSaltHex"`
+	RecaptchaV3SiteKey string                `yaml:"recaptchaV3SiteKey"`
+	ServerHanshake     ServerHandshakeConfig `yaml:"serverHandshake"`
 }
 
 type GrpcConfig struct {
@@ -48,4 +51,20 @@ type PrometheusConfig struct {
 	Enabled  bool   `yaml:"enabled"`
 	Username string `yaml:"username"`
 	Password string `yaml:"password"`
+}
+
+type ServerHandshakeConfig struct {
+	ID                  string                         `yaml:"id"`
+	OriginServer        string                         `yaml:"originServer"`
+	Type                int                            `yaml:"type"`
+	MinimumLevel        int                            `yaml:"minimumLevel"`
+	SignatureScheme     string                         `yaml:"signatureScheme"`
+	SenderMailioAddress string                         `yaml:"senderMailioAddress"`
+	SenderEmailAddress  string                         `yaml:"senderEmailAddress"`
+	Subtypes            []ServerHandshakeSubtypeConfig `yaml:"subtypes"`
+}
+
+type ServerHandshakeSubtypeConfig struct {
+	Subtype          int `yaml:"subtype"`
+	FrequencyMinutes int `yaml:"frequencyMinutes,omitempty"`
 }

@@ -27,18 +27,12 @@ func NewCouchDBRepository(url, DBName string, username string, password string, 
 		httpmock.ActivateNonDefault(cl.GetClient())
 	}
 
-	var dbs []string
-	var dbErr CouchDBError
-	cl.R().SetResult(&dbs).SetError(&dbErr).Get("_all_dbs")
-	if dbErr.Error != "" {
-		return nil, fmt.Errorf("failed to get list of databases: %s", dbErr.Error)
+	existstRes, exsistsErr := cl.R().Head(DBName)
+	if exsistsErr != nil {
+		return nil, fmt.Errorf("failed to check if database exists: %s", exsistsErr.Error())
 	}
-
-	// check if database already exists
-	for _, db := range dbs {
-		if db == DBName {
-			return &CouchDBRepository{cl, DBName}, nil
-		}
+	if existstRes.StatusCode() == 200 {
+		return &CouchDBRepository{cl, DBName}, nil
 	}
 
 	var ok OK
@@ -56,14 +50,17 @@ func NewCouchDBRepository(url, DBName string, username string, password string, 
 
 // GetByID returns a document by its ID
 func (c *CouchDBRepository) GetByID(ctx context.Context, id string) (interface{}, error) {
-	var data BaseDocument
+	// var data BaseDocument
 
-	response, _ := c.client.R().SetResult(&data).Get(fmt.Sprintf("%s/%s", c.dbName, id))
+	response, err := c.client.R().Get(fmt.Sprintf("%s/%s", c.dbName, id))
+	if err != nil {
+		return nil, err
+	}
 	if response.IsError() {
 		return nil, response.Error().(error)
 	}
 
-	return &data, nil
+	return response, nil
 }
 
 // return all documents from database
