@@ -1,0 +1,179 @@
+definitions:
+  types.Handshake:
+    properties:
+      _id:
+        type: string
+      _rev:
+        description: Rev is the revision number returned
+        type: string
+      id:
+        type: string
+      ok:
+        type: boolean
+      rev:
+        type: string
+    type: object
+  types.InputEmailPassword:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  types.JwsToken:
+    properties:
+      token:
+        type: string
+    type: object
+info:
+  contact: {}
+  description: Implements the Mailio server based on https://mirs.mail.io/ specifications
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  title: Mailio Server API
+  version: "1.0"
+paths:
+  /api/v1/handshake:
+    post:
+      consumes:
+      - application/json
+      description: Create a new handshake
+      parameters:
+      - description: Handshake
+        in: body
+        name: handshake
+        required: true
+        schema:
+          $ref: '#/definitions/types.Handshake'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/types.Handshake'
+      security:
+      - Bearer: []
+      summary: Create a new handshake
+      tags:
+      - HANDSHAKE API
+  /api/v1/handshake/{id}:
+    delete:
+      description: Delete a handshake
+      parameters:
+      - description: Handshake ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+      security:
+      - Bearer: []
+      summary: Delete a handshake
+      tags:
+      - HANDSHAKE API
+    get:
+      consumes:
+      - application/json
+      description: Returns a single handshake by id
+      parameters:
+      - description: Handshake ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Handshake'
+      security:
+      - Bearer: []
+      summary: Get handshake by id
+      tags:
+      - HANDSHAKE API
+    put:
+      consumes:
+      - application/json
+      description: Update a handshake
+      parameters:
+      - description: Handshake ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Handshake
+        in: body
+        name: handshake
+        required: true
+        schema:
+          $ref: '#/definitions/types.Handshake'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Handshake'
+      security:
+      - Bearer: []
+      summary: Update a handshake
+      tags:
+      - HANDSHAKE API
+  /api/v1/login:
+    post:
+      consumes:
+      - application/json
+      description: Returns a JWS token
+      parameters:
+      - description: Handshake ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.JwsToken'
+      summary: Login with username and password
+      tags:
+      - USER ACCOUNT API
+  /api/v1/register:
+    post:
+      consumes:
+      - application/json
+      description: Returns a JWS token
+      parameters:
+      - description: email and password input
+        in: body
+        name: emailPassword
+        required: true
+        schema:
+          $ref: '#/definitions/types.InputEmailPassword'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.JwsToken'
+      summary: Register user
+      tags:
+      - USER ACCOUNT API
+securityDefinitions:
+  Bearer:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
