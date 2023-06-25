@@ -63,11 +63,8 @@ func (ua *UserAccountApi) Login(c *gin.Context) {
 		return
 	}
 
-	var privateKey ed25519.PrivateKey
-	//TODO! load privat key from server keys
-
+	privateKey := global.PrivateKey
 	// Sign the payload with servers private key.
-	// Replace "privateKey" with your actual private key.
 	token, err := generateJWSToken(privateKey, payload)
 	if err != nil {
 		ApiErrorf(c, http.StatusInternalServerError, "Failed to sign token")
@@ -95,6 +92,9 @@ func (ua *UserAccountApi) Register(c *gin.Context) {
 		return
 	}
 
+	//todo! validate public keys (length, base64, ed25519)
+	//todo! validate mailio address format
+
 	err := ua.validate.Struct(inputRegister)
 	if err != nil {
 		msg := ValidatorErrorToUser(err.(validator.ValidationErrors))
@@ -120,13 +120,18 @@ func (ua *UserAccountApi) Register(c *gin.Context) {
 		Address:        inputRegister.Address,
 		Created:        util.GetTimestamp(),
 	}
-	output, err := ua.userService.CreateUser(user, inputRegister.Password)
+	outputUser, err := ua.userService.CreateUser(user, inputRegister.Password)
 	if err != nil {
 		ApiErrorf(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	token, tErr := generateJWSToken(global.PrivateKey, []byte(output.Email))
+	// sign user with servers private key and store it in db
+	signature := ed25519.Sign(global.PrivateKey, []byte(outputUser.Address))
+	signatureBase64 := base64.StdEncoding.EncodeToString(signature)
+	//todo! create DID ID and DID document and store it in database!
+
+	token, tErr := generateJWSToken(global.PrivateKey, []byte(outputUser.Email))
 	if tErr != nil {
 		ApiErrorf(c, http.StatusInternalServerError, "Failed to sign token")
 		return
