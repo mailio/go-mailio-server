@@ -63,7 +63,16 @@ func ConfigRoutes(router *gin.Engine) *gin.Engine {
 	// API definitions
 	handshakeApi := api.NewHandshakeApi()
 	accountApi := api.NewUserAccountApi(userService)
+	didApi := api.NewDIDApi()
 
+	// PUBLIC ROOT API
+	rootPublicApi := router.Group("/")
+	{
+		rootPublicApi.GET(".well-known/did.json", didApi.CreateServerDID)
+		rootPublicApi.GET(".well-known/did-configuration.json", didApi.CreateServerDIDConfiguration)
+	}
+
+	// PUBLIC API
 	publicApi := router.Group("/api", metrics.MetricsMiddleware())
 	{
 		publicApi.POST("/v1/register", accountApi.Register)
@@ -74,6 +83,8 @@ func ConfigRoutes(router *gin.Engine) *gin.Engine {
 	{
 		rootApi.GET("/v1/handshake/:id", handshakeApi.GetHandshake)
 	}
+
+	router.StaticFile("./well-known/did.json", "./well-known/did.json")
 
 	// // webhook with basic authentication
 	// smtpWebhooks := router.Group("/webhooks", gin.BasicAuth(gin.Accounts{

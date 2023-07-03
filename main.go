@@ -16,6 +16,7 @@ import (
 	"github.com/mailio/go-mailio-server/docs"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/types"
+	"github.com/mailio/go-mailio-server/util"
 	cfg "github.com/mailio/go-web3-kit/config"
 	w3srv "github.com/mailio/go-web3-kit/gingonic"
 	"google.golang.org/grpc"
@@ -40,6 +41,13 @@ func loadServerEd25519Keys(conf global.Config) {
 
 	global.PublicKey = ed25519.PublicKey(publicKeyBytes)
 	global.PrivateKey = ed25519.PrivateKey(decodedPrivBytes)
+	global.MailioKeysCreated = serverKeysJson.Created
+
+	mailioDid, didErr := util.CreateMailioDIDDocument()
+	if didErr != nil {
+		panic(didErr.Error())
+	}
+	global.MailioDID = &mailioDid.ID
 }
 
 // @title Mailio Server API

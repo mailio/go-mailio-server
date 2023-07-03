@@ -20,7 +20,7 @@ func NewHandshakeApi() *HandshakeApi {
 // @Security Bearer
 // @Summary Get handshake by id
 // @Description Returns a single handshake by id
-// @Tags HANDSHAKE API
+// @Tags Handshake
 // @Param id path string true "Handshake ID"
 // @Success 200 {object} types.Handshake
 // @Accept json
@@ -40,7 +40,7 @@ func (ha *HandshakeApi) GetHandshake(c *gin.Context) {
 // @Security Bearer
 // @Summary Create a new handshake
 // @Description Create a new handshake
-// @Tags HANDSHAKE API
+// @Tags Handshake
 // @Accept json
 // @Produce json
 // @Param handshake body types.Handshake true "Handshake"
@@ -68,7 +68,7 @@ func (ha *HandshakeApi) CreateHandshake(c *gin.Context) {
 // @Security Bearer
 // @Summary Update a handshake
 // @Description Update a handshake
-// @Tags HANDSHAKE API
+// @Tags Handshake
 // @Accept json
 // @Produce json
 // @Param id path string true "Handshake ID"
@@ -99,7 +99,7 @@ func (ha *HandshakeApi) UpdateHandshake(c *gin.Context) {
 // @Security Bearer
 // @Summary Delete a handshake
 // @Description Delete a handshake
-// @Tags HANDSHAKE API
+// @Tags Handshake
 // @Param id path string true "Handshake ID"
 // @Success 204
 // @Router /api/v1/handshake/{id} [delete]

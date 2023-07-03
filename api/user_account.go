@@ -1,15 +1,18 @@
 package api
 
 import (
+	"crypto"
 	"crypto/ed25519"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/mail"
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-jose/go-jose/v3"
 	"github.com/go-playground/validator/v10"
+	"github.com/mailio/go-mailio-core/did"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/services"
 	"github.com/mailio/go-mailio-server/types"
@@ -45,7 +48,7 @@ func generateJWSToken(privateKey ed25519.PrivateKey, payload []byte) (string, er
 // Login method
 // @Summary Login with username and password
 // @Description Returns a JWS token
-// @Tags USER ACCOUNT API
+// @Tags User Account
 // @Param id path string true "Handshake ID"
 // @Success 200 {object} types.JwsToken
 // @Accept json
@@ -78,7 +81,7 @@ func (ua *UserAccountApi) Login(c *gin.Context) {
 // Register user method
 // @Summary Register user
 // @Description Returns a JWS token
-// @Tags USER ACCOUNT API
+// @Tags User Account
 // @Param emailPassword body types.InputEmailPassword true "email and password input"
 // @Success 200 {object} types.JwsToken
 // @Accept json
@@ -126,10 +129,47 @@ func (ua *UserAccountApi) Register(c *gin.Context) {
 		return
 	}
 
-	// sign user with servers private key and store it in db
-	signature := ed25519.Sign(global.PrivateKey, []byte(outputUser.Address))
-	signatureBase64 := base64.StdEncoding.EncodeToString(signature)
-	//todo! create DID ID and DID document and store it in database!
+	signingKeyBytes, err := base64.StdEncoding.DecodeString(inputRegister.Ed25519SigningPublicKeyBase64)
+	if err != nil {
+		ApiErrorf(c, http.StatusBadRequest, "Failed to decode signing key")
+		return
+	}
+	if len(signingKeyBytes) != 32 {
+		ApiErrorf(c, http.StatusBadRequest, "Invalid signing key length")
+		return
+	}
+	signingKey := crypto.PublicKey(signingKeyBytes)
+	encryptionKeyBytes, err := base64.StdEncoding.DecodeString(inputRegister.X25519PublicKeyBase64)
+	if err != nil {
+		ApiErrorf(c, http.StatusBadRequest, "Failed to decode encryption publoic key")
+		return
+	}
+	if len(encryptionKeyBytes) != 32 {
+		ApiErrorf(c, http.StatusBadRequest, "Invalid encryption public key length")
+		return
+	}
+	encryptionPublicKey := crypto.PublicKey(encryptionKeyBytes)
+
+	// create DID ID and DID document and store it in database!
+	mk := &did.MailioKey{
+		MasterSignKey: &did.Key{
+			Type:      did.KeyTypeEd25519,
+			PublicKey: signingKey,
+		},
+		MasterAgreementKey: &did.Key{
+			Type:      did.KeyTypeX25519KeyAgreement,
+			PublicKey: encryptionPublicKey,
+		},
+	}
+	userDIDDoc, didErr := did.NewMailioDIDDocument(mk, global.PublicKey)
+	if didErr != nil {
+		ApiErrorf(c, http.StatusInternalServerError, "Failed to create DID document")
+		return
+	}
+	// TODO! finish up here (store in database)
+	fmt.Printf("%v\n", userDIDDoc)
+	// upload DID document to IPFS
+	// vc := did.NewVerifiableCredential(userDIDDoc)
 
 	token, tErr := generateJWSToken(global.PrivateKey, []byte(outputUser.Email))
 	if tErr != nil {

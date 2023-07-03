@@ -3,6 +3,7 @@ package global
 import (
 	"crypto/ed25519"
 
+	mailiodid "github.com/mailio/go-mailio-core/did"
 	cfg "github.com/mailio/go-web3-kit/config"
 )
 
@@ -12,6 +13,8 @@ var Conf Config
 // Public and Private key of a server (loaded from serverKeysPath in conf.yaml)
 var PublicKey ed25519.PublicKey
 var PrivateKey ed25519.PrivateKey
+var MailioKeysCreated int64
+var MailioDID *mailiodid.DID
 
 type Config struct {
 	cfg.YamlConfig `yaml:",inline"`

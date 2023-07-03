@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"time"
 
 	mCrypto "github.com/mailio/go-mailio-core/crypto"
 	"github.com/spf13/cobra"
@@ -30,9 +31,10 @@ var keysCmd = &cobra.Command{
 		if err != nil {
 			panic(err)
 		}
-		keysJson := map[string]string{
+		keysJson := map[string]interface{}{
 			"type":       "mailio_server_keys_ed25519",
 			"privateKey": *private,
+			"created":    time.Now().UnixMilli(),
 		}
 		fileBytes, err := json.MarshalIndent(keysJson, "", "  ")
 		if outputFile != "" {
