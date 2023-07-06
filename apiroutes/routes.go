@@ -52,17 +52,26 @@ func ConfigRoutes(router *gin.Engine) *gin.Engine {
 	}
 
 	repoUrl := global.Conf.CouchDB.Scheme + "://" + global.Conf.CouchDB.Host + ":" + strconv.Itoa(global.Conf.CouchDB.Port)
-	repository, repoErr := repository.NewCouchDBRepository(repoUrl, "handshake", global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
+	handshakeRepo, repoErr := repository.NewCouchDBRepository(repoUrl, repository.Handshake, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
+	nonceRepo, repoErr := repository.NewCouchDBRepository(repoUrl, repository.Nonce, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
+	userRepo, repoErr := repository.NewCouchDBRepository(repoUrl, repository.User, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
 	if repoErr != nil {
 		panic(repoErr)
 	}
 
+	// REPOSITORY definitions
+	dbSelector := repository.NewCouchDBSelector()
+	dbSelector.AddDB(handshakeRepo)
+	dbSelector.AddDB(nonceRepo)
+	dbSelector.AddDB(userRepo)
+
 	// SERVICE definitions
-	userService := services.NewUserService(repository)
+	userService := services.NewUserService(dbSelector)
+	nonceService := services.NewNonceService(dbSelector)
 
 	// API definitions
 	handshakeApi := api.NewHandshakeApi()
-	accountApi := api.NewUserAccountApi(userService)
+	accountApi := api.NewUserAccountApi(userService, nonceService)
 	didApi := api.NewDIDApi()
 
 	// PUBLIC ROOT API
@@ -77,6 +86,7 @@ func ConfigRoutes(router *gin.Engine) *gin.Engine {
 	{
 		publicApi.POST("/v1/register", accountApi.Register)
 		publicApi.POST("/v1/login", accountApi.Login)
+		publicApi.GET("/v1/nonce", accountApi.ChallengeNonce)
 	}
 
 	rootApi := router.Group("/api", metrics.MetricsMiddleware(), restinterceptors.JWSMiddleware())

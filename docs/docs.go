@@ -304,9 +304,9 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Handshake ID",
-                        "name": "id",
-                        "in": "path",
+                        "description": "Nonce string",
+                        "name": "nonce",
+                        "in": "query",
                         "required": true
                     }
                 ],
@@ -315,6 +315,29 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/types.JwsToken"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/nonce": {
+            "get": {
+                "description": "Returns a nonce which client needs to sign with their private key",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "User Account"
+                ],
+                "summary": "Login and Registration challenge nonce",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.NonceResponse"
                         }
                     }
                 }
@@ -615,10 +638,22 @@ const docTemplate = `{
                 "password"
             ],
             "properties": {
+                "did": {
+                    "type": "string"
+                },
                 "email": {
                     "type": "string"
                 },
+                "nonce": {
+                    "type": "string"
+                },
                 "password": {
+                    "type": "string"
+                },
+                "publicKeyBase64": {
+                    "type": "string"
+                },
+                "signatureBase64": {
                     "type": "string"
                 }
             }
@@ -627,6 +662,14 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "token": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.NonceResponse": {
+            "type": "object",
+            "properties": {
+                "nonce": {
                     "type": "string"
                 }
             }

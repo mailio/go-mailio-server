@@ -8,12 +8,13 @@ require (
 	github.com/go-kit/log v0.2.1
 	github.com/go-playground/validator/v10 v10.14.0
 	github.com/go-resty/resty/v2 v2.7.0
+	github.com/google/uuid v1.3.0
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.0.0-rc.5
 	github.com/hashicorp/golang-lru/v2 v2.0.2
 	github.com/jarcoal/httpmock v1.3.0
 	github.com/lestrrat-go/jwx/v2 v2.0.11
-	github.com/mailio/go-mailio-core v0.1.9
+	github.com/mailio/go-mailio-core v0.1.10-0.20230703204337-b8192bfd68c5
 	github.com/mailio/go-web3-kit v0.0.0-20230302165532-057a45112b37
 	github.com/prometheus/client_golang v1.15.0
 	github.com/spf13/cobra v1.7.0

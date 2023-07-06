@@ -169,9 +169,17 @@ definitions:
     type: object
   types.InputEmailPassword:
     properties:
+      did:
+        type: string
       email:
         type: string
+      nonce:
+        type: string
       password:
+        type: string
+      publicKeyBase64:
+        type: string
+      signatureBase64:
         type: string
     required:
     - email
@@ -180,6 +188,11 @@ definitions:
   types.JwsToken:
     properties:
       token:
+        type: string
+    type: object
+  types.NonceResponse:
+    properties:
+      nonce:
         type: string
     type: object
   types.VCValidationResponse:
@@ -373,9 +386,9 @@ paths:
       - application/json
       description: Returns a JWS token
       parameters:
-      - description: Handshake ID
-        in: path
-        name: id
+      - description: Nonce string
+        in: query
+        name: nonce
         required: true
         type: string
       produces:
@@ -386,6 +399,21 @@ paths:
           schema:
             $ref: '#/definitions/types.JwsToken'
       summary: Login with username and password
+      tags:
+      - User Account
+  /api/v1/nonce:
+    get:
+      consumes:
+      - application/json
+      description: Returns a nonce which client needs to sign with their private key
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.NonceResponse'
+      summary: Login and Registration challenge nonce
       tags:
       - User Account
   /api/v1/register:

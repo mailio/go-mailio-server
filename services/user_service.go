@@ -14,12 +14,15 @@ import (
 )
 
 type UserService struct {
-	repo repository.Repository
+	repoSelector *repository.CouchDBSelector
 }
 
-func NewUserService(repo repository.Repository) *UserService {
+func NewUserService(repoSelector *repository.CouchDBSelector) *UserService {
+	if repoSelector == nil {
+		panic("repoSelector cannot be nil")
+	}
 	return &UserService{
-		repo: repo,
+		repoSelector: repoSelector,
 	}
 }
 
@@ -29,7 +32,11 @@ func (us *UserService) CreateUser(user *types.User, password string) (*types.Use
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	err := us.repo.Save(ctx, fmt.Sprintf("/_users/org.couchdb.user:%s", user.Email), map[string]interface{}{"email": user.Email, "password": password, "roles": []string{}, "type": "user"})
+	userRepo, rErr := us.repoSelector.ChooseDB(repository.User)
+	if rErr != nil {
+		return nil, rErr
+	}
+	err := userRepo.Save(ctx, fmt.Sprintf(":%s", user.MailioAddress), map[string]interface{}{"email": user.Email, "password": password, "roles": []string{}, "type": "user"})
 	if err != nil {
 		global.Logger.Log(err, "Failed to register user")
 		return nil, err
@@ -39,7 +46,7 @@ func (us *UserService) CreateUser(user *types.User, password string) (*types.Use
 
 	// wait for database to be created
 	for i := 1; i < 5; i++ {
-		resp, _ := us.repo.GetByID(ctx, hexEmail)
+		resp, _ := userRepo.GetByID(ctx, hexEmail)
 		doc := resp.(resty.Response)
 		hErr := handleError(doc.Body())
 		if hErr != nil {
@@ -62,7 +69,7 @@ func (us *UserService) CreateUser(user *types.User, password string) (*types.Use
 		"type": "json",
 		"ddoc": "folder-index",
 	}
-	err = us.repo.Save(ctx, fmt.Sprintf("/%s/_index", hexEmail), folderIndex)
+	err = userRepo.Save(ctx, fmt.Sprintf("/%s/_index", hexEmail), folderIndex)
 	if err != nil {
 		return nil, err
 	}

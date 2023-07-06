@@ -10,4 +10,10 @@ type Repository interface {
 	Save(ctx context.Context, docID string, data interface{}) error
 	Update(ctx context.Context, id string, data interface{}) error
 	Delete(ctx context.Context, id string) error
+	GetDBName() string
+	GetClient() interface{}
+}
+
+type DBSelector interface {
+	ChooseDB(dbName string) (Repository, error)
 }

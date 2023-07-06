@@ -130,3 +130,13 @@ func (c *CouchDBRepository) Delete(ctx context.Context, id string) error {
 	}
 	return err
 }
+
+// return name of the database
+func (c *CouchDBRepository) GetDBName() string {
+	return c.dbName
+}
+
+// returns a resty client
+func (c *CouchDBRepository) GetClient() interface{} {
+	return c.client
+}
