@@ -1,4 +1,4 @@
-package repository
+package types
 
 type OK struct {
 	IsOK bool `json:"ok"`

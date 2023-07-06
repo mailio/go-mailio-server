@@ -8,6 +8,7 @@ import (
 	"github.com/go-resty/resty/v2"
 	"github.com/jarcoal/httpmock"
 	"github.com/mailio/go-mailio-server/global"
+	"github.com/mailio/go-mailio-server/types"
 )
 
 // implements Repository interface using CouchDB
@@ -35,8 +36,8 @@ func NewCouchDBRepository(url, DBName string, username string, password string, 
 		return &CouchDBRepository{cl, DBName}, nil
 	}
 
-	var ok OK
-	var dbErr2 CouchDBError
+	var ok types.OK
+	var dbErr2 types.CouchDBError
 	// create DB since it doesn't exist
 	cl.R().SetResult(&ok).SetError(&dbErr2).Put(DBName)
 	if dbErr2.Error != "" {
@@ -65,8 +66,8 @@ func (c *CouchDBRepository) GetByID(ctx context.Context, id string) (interface{}
 
 // return all documents from database
 func (c *CouchDBRepository) GetAll(ctx context.Context, limit int, skip int) ([]interface{}, error) {
-	var data []*BaseDocument
-	var dbErr CouchDBError
+	var data []*types.BaseDocument
+	var dbErr types.CouchDBError
 
 	c.client.R().SetBody(map[string]interface{}{
 		"selector": map[string]interface{}{
@@ -91,8 +92,8 @@ func (c *CouchDBRepository) GetAll(ctx context.Context, limit int, skip int) ([]
 
 // Save creates a new doc or updates an existing one
 func (c *CouchDBRepository) Save(ctx context.Context, docID string, data interface{}) error {
-	var ok OK
-	var dbErr CouchDBError
+	var ok types.OK
+	var dbErr types.CouchDBError
 
 	c.client.R().SetBody(data).SetResult(&ok).SetError(&dbErr).Put(fmt.Sprintf("%s/%s", c.dbName, docID))
 	if dbErr.Error != "" {
@@ -103,8 +104,8 @@ func (c *CouchDBRepository) Save(ctx context.Context, docID string, data interfa
 
 // Update updates an existing document
 func (c *CouchDBRepository) Update(ctx context.Context, id string, data interface{}) error {
-	var ok OK
-	var dbErr CouchDBError
+	var ok types.OK
+	var dbErr types.CouchDBError
 	c.client.R().SetBody(data).SetResult(&ok).SetError(&dbErr).Put(fmt.Sprintf("%s/%s", c.dbName, id))
 	if dbErr.Error != "" {
 		return fmt.Errorf("failed to update document: %s", dbErr.Error)
@@ -121,9 +122,9 @@ func (c *CouchDBRepository) Delete(ctx context.Context, id string) error {
 	if err != nil {
 		return err
 	}
-	d := doc.(*BaseDocument)
+	d := doc.(*types.BaseDocument)
 
-	var delErr CouchDBError
+	var delErr types.CouchDBError
 	c.client.R().SetBody(map[string]interface{}{}).SetError(&delErr).SetQueryParam("rev", d.Rev).Delete(fmt.Sprintf("%s/%s", c.dbName, id))
 	if delErr.Error != "" {
 		return fmt.Errorf("failed to delete document: %s", delErr.Error)

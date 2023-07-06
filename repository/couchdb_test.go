@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/jarcoal/httpmock"
+	"github.com/mailio/go-mailio-server/types"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -17,11 +18,13 @@ func InitMockDatabase(dbName string) (Repository, error) {
 	httpmock.RegisterResponder("GET", fmt.Sprintf("%s/%s", url, "_all_dbs"),
 		httpmock.NewStringResponder(200, `[]`))
 
-	mr, mErr := httpmock.NewJsonResponder(201, OK{IsOK: true})
+	mr, mErr := httpmock.NewJsonResponder(201, types.OK{IsOK: true})
 	if mErr != nil {
 		return nil, mErr
 	}
 	httpmock.RegisterResponder("PUT", fmt.Sprintf("%s/%s", url, dbName), mr)
+	httpmock.RegisterResponder("HEAD", fmt.Sprintf("%s/%s", url, dbName), mr)
+	httpmock.RegisterResponder("GET", fmt.Sprintf("%s/%s", url, dbName), mr)
 
 	db, err := NewCouchDBRepository(url, "test", "test", "test", true)
 	if err != nil {
@@ -49,13 +52,13 @@ func TestGetByID(t *testing.T) {
 	db, _ := InitMockDatabase("test")
 	defer deactivateMock()
 
-	mk, _ := httpmock.NewJsonResponder(201, OK{IsOK: true})
+	mk, _ := httpmock.NewJsonResponder(201, types.OK{IsOK: true})
 	httpmock.RegisterResponder("POST", fmt.Sprintf("%s/%s", url, "test"), mk)
 
-	mk, _ = httpmock.NewJsonResponder(200, BaseDocument{ID: "test"})
+	mk, _ = httpmock.NewJsonResponder(200, types.BaseDocument{ID: "test"})
 	httpmock.RegisterResponder("GET", fmt.Sprintf("%s/%s/%s", url, "test", "test"), mk)
 
-	db.Save(context.Background(), "test", &BaseDocument{
+	db.Save(context.Background(), "test", &types.BaseDocument{
 		ID: "test",
 	})
 	res, err := db.GetByID(context.Background(), "test")
@@ -65,5 +68,5 @@ func TestGetByID(t *testing.T) {
 	if res == nil {
 		t.Fatal("res is nil")
 	}
-	assert.Equal(t, "test", res.(*BaseDocument).ID)
+	assert.Equal(t, "test", res.(*types.BaseDocument).ID)
 }
