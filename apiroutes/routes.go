@@ -69,6 +69,10 @@ func ConfigRoutes(router *gin.Engine) *gin.Engine {
 	userService := services.NewUserService(dbSelector)
 	nonceService := services.NewNonceService(dbSelector)
 
+	// Create DESIGN DOCUMENTS
+	// create a design document to return all documents older than N minutes
+	repository.CreateDesign_DeleteExpiredRecordsByCreatedDate(nonceRepo, 5)
+
 	// API definitions
 	handshakeApi := api.NewHandshakeApi()
 	accountApi := api.NewUserAccountApi(userService, nonceService)
