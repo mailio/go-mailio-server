@@ -33,7 +33,7 @@ func (ha *HandshakeApi) GetHandshake(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, types.Handshake{BaseDocument: repository.BaseDocument{ID: id}})
+	c.JSON(http.StatusOK, types.Handshake{BaseDocument: types.BaseDocument{ID: id}})
 }
 
 // Create Handshake method

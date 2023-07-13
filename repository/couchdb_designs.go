@@ -2,6 +2,7 @@ package repository
 
 import (
 	"fmt"
+
 	"github.com/go-resty/resty/v2"
 	"github.com/mailio/go-mailio-server/types"
 )

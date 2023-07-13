@@ -4,9 +4,10 @@ import "github.com/mailio/go-mailio-core/errors"
 
 const (
 	// CouchDB is the name of the CouchDB database
-	Handshake = "handshake"
-	Nonce     = "nonce"
-	User      = "/_users/org.couchdb.user"
+	Handshake     = "handshake"
+	Nonce         = "nonce"
+	User          = "/_users/org.couchdb.user"
+	MailioMapping = "mailio_mapping"
 )
 
 type CouchDBSelector struct {

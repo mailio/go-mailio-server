@@ -95,16 +95,16 @@ func (ua *UserAccountApi) ChallengeNonce(c *gin.Context) {
 func (ua *UserAccountApi) Login(c *gin.Context) {
 	// Create a payload with the user's ID and the token's expiration time.
 	// Replace "userID" and "expirationTime" with your actual user ID and token expiration time.
-	var inputUserPass types.InputEmailPassword
-	if err := c.ShouldBindJSON(&inputUserPass); err != nil {
+	var inputLogin types.InputLogin
+	if err := c.ShouldBindJSON(&inputLogin); err != nil {
 		ApiErrorf(c, http.StatusBadRequest, "invalid email or password")
 		return
 	}
-	if !util.IsEd25519PublicKey(inputUserPass.Ed25519SigningPublicKeyBase64) {
+	if !util.IsEd25519PublicKey(inputLogin.Ed25519SigningPublicKeyBase64) {
 		ApiErrorf(c, http.StatusBadRequest, "invalid public key")
 		return
 	}
-	decodedPubKey, _ := base64.StdEncoding.DecodeString(inputUserPass.Ed25519SigningPublicKeyBase64)
+	decodedPubKey, _ := base64.StdEncoding.DecodeString(inputLogin.Ed25519SigningPublicKeyBase64)
 	pubKey := ed25519.PublicKey(decodedPubKey)
 	mk := did.MailioKey{
 		MasterSignKey: &did.Key{
@@ -135,7 +135,7 @@ func (ua *UserAccountApi) Login(c *gin.Context) {
 	// 	return
 	// }
 	// Sign the payload with servers private key.
-	token, err := generateJWSToken(global.PrivateKey, mk.DID(), inputUserPass.Nonce)
+	token, err := generateJWSToken(global.PrivateKey, mk.DID(), inputLogin.Nonce)
 	if err != nil {
 		ApiErrorf(c, http.StatusInternalServerError, "Failed to sign token")
 		return
@@ -148,7 +148,7 @@ func (ua *UserAccountApi) Login(c *gin.Context) {
 // @Summary Register user
 // @Description Returns a JWS token
 // @Tags User Account
-// @Param emailPassword body types.InputEmailPassword true "email and password input"
+// @Param registration body types.InputRegister true "registration input"
 // @Success 200 {object} types.JwsToken
 // @Accept json
 // @Produce json
@@ -224,9 +224,15 @@ func (ua *UserAccountApi) Register(c *gin.Context) {
 		MailioAddress:  inputRegister.MailioAddress,
 		Created:        util.GetTimestamp(),
 	}
-	// TODO! add mapping from mailio address to email address and from sacrypt email address
-	outputUser, err := ua.userService.CreateUser(user, inputRegister.Password)
-	if err != nil {
+	// map sacrypt (encrryped email) address to mailio address
+	_, errMu := ua.userService.MapEmailToMailioAddress(user)
+	if errMu != nil {
+		ApiErrorf(c, http.StatusInternalServerError, "failed to create user to address mapping")
+		return
+	}
+	// create user database
+	_, errCU := ua.userService.CreateUser(user, inputRegister.DatabasePassword)
+	if errCU != nil {
 		ApiErrorf(c, http.StatusBadRequest, err.Error())
 		return
 	}

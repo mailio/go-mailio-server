@@ -167,23 +167,35 @@ definitions:
       rev:
         type: string
     type: object
-  types.InputEmailPassword:
+  types.InputRegister:
     properties:
-      did:
+      databasePassword:
+        description: this is a password for couchdbs private user database
+        type: string
+      ed25519SigningPublicKeyBase64:
+        description: public key of the private key used to sign the nonce
         type: string
       email:
         type: string
+      mailioAddress:
+        description: Password                      string `json:"password,omitempty"`
+        type: string
       nonce:
         type: string
-      password:
-        type: string
-      publicKeyBase64:
-        type: string
       signatureBase64:
+        description: signature of Nonce string
+        type: string
+      x25519PublicKeyBase64:
+        description: public encryption key
         type: string
     required:
+    - databasePassword
+    - ed25519SigningPublicKeyBase64
     - email
-    - password
+    - mailioAddress
+    - nonce
+    - signatureBase64
+    - x25519PublicKeyBase64
     type: object
   types.JwsToken:
     properties:
@@ -422,12 +434,12 @@ paths:
       - application/json
       description: Returns a JWS token
       parameters:
-      - description: email and password input
+      - description: register input
         in: body
         name: emailPassword
         required: true
         schema:
-          $ref: '#/definitions/types.InputEmailPassword'
+          $ref: '#/definitions/types.InputRegister'
       produces:
       - application/json
       responses:

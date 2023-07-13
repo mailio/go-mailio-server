@@ -55,6 +55,7 @@ func ConfigRoutes(router *gin.Engine) *gin.Engine {
 	handshakeRepo, repoErr := repository.NewCouchDBRepository(repoUrl, repository.Handshake, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
 	nonceRepo, repoErr := repository.NewCouchDBRepository(repoUrl, repository.Nonce, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
 	userRepo, repoErr := repository.NewCouchDBRepository(repoUrl, repository.User, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
+	mailioMappingRepo, repoErr := repository.NewCouchDBRepository(repoUrl, repository.MailioMapping, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
 	if repoErr != nil {
 		panic(repoErr)
 	}
@@ -64,6 +65,7 @@ func ConfigRoutes(router *gin.Engine) *gin.Engine {
 	dbSelector.AddDB(handshakeRepo)
 	dbSelector.AddDB(nonceRepo)
 	dbSelector.AddDB(userRepo)
+	dbSelector.AddDB(mailioMappingRepo)
 
 	// SERVICE definitions
 	userService := services.NewUserService(dbSelector)

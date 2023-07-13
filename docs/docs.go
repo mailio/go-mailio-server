@@ -358,12 +358,12 @@ const docTemplate = `{
                 "summary": "Register user",
                 "parameters": [
                     {
-                        "description": "email and password input",
+                        "description": "register input",
                         "name": "emailPassword",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/types.InputEmailPassword"
+                            "$ref": "#/definitions/types.InputRegister"
                         }
                     }
                 ],
@@ -631,29 +631,42 @@ const docTemplate = `{
                 }
             }
         },
-        "types.InputEmailPassword": {
+        "types.InputRegister": {
             "type": "object",
             "required": [
+                "databasePassword",
+                "ed25519SigningPublicKeyBase64",
                 "email",
-                "password"
+                "mailioAddress",
+                "nonce",
+                "signatureBase64",
+                "x25519PublicKeyBase64"
             ],
             "properties": {
-                "did": {
+                "databasePassword": {
+                    "description": "this is a password for couchdbs private user database",
+                    "type": "string"
+                },
+                "ed25519SigningPublicKeyBase64": {
+                    "description": "public key of the private key used to sign the nonce",
                     "type": "string"
                 },
                 "email": {
                     "type": "string"
                 },
+                "mailioAddress": {
+                    "description": "Password                      string ` + "`" + `json:\"password,omitempty\"` + "`" + `",
+                    "type": "string"
+                },
                 "nonce": {
                     "type": "string"
                 },
-                "password": {
-                    "type": "string"
-                },
-                "publicKeyBase64": {
-                    "type": "string"
-                },
                 "signatureBase64": {
+                    "description": "signature of Nonce string",
+                    "type": "string"
+                },
+                "x25519PublicKeyBase64": {
+                    "description": "public encryption key",
                     "type": "string"
                 }
             }

@@ -7,3 +7,8 @@ type User struct {
 	Created        int64  `json:"created" validate:"required"`
 	Modified       int64  `json:"modified,omitempty"`
 }
+
+type EmailToMailioMapping struct {
+	EncryptedEmail string `json:"encryptedEmail"`
+	MailioAddress  string `json:"address"`
+}
