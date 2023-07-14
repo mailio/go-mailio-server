@@ -199,7 +199,7 @@ func (ua *UserAccountApi) Register(c *gin.Context) {
 		return
 	}
 
-	mailioAddress, err := mailiocrypto.NewMailioCrypto().PublicKeyToMailioAddress(inputRegister.SignatureBase64)
+	mailioAddress, err := mailiocrypto.NewMailioCrypto().PublicKeyToMailioAddress(inputRegister.Ed25519SigningPublicKeyBase64)
 	if err != nil {
 		ApiErrorf(c, http.StatusInternalServerError, "failed to generate mailio address")
 		return

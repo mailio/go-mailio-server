@@ -36,6 +36,10 @@ func NewCouchDBRepository(url, DBName string, username string, password string, 
 		return &CouchDBRepository{cl, DBName}, nil
 	}
 
+	// special case for user database (doesn't exist by default. Must be per specific user)
+	if DBName == User {
+		return &CouchDBRepository{cl, DBName}, nil
+	}
 	var ok types.OK
 	var dbErr2 types.CouchDBError
 	// create DB since it doesn't exist
@@ -58,7 +62,8 @@ func (c *CouchDBRepository) GetByID(ctx context.Context, id string) (interface{}
 		return nil, err
 	}
 	if response.IsError() {
-		return nil, response.Error().(error)
+		outErr := handleError(response)
+		return nil, outErr
 	}
 
 	return response, nil
@@ -95,9 +100,13 @@ func (c *CouchDBRepository) Save(ctx context.Context, docID string, data interfa
 	var ok types.OK
 	var dbErr types.CouchDBError
 
-	c.client.R().SetBody(data).SetResult(&ok).SetError(&dbErr).Put(fmt.Sprintf("%s/%s", c.dbName, docID))
-	if dbErr.Error != "" {
-		return fmt.Errorf("failed to save document: %s", dbErr.Error)
+	resp, rErr := c.client.R().SetBody(data).SetResult(&ok).SetError(&dbErr).Put(fmt.Sprintf("%s/%s", c.dbName, docID))
+	if rErr != nil {
+		return rErr
+	}
+	if resp.IsError() {
+		outErr := handleError(resp)
+		return outErr
 	}
 	return nil
 }
@@ -106,12 +115,13 @@ func (c *CouchDBRepository) Save(ctx context.Context, docID string, data interfa
 func (c *CouchDBRepository) Update(ctx context.Context, id string, data interface{}) error {
 	var ok types.OK
 	var dbErr types.CouchDBError
-	c.client.R().SetBody(data).SetResult(&ok).SetError(&dbErr).Put(fmt.Sprintf("%s/%s", c.dbName, id))
-	if dbErr.Error != "" {
-		return fmt.Errorf("failed to update document: %s", dbErr.Error)
+	resp, rErr := c.client.R().SetBody(data).SetResult(&ok).SetError(&dbErr).Put(fmt.Sprintf("%s/%s", c.dbName, id))
+	if rErr != nil {
+		return rErr
 	}
-	if ok.IsOK == false {
-		return fmt.Errorf("failed to update document")
+	if resp.IsError() {
+		outErr := handleError(resp)
+		return outErr
 	}
 	return nil
 }
@@ -125,11 +135,15 @@ func (c *CouchDBRepository) Delete(ctx context.Context, id string) error {
 	d := doc.(*types.BaseDocument)
 
 	var delErr types.CouchDBError
-	c.client.R().SetBody(map[string]interface{}{}).SetError(&delErr).SetQueryParam("rev", d.Rev).Delete(fmt.Sprintf("%s/%s", c.dbName, id))
-	if delErr.Error != "" {
-		return fmt.Errorf("failed to delete document: %s", delErr.Error)
+	resp, rErr := c.client.R().SetBody(map[string]interface{}{}).SetError(&delErr).SetQueryParam("rev", d.Rev).Delete(fmt.Sprintf("%s/%s", c.dbName, id))
+	if rErr != nil {
+		return rErr
 	}
-	return err
+	if resp.IsError() {
+		outErr := handleError(resp)
+		return outErr
+	}
+	return nil
 }
 
 // return name of the database

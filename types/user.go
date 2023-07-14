@@ -9,6 +9,7 @@ type User struct {
 }
 
 type EmailToMailioMapping struct {
+	BaseDocument
 	EncryptedEmail string `json:"encryptedEmail"`
 	MailioAddress  string `json:"address"`
 }

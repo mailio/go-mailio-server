@@ -2,15 +2,15 @@ package services
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"time"
 
-	"github.com/go-resty/resty/v2"
+	coreErrors "github.com/mailio/go-mailio-core/errors"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/repository"
 	"github.com/mailio/go-mailio-server/types"
-	"github.com/mailio/go-mailio-server/util"
 )
 
 type UserService struct {
@@ -42,15 +42,13 @@ func (us *UserService) CreateUser(user *types.User, databasePassword string) (*t
 		return nil, err
 	}
 
-	hexEmail := "userdb-" + util.HexEncodeToString(user.Email)
+	hexEmail := "userdb-" + user.MailioAddress // MailioAddress already hex
 
 	// wait for database to be created
 	for i := 1; i < 5; i++ {
-		resp, _ := userRepo.GetByID(ctx, hexEmail)
-		doc := resp.(resty.Response)
-		hErr := handleError(doc.Body())
+		_, hErr := userRepo.GetByID(ctx, hexEmail)
 		if hErr != nil {
-			if hErr.Error() == "not_found" {
+			if errors.Is(hErr, coreErrors.ErrNotFound) {
 				backoff := int(100 * math.Pow(2, float64(i)))
 				time.Sleep(time.Duration(backoff) * time.Millisecond)
 				continue
@@ -89,7 +87,17 @@ func (us *UserService) MapEmailToMailioAddress(user *types.User) (*types.EmailTo
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
-	// encryptedEmail as document ID
+
+	// Check if email already exists
+	existing, eErr := repo.GetByID(ctx, mapping.EncryptedEmail)
+	if eErr != nil {
+		if eErr != coreErrors.ErrNotFound {
+			return nil, eErr
+		}
+	}
+	if existing != nil {
+		return nil, coreErrors.ErrUserExists
+	}
 	sErr := repo.Save(ctx, mapping.EncryptedEmail, mapping)
 	if sErr != nil {
 		return nil, sErr
