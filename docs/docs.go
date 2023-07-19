@@ -33,7 +33,14 @@ const docTemplate = `{
                     "Decentralized Identifiers"
                 ],
                 "summary": "Mailio Server DID Configuration",
-                "responses": {}
+                "responses": {
+                    "500": {
+                        "description": "error creating server did configuration",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    }
+                }
             }
         },
         "/.well-known/did.json": {
@@ -54,6 +61,12 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/did.Document"
+                        }
+                    },
+                    "500": {
+                        "description": "error creating server did",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
                         }
                     }
                 }
@@ -137,6 +150,38 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/types.VCValidationResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/findaddress": {
+            "get": {
+                "description": "Returns a mailio address",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "User Account"
+                ],
+                "summary": "Find user by base64 scrypt email address",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Base64 formatted Scrypt of email address",
+                        "name": "email",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.OutputFindAddress"
                         }
                     }
                 }
@@ -388,6 +433,50 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    }
+                }
+            }
+        },
+        "/{address}/did.json": {
+            "get": {
+                "description": "Returns users DID document based on mailio address",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Decentralized Identifiers"
+                ],
+                "summary": "Resolve users DID document",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Mailio address",
+                        "name": "address",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/did.Document"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid DID",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "404": {
+                        "description": "DID not found",
                         "schema": {
                             "$ref": "#/definitions/api.ApiError"
                         }
@@ -714,6 +803,14 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "nonce": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.OutputFindAddress": {
+            "type": "object",
+            "properties": {
+                "address": {
                     "type": "string"
                 }
             }

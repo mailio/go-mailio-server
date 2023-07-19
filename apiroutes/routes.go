@@ -86,13 +86,14 @@ func ConfigRoutes(router *gin.Engine) *gin.Engine {
 	// API definitions
 	handshakeApi := api.NewHandshakeApi()
 	accountApi := api.NewUserAccountApi(userService, nonceService, ssiService)
-	didApi := api.NewDIDApi()
+	didApi := api.NewDIDApi(ssiService)
 
 	// PUBLIC ROOT API
 	rootPublicApi := router.Group("/")
 	{
 		rootPublicApi.GET(".well-known/did.json", didApi.CreateServerDID)
 		rootPublicApi.GET(".well-known/did-configuration.json", didApi.CreateServerDIDConfiguration)
+		rootPublicApi.GET(":address/did.json", didApi.GetDIDDocument)
 	}
 
 	// PUBLIC API
@@ -101,6 +102,7 @@ func ConfigRoutes(router *gin.Engine) *gin.Engine {
 		publicApi.POST("/v1/register", accountApi.Register)
 		publicApi.POST("/v1/login", accountApi.Login)
 		publicApi.GET("/v1/nonce", accountApi.ChallengeNonce)
+		publicApi.GET("/v1/findaddress", accountApi.FindUsersAddressByEmail)
 	}
 
 	rootApi := router.Group("/api", metrics.MetricsMiddleware(), restinterceptors.JWSMiddleware())

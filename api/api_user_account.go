@@ -305,3 +305,30 @@ func (ua *UserAccountApi) Register(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"token": token})
 }
+
+// Find user by email address
+// @Summary Find user by base64 scrypt email address
+// @Description Returns a mailio address
+// @Tags User Account
+// @Param email query string true "Base64 formatted Scrypt of email address"
+// @Success 200 {object} types.OutputFindAddress
+// @Accept json
+// @Produce json
+// @Router /api/v1/findaddress [get]
+func (ua *UserAccountApi) FindUsersAddressByEmail(c *gin.Context) {
+	email := c.Query("email")
+	if email == "" {
+		ApiErrorf(c, http.StatusBadRequest, "scrypt of email is require with params: N=32768, R=8,P=1,Len=32")
+		return
+	}
+
+	mapping, err := ua.userService.FindUserByScryptEmail(email)
+	if err != nil {
+		ApiErrorf(c, http.StatusNotFound, "email not found")
+		return
+	}
+	output := &types.OutputFindAddress{
+		Address: mapping.MailioAddress,
+	}
+	c.JSON(http.StatusOK, output)
+}

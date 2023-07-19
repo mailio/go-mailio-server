@@ -138,3 +138,19 @@ func (ssi *SelfSovereignService) StoreRegistrationSSI(mk *did.MailioKey) error {
 	//TODO! impelement index on credentialSubject/id and then design document to be able to query all VCs for a user
 	return nil
 }
+
+// Returns the DID document for the given mailio address
+func (ssi *SelfSovereignService) GetDIDDocument(mailioAddress string) (*did.Document, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+	response, eErr := ssi.didRepo.GetByID(ctx, did.DIDKeyPrefix+mailioAddress)
+	if eErr != nil { // only error allowed is not found error
+		return nil, eErr
+	}
+	var didDoc types.DidDocument
+	mErr := repository.MapToObject(response, &didDoc)
+	if mErr != nil {
+		return nil, mErr
+	}
+	return didDoc.DID, nil
+}

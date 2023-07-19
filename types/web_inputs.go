@@ -16,3 +16,8 @@ type InputRegister struct {
 	DatabasePassword      string `json:"databasePassword" validate:"required"`      // this is a password for couchdbs private user database
 	X25519PublicKeyBase64 string `json:"x25519PublicKeyBase64" validate:"required"` // public encryption key
 }
+
+// for DID resolution
+type InputDID struct {
+	DID string `json:"did" validate:"required"`
+}

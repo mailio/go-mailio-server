@@ -111,3 +111,23 @@ func (us *UserService) MapEmailToMailioAddress(user *types.User) (*types.EmailTo
 
 	return mapping, nil
 }
+
+// finding user by email address (email address must be encrypted with scrypt)
+func (us *UserService) FindUserByScryptEmail(scryptEmail string) (*types.EmailToMailioMapping, error) {
+	repo, err := us.repoSelector.ChooseDB(repository.MailioMapping)
+	if err != nil {
+		return nil, err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+	response, eErr := repo.GetByID(ctx, scryptEmail)
+	if eErr != nil {
+		return nil, eErr
+	}
+	var userMapping types.EmailToMailioMapping
+	mErr := repository.MapToObject(response, &userMapping)
+	if mErr != nil {
+		return nil, mErr
+	}
+	return &userMapping, nil
+}

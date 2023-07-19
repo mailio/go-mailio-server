@@ -5,18 +5,26 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwt"
 	"github.com/mailio/go-mailio-core/did"
+	coreErrors "github.com/mailio/go-mailio-core/errors"
 	"github.com/mailio/go-mailio-server/global"
+	"github.com/mailio/go-mailio-server/services"
 	"github.com/mailio/go-mailio-server/util"
 )
 
 type DIDApi struct {
+	ssiService *services.SelfSovereignService
+	validate   *validator.Validate
 }
 
-func NewDIDApi() *DIDApi {
-	return &DIDApi{}
+func NewDIDApi(ssiService *services.SelfSovereignService) *DIDApi {
+	return &DIDApi{
+		ssiService: ssiService,
+		validate:   validator.New(),
+	}
 }
 
 // Server DID
@@ -24,6 +32,7 @@ func NewDIDApi() *DIDApi {
 // @Description Returns a DID Document
 // @Tags Decentralized Identifiers
 // @Success 200 {object} did.Document
+// @Failure 500 {object} api.ApiError "error creating server did"
 // @Accept json
 // @Produce json
 // @Router /.well-known/did.json [get]
@@ -42,6 +51,7 @@ func (did *DIDApi) CreateServerDID(c *gin.Context) {
 // @Summary Mailio Server DID Configuration
 // @Description Returns a DID Configuration
 // @Tags Decentralized Identifiers
+// @Failure 500 {object} api.ApiError "error creating server did configuration"
 // @Accept json
 // @Produce json
 // @Router /.well-known/did-configuration.json [get]
@@ -93,13 +103,31 @@ func (da *DIDApi) CreateServerDIDConfiguration(c *gin.Context) {
 }
 
 // Returns users DID document based on the mailio address
-// @Summary Return users DID document
+// @Summary Resolve users DID document
 // @Description Returns users DID document based on mailio address
 // @Tags Decentralized Identifiers
 // @Accept json
 // @Produce json
-// @Router /v1/{address}/did.json [get]
-func (did *DIDApi) GetUserDID(c *gin.Context) {
-	//TODO! finish implementation
-	c.JSON(http.StatusOK, gin.H{"message": "not implemented"})
+// @Param address path string true "Mailio address"
+// @Success 200 {object} did.Document
+// @Failure 404 {object} api.ApiError "DID not found"
+// @Failure 400 {object} api.ApiError "Invalid DID"
+// @Router /{address}/did.json [get]
+func (did *DIDApi) GetDIDDocument(c *gin.Context) {
+	address := c.Param("address")
+	if address == "" {
+		ApiErrorf(c, http.StatusNotFound, "address not found")
+		return
+	}
+
+	resolved, err := did.ssiService.GetDIDDocument(address)
+	if err != nil {
+		if err == coreErrors.ErrNotFound {
+			ApiErrorf(c, http.StatusNotFound, "did not found")
+			return
+		}
+		ApiErrorf(c, http.StatusBadRequest, "error resolving did")
+		return
+	}
+	c.JSON(http.StatusOK, resolved)
 }

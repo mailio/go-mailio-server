@@ -216,6 +216,11 @@ definitions:
       nonce:
         type: string
     type: object
+  types.OutputFindAddress:
+    properties:
+      address:
+        type: string
+    type: object
   types.VCValidationResponse:
     properties:
       requestId:
@@ -239,7 +244,11 @@ paths:
       description: Returns a DID Configuration
       produces:
       - application/json
-      responses: {}
+      responses:
+        "500":
+          description: error creating server did configuration
+          schema:
+            $ref: '#/definitions/api.ApiError'
       summary: Mailio Server DID Configuration
       tags:
       - Decentralized Identifiers
@@ -255,7 +264,40 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/did.Document'
+        "500":
+          description: error creating server did
+          schema:
+            $ref: '#/definitions/api.ApiError'
       summary: Mailio Server DID Document (public keys)
+      tags:
+      - Decentralized Identifiers
+  /{address}/did.json:
+    get:
+      consumes:
+      - application/json
+      description: Returns users DID document based on mailio address
+      parameters:
+      - description: Mailio address
+        in: path
+        name: address
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/did.Document'
+        "400":
+          description: Invalid DID
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "404":
+          description: DID not found
+          schema:
+            $ref: '#/definitions/api.ApiError'
+      summary: Resolve users DID document
       tags:
       - Decentralized Identifiers
   /api/v1/credentials/{id}:
@@ -310,6 +352,27 @@ paths:
       summary: Verify a verifiable credential
       tags:
       - Verifiable Credentials
+  /api/v1/findaddress:
+    get:
+      consumes:
+      - application/json
+      description: Returns a mailio address
+      parameters:
+      - description: Base64 formatted Scrypt of email address
+        in: query
+        name: email
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.OutputFindAddress'
+      summary: Find user by base64 scrypt email address
+      tags:
+      - User Account
   /api/v1/handshake:
     post:
       consumes:
