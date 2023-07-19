@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-resty/resty/v2"
 	"github.com/mailio/go-mailio-core/did"
+	coreErrors "github.com/mailio/go-mailio-core/errors"
 	mailioErrors "github.com/mailio/go-mailio-core/errors"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/repository"
@@ -67,7 +68,7 @@ func (mdrs *MailioDIDResolverService) ResolveDID(mailioDIDAddress string) (*did.
 		didDoc, err := mdrs.repo.GetByID(ctx, d)
 		if err != nil {
 			// TODO: check if not found
-			return nil, err
+			return nil, coreErrors.ErrNotFound
 		}
 		out := didDoc.(*did.Document)
 		return out, nil

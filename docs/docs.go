@@ -358,8 +358,8 @@ const docTemplate = `{
                 "summary": "Register user",
                 "parameters": [
                     {
-                        "description": "register input",
-                        "name": "emailPassword",
+                        "description": "registration input",
+                        "name": "registration",
                         "in": "body",
                         "required": true,
                         "schema": {
@@ -373,12 +373,43 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/types.JwsToken"
                         }
+                    },
+                    "404": {
+                        "description": "Invalid input parameters",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "409": {
+                        "description": "User already exists",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
                     }
                 }
             }
         }
     },
     "definitions": {
+        "api.ApiError": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "description": "Code is the HTTP status code",
+                    "type": "integer"
+                },
+                "message": {
+                    "description": "Message is the error message",
+                    "type": "string"
+                }
+            }
+        },
         "did.AuthorizedApplication": {
             "type": "object",
             "properties": {

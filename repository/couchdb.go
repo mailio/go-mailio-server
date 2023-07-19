@@ -100,6 +100,7 @@ func (c *CouchDBRepository) Save(ctx context.Context, docID string, data interfa
 	var ok types.OK
 	var dbErr types.CouchDBError
 
+	c.client.Debug = true
 	resp, rErr := c.client.R().SetBody(data).SetResult(&ok).SetError(&dbErr).Put(fmt.Sprintf("%s/%s", c.dbName, docID))
 	if rErr != nil {
 		return rErr

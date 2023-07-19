@@ -9,19 +9,6 @@ import (
 	"github.com/go-resty/resty/v2"
 )
 
-// func MapToDesignDocument(resp interface{}) (*types.DesignDocument, error) {
-// 	if response, ok := resp.(*resty.Response); ok {
-// 		data := response.Body()
-// 		var ddoc types.DesignDocument
-// 		err := json.Unmarshal(data, &ddoc)
-// 		if err != nil {
-// 			return nil, errors.New(fmt.Sprintf("%s cannot be mapped to DesignDocument", response.Body()))
-// 		}
-// 		return &ddoc, nil
-// 	}
-// 	return nil, errors.New("resp is not a resty.Response")
-// }
-
 /**
 * Object Mapper (from couchdb resty response to object based on the database name)
 **/

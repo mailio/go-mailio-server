@@ -6,8 +6,10 @@ const (
 	// CouchDB is the name of the CouchDB database
 	Handshake     = "handshake"
 	Nonce         = "nonce"
-	User          = "/_users/org.couchdb.user"
+	User          = "_users"
 	MailioMapping = "mailio_mapping"
+	DID           = "did" // decentralized identifiers
+	VCS           = "vcs" // verifiable credentials
 )
 
 type CouchDBSelector struct {

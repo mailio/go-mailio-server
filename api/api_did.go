@@ -91,3 +91,15 @@ func (da *DIDApi) CreateServerDIDConfiguration(c *gin.Context) {
 
 	c.JSON(http.StatusOK, config)
 }
+
+// Returns users DID document based on the mailio address
+// @Summary Return users DID document
+// @Description Returns users DID document based on mailio address
+// @Tags Decentralized Identifiers
+// @Accept json
+// @Produce json
+// @Router /v1/{address}/did.json [get]
+func (did *DIDApi) GetUserDID(c *gin.Context) {
+	//TODO! finish implementation
+	c.JSON(http.StatusOK, gin.H{"message": "not implemented"})
+}

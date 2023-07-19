@@ -1,11 +1,9 @@
 package api
 
 import (
-	"crypto"
 	"crypto/ed25519"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/mail"
 	"time"
@@ -13,9 +11,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/go-jose/go-jose/v3"
 	"github.com/go-playground/validator/v10"
-	"github.com/google/uuid"
 	mailiocrypto "github.com/mailio/go-mailio-core/crypto"
 	"github.com/mailio/go-mailio-core/did"
+	coreErrors "github.com/mailio/go-mailio-core/errors"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/services"
 	"github.com/mailio/go-mailio-server/types"
@@ -25,13 +23,15 @@ import (
 type UserAccountApi struct {
 	userService  *services.UserService
 	nonceService *services.NonceService
+	ssiService   *services.SelfSovereignService
 	validate     *validator.Validate
 }
 
-func NewUserAccountApi(userService *services.UserService, nonceService *services.NonceService) *UserAccountApi {
+func NewUserAccountApi(userService *services.UserService, nonceService *services.NonceService, ssiService *services.SelfSovereignService) *UserAccountApi {
 	return &UserAccountApi{
 		userService:  userService,
 		nonceService: nonceService,
+		ssiService:   ssiService,
 		validate:     validator.New(),
 	}
 }
@@ -60,6 +60,24 @@ func generateJWSToken(serverPrivateKey ed25519.PrivateKey, userDid, challenge st
 	}
 
 	return object.CompactSerialize()
+}
+
+// Validate signature from the input data
+func validateSignature(loginInput *types.InputLogin) (bool, error) {
+	//TODO! important! validate that nonce came from the server
+	if !util.IsEd25519PublicKey(loginInput.Ed25519SigningPublicKeyBase64) {
+		return false, coreErrors.ErrInvalidPublicKey
+	}
+	signingKeyBytes, _ := base64.StdEncoding.DecodeString(loginInput.Ed25519SigningPublicKeyBase64)
+
+	signatureBytes, sErr := base64.StdEncoding.DecodeString(loginInput.SignatureBase64)
+	if sErr != nil {
+		return false, coreErrors.ErrSignatureInvalid
+	}
+
+	// verify signature
+	isValid := ed25519.Verify(signingKeyBytes, []byte(loginInput.Nonce), signatureBytes)
+	return isValid, nil
 }
 
 // Login and Registration challenge nonce
@@ -150,6 +168,9 @@ func (ua *UserAccountApi) Login(c *gin.Context) {
 // @Tags User Account
 // @Param registration body types.InputRegister true "registration input"
 // @Success 200 {object} types.JwsToken
+// @Failure 404 {object} ApiError "Invalid input parameters"
+// @Failure 500 {object} ApiError "Internal server error"
+// @Failure 409 {object} ApiError "User already exists"
 // @Accept json
 // @Produce json
 // @Router /api/v1/register [post]
@@ -173,27 +194,36 @@ func (ua *UserAccountApi) Register(c *gin.Context) {
 		ApiErrorf(c, http.StatusBadRequest, "invalid email address")
 		return
 	}
-	if !util.IsEd25519PublicKey(inputRegister.Ed25519SigningPublicKeyBase64) {
-		ApiErrorf(c, http.StatusBadRequest, "invalid signing public key")
-		return
-	}
 	if !util.IsEd25519PublicKey(inputRegister.X25519PublicKeyBase64) {
 		ApiErrorf(c, http.StatusBadRequest, "invalid encryption public key")
 		return
 	}
-	signingKeyBytes, _ := base64.StdEncoding.DecodeString(inputRegister.Ed25519SigningPublicKeyBase64)
-	signingKey := crypto.PublicKey(signingKeyBytes)
-	encryptionKeyBytes, _ := base64.StdEncoding.DecodeString(inputRegister.X25519PublicKeyBase64)
-	encryptionPublicKey := crypto.PublicKey(encryptionKeyBytes)
-
-	signatureBytes, sErr := base64.StdEncoding.DecodeString(inputRegister.SignatureBase64)
-	if sErr != nil {
-		ApiErrorf(c, http.StatusBadRequest, "invalid signature")
+	signingKeyBytes, skBytesErr := base64.StdEncoding.DecodeString(inputRegister.Ed25519SigningPublicKeyBase64)
+	if skBytesErr != nil {
+		ApiErrorf(c, http.StatusBadRequest, "invalid signing public key")
 		return
 	}
+	signingKey := ed25519.PublicKey(signingKeyBytes)
+	encryptionKeyBytes, ekBytesErr := base64.StdEncoding.DecodeString(inputRegister.X25519PublicKeyBase64)
+	if ekBytesErr != nil {
+		ApiErrorf(c, http.StatusBadRequest, "invalid encryption public key")
+		return
+	}
+	encryptionPublicKey := ed25519.PublicKey(encryptionKeyBytes)
 
-	// verify signature
-	isValid := ed25519.Verify(signingKeyBytes, []byte(inputRegister.Nonce), signatureBytes)
+	// validate siganture
+	isValid, validErr := validateSignature(&inputRegister.InputLogin)
+	if validErr != nil {
+		if validErr == coreErrors.ErrSignatureInvalid {
+			ApiErrorf(c, http.StatusBadRequest, "invalid signature")
+			return
+		} else if validErr == coreErrors.ErrInvalidPublicKey {
+			ApiErrorf(c, http.StatusBadRequest, "invalid public key")
+			return
+		}
+		ApiErrorf(c, http.StatusInternalServerError, "failed to validate signature")
+		return
+	}
 	if !isValid {
 		ApiErrorf(c, http.StatusBadRequest, "invalid signature")
 		return
@@ -224,16 +254,29 @@ func (ua *UserAccountApi) Register(c *gin.Context) {
 		MailioAddress:  inputRegister.MailioAddress,
 		Created:        util.GetTimestamp(),
 	}
-	// map sacrypt (encrryped email) address to mailio address
-	_, errMu := ua.userService.MapEmailToMailioAddress(user)
-	if errMu != nil {
-		ApiErrorf(c, http.StatusInternalServerError, "failed to create user to address mapping")
-		return
-	}
 	// create user database
 	_, errCU := ua.userService.CreateUser(user, inputRegister.DatabasePassword)
 	if errCU != nil {
-		ApiErrorf(c, http.StatusBadRequest, err.Error())
+		if errCU == coreErrors.ErrUserExists {
+			ApiErrorf(c, http.StatusConflict, "user already exists")
+			return
+		}
+		if errCU == types.ErrConflict {
+			ApiErrorf(c, http.StatusConflict, "user already exists")
+			return
+		}
+		ApiErrorf(c, http.StatusBadRequest, errCU.Error())
+		return
+	}
+
+	// map sacrypt (encrryped email) address to mailio address
+	_, errMu := ua.userService.MapEmailToMailioAddress(user)
+	if errMu != nil {
+		if errMu == coreErrors.ErrUserExists {
+			ApiErrorf(c, http.StatusBadRequest, "user already exists")
+			return
+		}
+		ApiErrorf(c, http.StatusInternalServerError, "failed to create user to address mapping")
 		return
 	}
 
@@ -248,39 +291,11 @@ func (ua *UserAccountApi) Register(c *gin.Context) {
 			PublicKey: encryptionPublicKey,
 		},
 	}
-	userDIDDoc, didErr := did.NewMailioDIDDocument(mk, global.PublicKey)
-	if didErr != nil {
-		ApiErrorf(c, http.StatusInternalServerError, "Failed to create DID document")
+	ssiErr := ua.ssiService.StoreRegistrationSSI(mk)
+	if ssiErr != nil {
+		ApiErrorf(c, http.StatusInternalServerError, "failed to store self-sovereign identity")
 		return
 	}
-	// TODO! finish up here (store in database)
-	fmt.Printf("%v\n", userDIDDoc)
-
-	// proof that user owns the email address at this domain
-	newCredId := uuid.New().String()
-	newVC := did.NewVerifiableCredential(global.MailioDID.String())
-	newVC.IssuanceDate = time.Now().UTC()
-	newVC.ID = global.Conf.Mailio.Domain + "/api/v1/credentials/" + newCredId
-	credentialSubject := did.CredentialSubject{
-		ID: mk.DID(),
-		AuthorizedApplication: &did.AuthorizedApplication{
-			ID:           mk.DID(),
-			Domains:      []string{global.Conf.Mailio.Domain},
-			ApprovalDate: time.Now(),
-		},
-	}
-	newVC.CredentialSubject = credentialSubject
-	newVC.CredentialStatus = &did.CredentialStatus{
-		ID:   global.Conf.Mailio.Domain + "/api/v1/credentials/" + newCredId + "/status",
-		Type: "CredentialStatusList2017",
-	}
-	vcpErr := newVC.CreateProof(global.PrivateKey)
-	if vcpErr != nil {
-		ApiErrorf(c, http.StatusInternalServerError, "Failed to create proof")
-		return
-	}
-	// TODO! store in database the newly generate VC
-	fmt.Printf("%v\n", newVC)
 
 	token, tErr := generateJWSToken(global.PrivateKey, mk.DID(), inputRegister.Nonce)
 	if tErr != nil {

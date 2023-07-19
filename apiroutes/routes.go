@@ -57,7 +57,10 @@ func ConfigRoutes(router *gin.Engine) *gin.Engine {
 	nonceRepo, nonceRepoErr := repository.NewCouchDBRepository(repoUrl, repository.Nonce, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
 	userRepo, userRepoErr := repository.NewCouchDBRepository(repoUrl, repository.User, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
 	mailioMappingRepo, mappingRepoErr := repository.NewCouchDBRepository(repoUrl, repository.MailioMapping, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
-	repoErr := errors.Join(handshakeRepoErr, nonceRepoErr, userRepoErr, mappingRepoErr)
+	didRepo, didRErr := repository.NewCouchDBRepository(repoUrl, repository.DID, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
+	vcsRepo, vscrErr := repository.NewCouchDBRepository(repoUrl, repository.VCS, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
+
+	repoErr := errors.Join(handshakeRepoErr, nonceRepoErr, userRepoErr, mappingRepoErr, didRErr, vscrErr)
 	if repoErr != nil {
 		panic(repoErr)
 	}
@@ -68,10 +71,13 @@ func ConfigRoutes(router *gin.Engine) *gin.Engine {
 	dbSelector.AddDB(nonceRepo)
 	dbSelector.AddDB(userRepo)
 	dbSelector.AddDB(mailioMappingRepo)
+	dbSelector.AddDB(didRepo)
+	dbSelector.AddDB(vcsRepo)
 
 	// SERVICE definitions
 	userService := services.NewUserService(dbSelector)
 	nonceService := services.NewNonceService(dbSelector)
+	ssiService := services.NewSelfSovereignService(dbSelector)
 
 	// Create DESIGN DOCUMENTS
 	// create a design document to return all documents older than N minutes
@@ -79,7 +85,7 @@ func ConfigRoutes(router *gin.Engine) *gin.Engine {
 
 	// API definitions
 	handshakeApi := api.NewHandshakeApi()
-	accountApi := api.NewUserAccountApi(userService, nonceService)
+	accountApi := api.NewUserAccountApi(userService, nonceService, ssiService)
 	didApi := api.NewDIDApi()
 
 	// PUBLIC ROOT API

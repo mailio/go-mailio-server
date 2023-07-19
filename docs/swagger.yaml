@@ -1,4 +1,13 @@
 definitions:
+  api.ApiError:
+    properties:
+      code:
+        description: Code is the HTTP status code
+        type: integer
+      message:
+        description: Message is the error message
+        type: string
+    type: object
   did.AuthorizedApplication:
     properties:
       approvalDate:
@@ -434,9 +443,9 @@ paths:
       - application/json
       description: Returns a JWS token
       parameters:
-      - description: register input
+      - description: registration input
         in: body
-        name: emailPassword
+        name: registration
         required: true
         schema:
           $ref: '#/definitions/types.InputRegister'
@@ -447,6 +456,18 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/types.JwsToken'
+        "404":
+          description: Invalid input parameters
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "409":
+          description: User already exists
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/api.ApiError'
       summary: Register user
       tags:
       - User Account

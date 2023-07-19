@@ -2,11 +2,13 @@ package services
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math"
 	"time"
 
+	"github.com/go-resty/resty/v2"
 	coreErrors "github.com/mailio/go-mailio-core/errors"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/repository"
@@ -36,40 +38,39 @@ func (us *UserService) CreateUser(user *types.User, databasePassword string) (*t
 	if rErr != nil {
 		return nil, rErr
 	}
-	err := userRepo.Save(ctx, fmt.Sprintf(":%s", user.MailioAddress), map[string]interface{}{"email": user.Email, "password": databasePassword, "roles": []string{}, "type": "user"})
+	err := userRepo.Save(ctx, fmt.Sprintf("%s:%s", "org.couchdb.user", user.MailioAddress), map[string]interface{}{"name": user.MailioAddress, "password": databasePassword, "roles": []string{}, "type": "user", "encryptedEmail": user.EncryptedEmail})
 	if err != nil {
 		global.Logger.Log(err, "Failed to register user")
 		return nil, err
 	}
 
-	hexEmail := "userdb-" + user.MailioAddress // MailioAddress already hex
+	hexUser := "userdb-" + hex.EncodeToString([]byte(user.MailioAddress)) // MailioAddress already hex
 
 	// wait for database to be created
+	c := userRepo.GetClient().(*resty.Client)
+
 	for i := 1; i < 5; i++ {
-		_, hErr := userRepo.GetByID(ctx, hexEmail)
+
+		headResponse, hErr := c.R().Get(fmt.Sprintf("%s", hexUser))
 		if hErr != nil {
-			if errors.Is(hErr, coreErrors.ErrNotFound) {
-				backoff := int(100 * math.Pow(2, float64(i)))
-				time.Sleep(time.Duration(backoff) * time.Millisecond)
-				continue
-			} else {
-				return nil, hErr
-			}
+			return nil, errors.New("Failed to create user database")
+		}
+		if headResponse.StatusCode() == 200 {
+			break
+		}
+
+		if headResponse.StatusCode() == 404 {
+			backoff := int(100 * math.Pow(2, float64(i)))
+			time.Sleep(time.Duration(backoff) * time.Millisecond)
+			continue
+		} else {
+			return nil, errors.New("Failed to create user database")
 		}
 	}
 
-	// create index on database
-	folderIndex := map[string]interface{}{
-		"index": map[string]interface{}{
-			"fields": []map[string]interface{}{{"folder": "desc"}, {"created": "desc"}},
-		},
-		"name": "folder-index",
-		"type": "json",
-		"ddoc": "folder-index",
-	}
-	err = userRepo.Save(ctx, fmt.Sprintf("/%s/_index", hexEmail), folderIndex)
-	if err != nil {
-		return nil, err
+	iErr := repository.CreateUserDatabaseFolderCreatedIndex(userRepo, hexUser)
+	if iErr != nil {
+		return nil, iErr
 	}
 
 	return user, nil
@@ -89,14 +90,19 @@ func (us *UserService) MapEmailToMailioAddress(user *types.User) (*types.EmailTo
 	defer cancel()
 
 	// Check if email already exists
-	existing, eErr := repo.GetByID(ctx, mapping.EncryptedEmail)
+	existingResponse, eErr := repo.GetByID(ctx, mapping.EncryptedEmail)
 	if eErr != nil {
 		if eErr != coreErrors.ErrNotFound {
 			return nil, eErr
 		}
 	}
-	if existing != nil {
-		return nil, coreErrors.ErrUserExists
+	if existingResponse != nil {
+		var existing types.EmailToMailioMapping
+		mErr := repository.MapToObject(existingResponse, &existing)
+		if mErr != nil {
+			return nil, mErr
+		}
+		mapping.BaseDocument = existing.BaseDocument
 	}
 	sErr := repo.Save(ctx, mapping.EncryptedEmail, mapping)
 	if sErr != nil {
