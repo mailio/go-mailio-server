@@ -44,6 +44,8 @@ type MailioConfig struct {
 	EmailSaltHex       string                `yaml:"emailSaltHex"`
 	RecaptchaV3SiteKey string                `yaml:"recaptchaV3SiteKey"`
 	ServerHanshake     ServerHandshakeConfig `yaml:"serverHandshake"`
+	AuthenticationPath string                `yaml:"authenticationPath"`
+	MessagingPath      string                `yaml:"messagingPath"`
 }
 
 type GrpcConfig struct {
