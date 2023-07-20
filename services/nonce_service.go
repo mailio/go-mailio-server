@@ -42,6 +42,41 @@ func (ns *NonceService) CreateNonce() (*types.Nonce, error) {
 	return nonce, nil
 }
 
+// Returns nonce by nonce id (wich is nonce itself) from database
+func (ns *NonceService) GetNonce(nonce string) (*types.Nonce, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
+	response, eErr := ns.nonceRepo.GetByID(ctx, nonce)
+	if eErr != nil { // only error allowed is not found error
+		return nil, eErr
+	}
+	// converted to mailio DID document
+	var existing types.Nonce
+	mErr := repository.MapToObject(response, &existing)
+	if mErr != nil {
+		return nil, mErr
+	}
+	return &existing, nil
+}
+
+// Delte nonce by nonce id (which is nonce itself)
+func (ns *NonceService) DeleteNonce(nonce string) error {
+	foundNonce, nErr := ns.GetNonce(nonce)
+	if nErr != nil {
+		return nErr
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
+	dnErr := ns.nonceRepo.Delete(ctx, foundNonce.ID)
+	if dnErr != nil {
+		return dnErr
+	}
+
+	return nil
+}
+
 func (ns *NonceService) RemoveExpiredNonces(olderThanMinutes int64) {
 	timeAgo := time.Now().Add(-1 * time.Minute * time.Duration(olderThanMinutes)).UnixMilli()
 	fmt.Printf("Delete nonces older than: %d\n", timeAgo)

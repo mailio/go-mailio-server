@@ -3,14 +3,16 @@ package services
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/go-resty/resty/v2"
 	"github.com/mailio/go-mailio-core/did"
 	coreErrors "github.com/mailio/go-mailio-core/errors"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/repository"
 	"github.com/mailio/go-mailio-server/types"
+	"github.com/mailio/go-mailio-server/util"
 )
 
 type SelfSovereignService struct {
@@ -111,10 +113,12 @@ func (ssi *SelfSovereignService) StoreRegistrationSSI(mk *did.MailioKey) error {
 	}
 
 	// proof that user owns the email address at this domain
-	newCredId := uuid.New().String()
+	// newCredId := uuid.New().String()
+	ID := []byte(mk.DID() + global.MailioDID.String())
+	newID := util.Sha256Hex(ID)
 	newVC := did.NewVerifiableCredential(global.MailioDID.String())
 	newVC.IssuanceDate = time.Now().UTC()
-	newVC.ID = newCredId
+	newVC.ID = newID
 	credentialSubject := did.CredentialSubject{
 		ID: mk.DID(),
 		AuthorizedApplication: &did.AuthorizedApplication{
@@ -125,20 +129,19 @@ func (ssi *SelfSovereignService) StoreRegistrationSSI(mk *did.MailioKey) error {
 	}
 	newVC.CredentialSubject = credentialSubject
 	newVC.CredentialStatus = &did.CredentialStatus{
-		ID:   global.Conf.Mailio.Domain + "/api/v1/credentials/" + newCredId + "/status",
+		ID:   global.Conf.Mailio.Domain + "/api/v1/credentials/" + newID + "/status",
 		Type: "CredentialStatusList2017",
 	}
 	vcpErr := newVC.CreateProof(global.PrivateKey)
 	if vcpErr != nil {
 		return errors.New("failed to create verifiable credential proof")
 	}
+
 	//store in database the newly generated VC
 	_, vcsErr := ssi.SaveVC(newVC)
 	if vcsErr != nil {
 		return errors.New("failed to store verifiable credential")
 	}
-
-	//TODO! impelement index on credentialSubject/id and then design document to be able to query all VCs for a user
 	return nil
 }
 
@@ -156,4 +159,46 @@ func (ssi *SelfSovereignService) GetDIDDocument(mailioAddress string) (*did.Docu
 		return nil, mErr
 	}
 	return didDoc.DID, nil
+}
+
+// Returns the DID document for the given mailio address
+func (ssi *SelfSovereignService) GetVCByID(address string) (*did.VerifiableCredential, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
+	ID := []byte(did.DIDKeyPrefix + address + global.MailioDID.String())
+	hexID := util.Sha256Hex(ID)
+	response, eErr := ssi.vcsRepo.GetByID(ctx, hexID)
+	if eErr != nil { // only error allowed is not found error
+		return nil, eErr
+	}
+	var vcDoc types.VerifiableCredentialDocument
+	mErr := repository.MapToObject(response, &vcDoc)
+	if mErr != nil {
+		return nil, mErr
+	}
+	return vcDoc.VC, nil
+}
+
+// List all VCs from a specific subject (where subject is a mailio DID)
+func (ssi *SelfSovereignService) ListSubjectVCs(mailioDID string, limit int, bookmark string) ([]*types.VerifiableCredentialDocument, error) {
+	query := map[string]interface{}{
+		"selector": map[string]interface{}{
+			"vc.credentialSubject.id": mailioDID,
+		},
+		"use_index": "credentialSubjectID-index",
+		"limit":     limit,
+	}
+	c := ssi.vcsRepo.GetClient().(*resty.Client)
+	response, rErr := c.R().SetBody(query).Post(fmt.Sprintf("%s/_find?bookmark=%s", repository.VCS, bookmark))
+	if rErr != nil {
+		return nil, rErr
+	}
+	var list []*types.VerifiableCredentialDocument
+	mErr := repository.MapToObject(response.Body(), &list)
+	if mErr != nil {
+		return nil, mErr
+	}
+
+	return list, nil
 }

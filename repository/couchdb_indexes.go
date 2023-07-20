@@ -27,3 +27,26 @@ func CreateUserDatabaseFolderCreatedIndex(userRepo Repository, mailioAddressHex 
 	}
 	return nil
 }
+
+func CreateVcsCredentialSubjectIDIndex(vcsRepo Repository) error {
+	dbName := VCS
+	// create index on database
+	credentialSubjectIDIndex := map[string]interface{}{
+		"index": map[string]interface{}{
+			"fields": []map[string]interface{}{{"vc.credentialSubject.id": "desc"}},
+		},
+		"name": "credentialSubjectID-index",
+		"type": "json",
+		"ddoc": "credentialSubjectID-index",
+	}
+	c := vcsRepo.GetClient().(*resty.Client)
+	resp, rErr := c.R().SetBody(credentialSubjectIDIndex).Post(fmt.Sprintf("%s/%s", dbName, "_index"))
+	if rErr != nil {
+		return rErr
+	}
+	if resp.IsError() {
+		outErr := handleError(resp)
+		return outErr
+	}
+	return nil
+}

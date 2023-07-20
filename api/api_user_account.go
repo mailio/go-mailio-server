@@ -63,8 +63,12 @@ func generateJWSToken(serverPrivateKey ed25519.PrivateKey, userDid, challenge st
 }
 
 // Validate signature from the input data
-func validateSignature(loginInput *types.InputLogin) (bool, error) {
-	//TODO! important! validate that nonce came from the server
+func (us *UserAccountApi) validateSignature(loginInput *types.InputLogin) (bool, error) {
+	foundNonce, fnErr := us.nonceService.GetNonce(loginInput.Nonce)
+	if fnErr != nil {
+		return false, fnErr
+	}
+
 	if !util.IsEd25519PublicKey(loginInput.Ed25519SigningPublicKeyBase64) {
 		return false, coreErrors.ErrInvalidPublicKey
 	}
@@ -76,7 +80,11 @@ func validateSignature(loginInput *types.InputLogin) (bool, error) {
 	}
 
 	// verify signature
-	isValid := ed25519.Verify(signingKeyBytes, []byte(loginInput.Nonce), signatureBytes)
+	isValid := ed25519.Verify(signingKeyBytes, []byte(foundNonce.Nonce), signatureBytes)
+
+	// delete nonce from database (don't fail if nonce not found)
+	us.nonceService.DeleteNonce(foundNonce.ID)
+
 	return isValid, nil
 }
 
@@ -85,19 +93,17 @@ func validateSignature(loginInput *types.InputLogin) (bool, error) {
 // @Description Returns a nonce which client needs to sign with their private key
 // @Tags User Account
 // @Success 200 {object} types.NonceResponse
+// @Failure 500 {object} api.ApiError "Internal server error"
 // @Accept json
 // @Produce json
 // @Router /api/v1/nonce [get]
 func (ua *UserAccountApi) ChallengeNonce(c *gin.Context) {
-	nonce64Bytes, err := util.GenerateNonce(64)
+	// store nonce to the couchdb and expire it after N minutes
+	nonce, err := ua.nonceService.CreateNonce()
 	if err != nil {
-		ApiErrorf(c, http.StatusInternalServerError, "Failed to generate nonce: %v", err)
+		ApiErrorf(c, http.StatusInternalServerError, "Failed to generate nonce")
 		return
 	}
-	nonce := types.NonceResponse{
-		Nonce: nonce64Bytes,
-	}
-	//TODO! store nonce to the couchdb and expire it after N minutes
 	c.JSON(http.StatusOK, nonce)
 }
 
@@ -105,8 +111,11 @@ func (ua *UserAccountApi) ChallengeNonce(c *gin.Context) {
 // @Summary Login with username and password
 // @Description Returns a JWS token
 // @Tags User Account
-// @Param nonce query string true "Nonce string"
+// @Param login body types.InputLogin true "login input"
 // @Success 200 {object} types.JwsToken
+// @Failure 401 {object} api.ApiError "Invalid signature"
+// @Failure 403 {object} api.ApiError "Failed to login (valid signature, no valid VC)"
+// @Failure 400 {object} api.ApiError "Invalid or missing input parameters"
 // @Accept json
 // @Produce json
 // @Router /api/v1/login [post]
@@ -122,6 +131,10 @@ func (ua *UserAccountApi) Login(c *gin.Context) {
 		ApiErrorf(c, http.StatusBadRequest, "invalid public key")
 		return
 	}
+	if inputLogin.MailioAddress == "" || inputLogin.Nonce == "" || inputLogin.SignatureBase64 == "" {
+		ApiErrorf(c, http.StatusBadRequest, "mailio address, nonce and signature are required")
+		return
+	}
 	decodedPubKey, _ := base64.StdEncoding.DecodeString(inputLogin.Ed25519SigningPublicKeyBase64)
 	pubKey := ed25519.PublicKey(decodedPubKey)
 	mk := did.MailioKey{
@@ -130,28 +143,46 @@ func (ua *UserAccountApi) Login(c *gin.Context) {
 		},
 	}
 
-	// // get user by email
-	// if inputUserPass.PublicKeyBase64 == "" || inputUserPass.SignatureBase64 == "" {
-	// 	ApiErrorf(c, http.StatusBadRequest, "public key and signature are required")
-	// 	return
-	// }
-	// if util.IsEd25519PublicKey(inputUserPass.PublicKeyBase64) == false {
-	// 	ApiErrorf(c, http.StatusBadRequest, "invalid public key")
-	// 	return
-	// }
-	// decodedPubKey, _ := base64.StdEncoding.DecodeString(inputUserPass.PublicKeyBase64)
-	// decodedSignature, err := base64.StdEncoding.DecodeString(inputUserPass.SignatureBase64)
-	// if err != nil {
-	// 	ApiErrorf(c, http.StatusBadRequest, "invalid signature")
-	// 	return
-	// }
-	// userPk := ed25519.PublicKey(decodedPubKey)
-	// // Verify the signature of the token using the user's public key.
-	// isValidSignature := ed25519.Verify(userPk, []byte(inputUserPass.Nonce), decodedSignature)
-	// if !isValidSignature {
-	// 	ApiErrorf(c, http.StatusBadRequest, "invalid signature")
-	// 	return
-	// }
+	isValid, validErr := ua.validateSignature(&inputLogin)
+	if validErr != nil {
+		if validErr == coreErrors.ErrSignatureInvalid {
+			ApiErrorf(c, http.StatusUnauthorized, "invalid signature")
+			return
+		} else if validErr == coreErrors.ErrInvalidPublicKey {
+			ApiErrorf(c, http.StatusUnauthorized, "invalid public key")
+			return
+		} else if validErr == coreErrors.ErrNotFound {
+			ApiErrorf(c, http.StatusUnauthorized, "nonce not found")
+			return
+		}
+		ApiErrorf(c, http.StatusInternalServerError, "failed to validate signature")
+		return
+	}
+	if !isValid {
+		ApiErrorf(c, http.StatusBadRequest, "invalid signature")
+		return
+	}
+
+	// validate also VC for the user (is user was registered at mail.io)
+	vc, vcErr := ua.ssiService.GetVCByID(inputLogin.MailioAddress)
+	if vcErr != nil {
+		if vcErr == coreErrors.ErrNotFound {
+			ApiErrorf(c, http.StatusForbidden, "failed to login (valid signature, no valid VC)")
+			return
+		}
+		ApiErrorf(c, http.StatusInternalServerError, "failed to retrieve a VC")
+		return
+	}
+	isVCValid, vcValidateErr := vc.VerifyProof(global.PublicKey)
+	if vcValidateErr != nil {
+		ApiErrorf(c, http.StatusForbidden, "failed to validate VC")
+		return
+	}
+	if !isVCValid {
+		ApiErrorf(c, http.StatusForbidden, "failed to login (valid signature, no valid VC)")
+		return
+	}
+
 	// Sign the payload with servers private key.
 	token, err := generateJWSToken(global.PrivateKey, mk.DID(), inputLogin.Nonce)
 	if err != nil {
@@ -168,6 +199,7 @@ func (ua *UserAccountApi) Login(c *gin.Context) {
 // @Tags User Account
 // @Param registration body types.InputRegister true "registration input"
 // @Success 200 {object} types.JwsToken
+// @Failure 401 {object} api.ApiError "Invalid signature"
 // @Failure 404 {object} ApiError "Invalid input parameters"
 // @Failure 500 {object} ApiError "Internal server error"
 // @Failure 409 {object} ApiError "User already exists"
@@ -212,13 +244,16 @@ func (ua *UserAccountApi) Register(c *gin.Context) {
 	encryptionPublicKey := ed25519.PublicKey(encryptionKeyBytes)
 
 	// validate siganture
-	isValid, validErr := validateSignature(&inputRegister.InputLogin)
+	isValid, validErr := ua.validateSignature(&inputRegister.InputLogin)
 	if validErr != nil {
 		if validErr == coreErrors.ErrSignatureInvalid {
 			ApiErrorf(c, http.StatusBadRequest, "invalid signature")
 			return
 		} else if validErr == coreErrors.ErrInvalidPublicKey {
 			ApiErrorf(c, http.StatusBadRequest, "invalid public key")
+			return
+		} else if validErr == coreErrors.ErrNotFound {
+			ApiErrorf(c, http.StatusBadRequest, "nonce not found")
 			return
 		}
 		ApiErrorf(c, http.StatusInternalServerError, "failed to validate signature")

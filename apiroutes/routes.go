@@ -79,6 +79,9 @@ func ConfigRoutes(router *gin.Engine) *gin.Engine {
 	nonceService := services.NewNonceService(dbSelector)
 	ssiService := services.NewSelfSovereignService(dbSelector)
 
+	// Create INDEXES
+	repository.CreateVcsCredentialSubjectIDIndex(vcsRepo)
+
 	// Create DESIGN DOCUMENTS
 	// create a design document to return all documents older than N minutes
 	repository.CreateDesign_DeleteExpiredRecordsByCreatedDate(nonceRepo, 5)
@@ -87,6 +90,7 @@ func ConfigRoutes(router *gin.Engine) *gin.Engine {
 	handshakeApi := api.NewHandshakeApi()
 	accountApi := api.NewUserAccountApi(userService, nonceService, ssiService)
 	didApi := api.NewDIDApi(ssiService)
+	vcApi := api.NewVCApi(ssiService)
 
 	// PUBLIC ROOT API
 	rootPublicApi := router.Group("/")
@@ -107,7 +111,12 @@ func ConfigRoutes(router *gin.Engine) *gin.Engine {
 
 	rootApi := router.Group("/api", metrics.MetricsMiddleware(), restinterceptors.JWSMiddleware())
 	{
+		// Handshakes
 		rootApi.GET("/v1/handshake/:id", handshakeApi.GetHandshake)
+
+		// VCs
+		rootApi.GET("/v1/credentials/:address/list", vcApi.ListVCs)
+		rootApi.GET("/v1/credentials/:address/:id", vcApi.GetVC)
 	}
 
 	router.StaticFile("./well-known/did.json", "./well-known/did.json")

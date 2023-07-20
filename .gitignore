@@ -26,3 +26,4 @@ test_server_keys.json
 
 .vscode
 deployment/couchdb/data
+__debug_bin

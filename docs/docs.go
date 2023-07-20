@@ -72,6 +72,61 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/credentials/{address}/list": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Retruns a list of VCs by mailio address",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Verifiable Credentials"
+                ],
+                "summary": "List all VCs for a specific mailio address",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Mailio address",
+                        "name": "address",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Limit of VCs to return",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Page token",
+                        "name": "pageToken",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/did.Document"
+                        }
+                    },
+                    "500": {
+                        "description": "error creating server did",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/credentials/{id}": {
             "get": {
                 "security": [
@@ -348,11 +403,13 @@ const docTemplate = `{
                 "summary": "Login with username and password",
                 "parameters": [
                     {
-                        "type": "string",
-                        "description": "Nonce string",
-                        "name": "nonce",
-                        "in": "query",
-                        "required": true
+                        "description": "login input",
+                        "name": "login",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.InputLogin"
+                        }
                     }
                 ],
                 "responses": {
@@ -360,6 +417,24 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/types.JwsToken"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid or missing input parameters",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid signature",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "403": {
+                        "description": "Failed to login (valid signature, no valid VC)",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
                         }
                     }
                 }
@@ -383,6 +458,12 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/types.NonceResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
                         }
                     }
                 }
@@ -417,6 +498,12 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/types.JwsToken"
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid signature",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
                         }
                     },
                     "404": {
@@ -747,6 +834,36 @@ const docTemplate = `{
                     "type": "boolean"
                 },
                 "rev": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.InputLogin": {
+            "type": "object",
+            "required": [
+                "ed25519SigningPublicKeyBase64",
+                "email",
+                "mailioAddress",
+                "nonce",
+                "signatureBase64"
+            ],
+            "properties": {
+                "ed25519SigningPublicKeyBase64": {
+                    "description": "public key of the private key used to sign the nonce",
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "mailioAddress": {
+                    "description": "Password                      string ` + "`" + `json:\"password,omitempty\"` + "`" + `",
+                    "type": "string"
+                },
+                "nonce": {
+                    "type": "string"
+                },
+                "signatureBase64": {
+                    "description": "signature of Nonce string",
                     "type": "string"
                 }
             }

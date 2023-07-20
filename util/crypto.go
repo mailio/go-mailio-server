@@ -101,3 +101,11 @@ func BytesToAddress(b []byte) MailioAddress {
 	a.SetBytes(b)
 	return a
 }
+
+// Sha256Hex returns the sha256 hash of the data as a hex string
+func Sha256Hex(data []byte) string {
+	hash := sha256.New()
+	hash.Write(data)
+	sum := hash.Sum(nil)
+	return hex.EncodeToString(sum)
+}
