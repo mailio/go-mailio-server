@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-resty/resty/v2"
 	"github.com/jarcoal/httpmock"
+	coreErrors "github.com/mailio/go-mailio-core/errors"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/types"
 )
@@ -131,12 +132,25 @@ func (c *CouchDBRepository) Update(ctx context.Context, id string, data interfac
 func (c *CouchDBRepository) Delete(ctx context.Context, id string) error {
 	doc, err := c.GetByID(ctx, id)
 	if err != nil {
-		return err
+		if err != coreErrors.ErrNotFound {
+			return err
+		}
+		return nil
 	}
-	d := doc.(*types.BaseDocument)
+
+	var baseDoc types.BaseDocument
+	mErr := MapToObject(doc, &baseDoc)
+	if mErr != nil {
+		return mErr
+	}
+
+	rev := ""
+	if baseDoc.Rev != "" {
+		rev = baseDoc.Rev
+	}
 
 	var delErr types.CouchDBError
-	resp, rErr := c.client.R().SetBody(map[string]interface{}{}).SetError(&delErr).SetQueryParam("rev", d.Rev).Delete(fmt.Sprintf("%s/%s", c.dbName, id))
+	resp, rErr := c.client.R().SetBody(map[string]interface{}{}).SetError(&delErr).SetQueryParam("rev", rev).Delete(fmt.Sprintf("%s/%s", c.dbName, id))
 	if rErr != nil {
 		return rErr
 	}

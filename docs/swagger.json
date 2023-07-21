@@ -63,7 +63,7 @@
                 }
             }
         },
-        "/api/v1/credentials/{address}/list": {
+        "/api/v1/credentials/list/{address}": {
             "get": {
                 "security": [
                     {
@@ -150,6 +150,18 @@
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/did.VerifiableCredential"
+                        }
+                    },
+                    "404": {
+                        "description": "VC not found",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "500": {
+                        "description": "error creating server did",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
                         }
                     }
                 }
@@ -847,7 +859,6 @@
                     "type": "string"
                 },
                 "mailioAddress": {
-                    "description": "Password                      string `json:\"password,omitempty\"`",
                     "type": "string"
                 },
                 "nonce": {
@@ -883,7 +894,6 @@
                     "type": "string"
                 },
                 "mailioAddress": {
-                    "description": "Password                      string `json:\"password,omitempty\"`",
                     "type": "string"
                 },
                 "nonce": {

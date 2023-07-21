@@ -30,6 +30,8 @@ func NewVCApi(ssiService *services.SelfSovereignService) *VC {
 // @Tags Verifiable Credentials
 // @Param id path string true "VC ID"
 // @Success 200 {object} did.VerifiableCredential
+// @Failure 404 {object} api.ApiError "VC not found"
+// @Failure 500 {object} api.ApiError "error creating server did"
 // @Accept json
 // @Produce json
 // @Router /api/v1/credentials/{id} [get]
@@ -107,16 +109,19 @@ func (vc *VC) RevokeVC(c *gin.Context) {
 // @Failure 500 {object} api.ApiError "error creating server did"
 // @Accept json
 // @Produce json
-// @Router /api/v1/credentials/{address}/list [get]
+// @Router /api/v1/credentials/list/{address} [get]
 func (vc *VC) ListVCs(c *gin.Context) {
 	limitStr := c.Query("limit")
 	address := c.Param("address")
 	pageToken := c.Param("pageToken")
-
-	limit, err := strconv.Atoi(limitStr)
-	if err != nil {
-		ApiErrorf(c, http.StatusBadRequest, "invalid limit")
-		return
+	limit := 10
+	if limitStr != "" {
+		l, err := strconv.Atoi(limitStr)
+		if err != nil {
+			ApiErrorf(c, http.StatusBadRequest, "invalid limit")
+			return
+		}
+		limit = l
 	}
 	output, err := vc.ssiService.ListSubjectVCs(address, limit, pageToken)
 	if err != nil {

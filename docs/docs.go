@@ -72,7 +72,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/credentials/{address}/list": {
+        "/api/v1/credentials/list/{address}": {
             "get": {
                 "security": [
                     {
@@ -159,6 +159,18 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/did.VerifiableCredential"
+                        }
+                    },
+                    "404": {
+                        "description": "VC not found",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "500": {
+                        "description": "error creating server did",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
                         }
                     }
                 }
@@ -856,7 +868,6 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "mailioAddress": {
-                    "description": "Password                      string ` + "`" + `json:\"password,omitempty\"` + "`" + `",
                     "type": "string"
                 },
                 "nonce": {
@@ -892,7 +903,6 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "mailioAddress": {
-                    "description": "Password                      string ` + "`" + `json:\"password,omitempty\"` + "`" + `",
                     "type": "string"
                 },
                 "nonce": {

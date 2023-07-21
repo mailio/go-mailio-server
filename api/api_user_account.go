@@ -3,17 +3,15 @@ package api
 import (
 	"crypto/ed25519"
 	"encoding/base64"
-	"encoding/json"
 	"net/http"
 	"net/mail"
-	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/go-jose/go-jose/v3"
 	"github.com/go-playground/validator/v10"
 	mailiocrypto "github.com/mailio/go-mailio-core/crypto"
 	"github.com/mailio/go-mailio-core/did"
 	coreErrors "github.com/mailio/go-mailio-core/errors"
+	"github.com/mailio/go-mailio-server/api/interceptors"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/services"
 	"github.com/mailio/go-mailio-server/types"
@@ -34,32 +32,6 @@ func NewUserAccountApi(userService *services.UserService, nonceService *services
 		ssiService:   ssiService,
 		validate:     validator.New(),
 	}
-}
-
-func generateJWSToken(serverPrivateKey ed25519.PrivateKey, userDid, challenge string) (string, error) {
-	pl := map[string]interface{}{
-		"iss": global.MailioDID.String(),
-		"sub": userDid,
-		"iat": time.Now().Unix(),
-		"jti": challenge,
-		"exp": time.Now().Add(time.Minute * 5).Unix(),
-		"aud": "mailio",
-	}
-	signer, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.EdDSA, Key: serverPrivateKey}, nil)
-	if err != nil {
-		return "", err
-	}
-
-	plBytes, plErr := json.Marshal(pl)
-	if plErr != nil {
-		return "", plErr
-	}
-	object, err := signer.Sign(plBytes)
-	if err != nil {
-		return "", err
-	}
-
-	return object.CompactSerialize()
 }
 
 // Validate signature from the input data
@@ -184,7 +156,7 @@ func (ua *UserAccountApi) Login(c *gin.Context) {
 	}
 
 	// Sign the payload with servers private key.
-	token, err := generateJWSToken(global.PrivateKey, mk.DID(), inputLogin.Nonce)
+	token, err := interceptors.GenerateJWSToken(global.PrivateKey, mk.DID(), inputLogin.Nonce)
 	if err != nil {
 		ApiErrorf(c, http.StatusInternalServerError, "Failed to sign token")
 		return
@@ -332,7 +304,7 @@ func (ua *UserAccountApi) Register(c *gin.Context) {
 		return
 	}
 
-	token, tErr := generateJWSToken(global.PrivateKey, mk.DID(), inputRegister.Nonce)
+	token, tErr := interceptors.GenerateJWSToken(global.PrivateKey, mk.DID(), inputRegister.Nonce)
 	if tErr != nil {
 		ApiErrorf(c, http.StatusInternalServerError, "Failed to sign token")
 		return

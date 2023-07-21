@@ -115,8 +115,8 @@ func ConfigRoutes(router *gin.Engine) *gin.Engine {
 		rootApi.GET("/v1/handshake/:id", handshakeApi.GetHandshake)
 
 		// VCs
-		rootApi.GET("/v1/credentials/:address/list", vcApi.ListVCs)
-		rootApi.GET("/v1/credentials/:address/:id", vcApi.GetVC)
+		rootApi.GET("/v1/credentials/list/:address", vcApi.ListVCs)
+		rootApi.GET("/v1/credentials/:id", vcApi.GetVC)
 	}
 
 	router.StaticFile("./well-known/did.json", "./well-known/did.json")

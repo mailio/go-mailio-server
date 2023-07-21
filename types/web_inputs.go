@@ -2,8 +2,7 @@ package types
 
 // for login
 type InputLogin struct {
-	Email string `json:"email" validate:"required,email"`
-	// Password                      string `json:"password,omitempty"`
+	Email                         string `json:"email" validate:"required,email"`
 	MailioAddress                 string `json:"mailioAddress" validate:"required"`
 	Nonce                         string `json:"nonce" validate:"required"`
 	Ed25519SigningPublicKeyBase64 string `json:"ed25519SigningPublicKeyBase64" validate:"required"` // public key of the private key used to sign the nonce

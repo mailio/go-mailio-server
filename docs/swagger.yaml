@@ -184,7 +184,6 @@ definitions:
       email:
         type: string
       mailioAddress:
-        description: Password                      string `json:"password,omitempty"`
         type: string
       nonce:
         type: string
@@ -209,7 +208,6 @@ definitions:
       email:
         type: string
       mailioAddress:
-        description: Password                      string `json:"password,omitempty"`
         type: string
       nonce:
         type: string
@@ -322,41 +320,6 @@ paths:
       summary: Resolve users DID document
       tags:
       - Decentralized Identifiers
-  /api/v1/credentials/{address}/list:
-    get:
-      consumes:
-      - application/json
-      description: Retruns a list of VCs by mailio address
-      parameters:
-      - description: Mailio address
-        in: path
-        name: address
-        required: true
-        type: string
-      - description: Limit of VCs to return
-        in: query
-        name: limit
-        type: integer
-      - description: Page token
-        in: query
-        name: pageToken
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/did.Document'
-        "500":
-          description: error creating server did
-          schema:
-            $ref: '#/definitions/api.ApiError'
-      security:
-      - Bearer: []
-      summary: List all VCs for a specific mailio address
-      tags:
-      - Verifiable Credentials
   /api/v1/credentials/{id}:
     get:
       consumes:
@@ -375,6 +338,14 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/did.VerifiableCredential'
+        "404":
+          description: VC not found
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "500":
+          description: error creating server did
+          schema:
+            $ref: '#/definitions/api.ApiError'
       security:
       - Bearer: []
       summary: Get verifiable credential by id
@@ -407,6 +378,41 @@ paths:
       security:
       - Bearer: []
       summary: Verify a verifiable credential
+      tags:
+      - Verifiable Credentials
+  /api/v1/credentials/list/{address}:
+    get:
+      consumes:
+      - application/json
+      description: Retruns a list of VCs by mailio address
+      parameters:
+      - description: Mailio address
+        in: path
+        name: address
+        required: true
+        type: string
+      - description: Limit of VCs to return
+        in: query
+        name: limit
+        type: integer
+      - description: Page token
+        in: query
+        name: pageToken
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/did.Document'
+        "500":
+          description: error creating server did
+          schema:
+            $ref: '#/definitions/api.ApiError'
+      security:
+      - Bearer: []
+      summary: List all VCs for a specific mailio address
       tags:
       - Verifiable Credentials
   /api/v1/findaddress:

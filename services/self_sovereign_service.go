@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -162,13 +163,11 @@ func (ssi *SelfSovereignService) GetDIDDocument(mailioAddress string) (*did.Docu
 }
 
 // Returns the DID document for the given mailio address
-func (ssi *SelfSovereignService) GetVCByID(address string) (*did.VerifiableCredential, error) {
+func (ssi *SelfSovereignService) GetVCByID(ID string) (*did.VerifiableCredential, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
-	ID := []byte(did.DIDKeyPrefix + address + global.MailioDID.String())
-	hexID := util.Sha256Hex(ID)
-	response, eErr := ssi.vcsRepo.GetByID(ctx, hexID)
+	response, eErr := ssi.vcsRepo.GetByID(ctx, ID)
 	if eErr != nil { // only error allowed is not found error
 		return nil, eErr
 	}
@@ -181,10 +180,10 @@ func (ssi *SelfSovereignService) GetVCByID(address string) (*did.VerifiableCrede
 }
 
 // List all VCs from a specific subject (where subject is a mailio DID)
-func (ssi *SelfSovereignService) ListSubjectVCs(mailioDID string, limit int, bookmark string) ([]*types.VerifiableCredentialDocument, error) {
+func (ssi *SelfSovereignService) ListSubjectVCs(address string, limit int, bookmark string) ([]*did.VerifiableCredential, error) {
 	query := map[string]interface{}{
 		"selector": map[string]interface{}{
-			"vc.credentialSubject.id": mailioDID,
+			"vc.credentialSubject.id": "did:mailio:" + address,
 		},
 		"use_index": "credentialSubjectID-index",
 		"limit":     limit,
@@ -194,10 +193,22 @@ func (ssi *SelfSovereignService) ListSubjectVCs(mailioDID string, limit int, boo
 	if rErr != nil {
 		return nil, rErr
 	}
-	var list []*types.VerifiableCredentialDocument
-	mErr := repository.MapToObject(response.Body(), &list)
-	if mErr != nil {
-		return nil, mErr
+	var listDocs map[string]interface{}
+	uErr := json.Unmarshal(response.Body(), &listDocs)
+	if uErr != nil {
+		return nil, uErr
+	}
+	list := make([]*did.VerifiableCredential, 0)
+
+	for _, docMap := range listDocs["docs"].([]interface{}) {
+		vcMap := docMap.(map[string]interface{})
+		var doc *types.VerifiableCredentialDocument
+		vcMapBytes, vcErr := json.Marshal(vcMap)
+		vcErrU := json.Unmarshal(vcMapBytes, &doc)
+		if errors.Join(vcErr, vcErrU) != nil {
+			return nil, errors.Join(vcErr, vcErrU)
+		}
+		list = append(list, doc.VC)
 	}
 
 	return list, nil
