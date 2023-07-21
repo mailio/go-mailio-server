@@ -1,7 +1,7 @@
 package types
 
 type Nonce struct {
-	BaseDocument
-	Nonce   string `json:"nonce"`
-	Created int64  `json:"created"`
+	BaseDocument `json:",inline"`
+	Nonce        string `json:"nonce"`
+	Created      int64  `json:"created"`
 }

@@ -179,6 +179,12 @@ func (ssi *SelfSovereignService) GetVCByID(ID string) (*did.VerifiableCredential
 	return vcDoc.VC, nil
 }
 
+func (ssi *SelfSovereignService) GetAuthorizedAppVCByAddress(address string, issuerDID string) (*did.VerifiableCredential, error) {
+	ID := []byte(did.DIDKeyPrefix + address + issuerDID)
+	hexID := util.Sha256Hex(ID)
+	return ssi.GetVCByID(hexID)
+}
+
 // List all VCs from a specific subject (where subject is a mailio DID)
 func (ssi *SelfSovereignService) ListSubjectVCs(address string, limit int, bookmark string) ([]*did.VerifiableCredential, error) {
 	query := map[string]interface{}{

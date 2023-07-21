@@ -55,7 +55,7 @@ func (us *UserAccountApi) validateSignature(loginInput *types.InputLogin) (bool,
 	isValid := ed25519.Verify(signingKeyBytes, []byte(foundNonce.Nonce), signatureBytes)
 
 	// delete nonce from database (don't fail if nonce not found)
-	us.nonceService.DeleteNonce(foundNonce.ID)
+	us.nonceService.DeleteNonce(foundNonce.Nonce)
 
 	return isValid, nil
 }
@@ -136,7 +136,7 @@ func (ua *UserAccountApi) Login(c *gin.Context) {
 	}
 
 	// validate also VC for the user (is user was registered at mail.io)
-	vc, vcErr := ua.ssiService.GetVCByID(inputLogin.MailioAddress)
+	vc, vcErr := ua.ssiService.GetAuthorizedAppVCByAddress(inputLogin.MailioAddress, global.MailioDID.String())
 	if vcErr != nil {
 		if vcErr == coreErrors.ErrNotFound {
 			ApiErrorf(c, http.StatusForbidden, "failed to login (valid signature, no valid VC)")

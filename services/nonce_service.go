@@ -62,14 +62,14 @@ func (ns *NonceService) GetNonce(nonce string) (*types.Nonce, error) {
 
 // Delte nonce by nonce id (which is nonce itself)
 func (ns *NonceService) DeleteNonce(nonce string) error {
-	foundNonce, nErr := ns.GetNonce(nonce)
-	if nErr != nil {
-		return nErr
-	}
+	// foundNonce, nErr := ns.GetNonce(nonce)
+	// if nErr != nil {
+	// 	return nErr
+	// }
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
-	dnErr := ns.nonceRepo.Delete(ctx, foundNonce.ID)
+	dnErr := ns.nonceRepo.Delete(ctx, nonce)
 	if dnErr != nil {
 		return dnErr
 	}

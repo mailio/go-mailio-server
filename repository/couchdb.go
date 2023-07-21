@@ -130,6 +130,9 @@ func (c *CouchDBRepository) Update(ctx context.Context, id string, data interfac
 
 // Delete deletes a document by its ID
 func (c *CouchDBRepository) Delete(ctx context.Context, id string) error {
+	if id == "" {
+		return coreErrors.ErrNotFound
+	}
 	doc, err := c.GetByID(ctx, id)
 	if err != nil {
 		if err != coreErrors.ErrNotFound {
@@ -145,8 +148,8 @@ func (c *CouchDBRepository) Delete(ctx context.Context, id string) error {
 	}
 
 	rev := ""
-	if baseDoc.Rev != "" {
-		rev = baseDoc.Rev
+	if baseDoc.UnderscoreRev != "" {
+		rev = baseDoc.UnderscoreRev
 	}
 
 	var delErr types.CouchDBError
