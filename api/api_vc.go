@@ -31,6 +31,7 @@ func NewVCApi(ssiService *services.SelfSovereignService) *VC {
 // @Param id path string true "VC ID"
 // @Success 200 {object} did.VerifiableCredential
 // @Failure 404 {object} api.ApiError "VC not found"
+// @Failure 429 {object} api.ApiError "rate limit exceeded"
 // @Failure 500 {object} api.ApiError "error creating server did"
 // @Accept json
 // @Produce json
@@ -66,6 +67,7 @@ func (vc *VC) UpdateVC(c *gin.Context) {
 // @Param requestId path string true "Reference ID (request ID, could be anything)"
 // @Param vc body did.VerifiableCredential true "Verifiable credential to verify"
 // @Success 200 {object} types.VCValidationResponse
+// @Failure 429 {object} api.ApiError "rate limit exceeded"
 // @Accept json
 // @Produce json
 // @Router /api/v1/credentials/{requestId}/verify [post]
@@ -106,6 +108,7 @@ func (vc *VC) RevokeVC(c *gin.Context) {
 // @Param limit query int false "Limit of VCs to return"
 // @Param pageToken query string false "Page token"
 // @Success 200 {object} did.Document
+// @Failure 429 {object} api.ApiError "rate limit exceeded"
 // @Failure 500 {object} api.ApiError "error creating server did"
 // @Accept json
 // @Produce json

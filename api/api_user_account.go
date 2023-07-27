@@ -65,6 +65,7 @@ func (us *UserAccountApi) validateSignature(loginInput *types.InputLogin) (bool,
 // @Description Returns a nonce which client needs to sign with their private key
 // @Tags User Account
 // @Success 200 {object} types.NonceResponse
+// @Failure 429 {object} api.ApiError "rate limit exceeded"
 // @Failure 500 {object} api.ApiError "Internal server error"
 // @Accept json
 // @Produce json
@@ -88,6 +89,7 @@ func (ua *UserAccountApi) ChallengeNonce(c *gin.Context) {
 // @Failure 401 {object} api.ApiError "Invalid signature"
 // @Failure 403 {object} api.ApiError "Failed to login (valid signature, no valid VC)"
 // @Failure 400 {object} api.ApiError "Invalid or missing input parameters"
+// @Failure 429 {object} api.ApiError "rate limit exceeded"
 // @Accept json
 // @Produce json
 // @Router /api/v1/login [post]
@@ -173,8 +175,9 @@ func (ua *UserAccountApi) Login(c *gin.Context) {
 // @Success 200 {object} types.JwsToken
 // @Failure 401 {object} api.ApiError "Invalid signature"
 // @Failure 404 {object} ApiError "Invalid input parameters"
-// @Failure 500 {object} ApiError "Internal server error"
 // @Failure 409 {object} ApiError "User already exists"
+// @Failure 429 {object} api.ApiError "rate limit exceeded"
+// @Failure 500 {object} ApiError "Internal server error"
 // @Accept json
 // @Produce json
 // @Router /api/v1/register [post]
@@ -319,6 +322,7 @@ func (ua *UserAccountApi) Register(c *gin.Context) {
 // @Tags User Account
 // @Param email query string true "Base64 formatted Scrypt of email address"
 // @Success 200 {object} types.OutputFindAddress
+// @Failure 429 {object} api.ApiError "rate limit exceeded"
 // @Accept json
 // @Produce json
 // @Router /api/v1/findaddress [get]

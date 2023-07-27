@@ -49,7 +49,7 @@ func CreateDesign_DeleteExpiredRecordsByCreatedDate(dbRepo Repository, olderThan
 						var now = Date.now();
 						var before = now - %d * 60 * 1000;
 						if (doc.created && doc.created <= before) {
-							emit(doc.created, doc); 
+							emit(doc.created, doc.nonce); 
 						}
 					}`, olderThanMinutes),
 			},

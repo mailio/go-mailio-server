@@ -32,6 +32,7 @@ func NewDIDApi(ssiService *services.SelfSovereignService) *DIDApi {
 // @Description Returns a DID Document
 // @Tags Decentralized Identifiers
 // @Success 200 {object} did.Document
+// @Failure 429 {object} api.ApiError "rate limit exceeded"
 // @Failure 500 {object} api.ApiError "error creating server did"
 // @Accept json
 // @Produce json
@@ -51,6 +52,7 @@ func (did *DIDApi) CreateServerDID(c *gin.Context) {
 // @Summary Mailio Server DID Configuration
 // @Description Returns a DID Configuration
 // @Tags Decentralized Identifiers
+// @Failure 429 {object} api.ApiError "rate limit exceeded"
 // @Failure 500 {object} api.ApiError "error creating server did configuration"
 // @Accept json
 // @Produce json
@@ -110,6 +112,7 @@ func (da *DIDApi) CreateServerDIDConfiguration(c *gin.Context) {
 // @Produce json
 // @Param address path string true "Mailio address"
 // @Success 200 {object} did.Document
+// @Failure 429 {object} api.ApiError "rate limit exceeded"
 // @Failure 404 {object} api.ApiError "DID not found"
 // @Failure 400 {object} api.ApiError "Invalid DID"
 // @Router /{address}/did.json [get]

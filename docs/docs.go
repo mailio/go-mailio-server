@@ -34,6 +34,12 @@ const docTemplate = `{
                 ],
                 "summary": "Mailio Server DID Configuration",
                 "responses": {
+                    "429": {
+                        "description": "rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
                     "500": {
                         "description": "error creating server did configuration",
                         "schema": {
@@ -61,6 +67,12 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/did.Document"
+                        }
+                    },
+                    "429": {
+                        "description": "rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
                         }
                     },
                     "500": {
@@ -118,6 +130,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/did.Document"
                         }
                     },
+                    "429": {
+                        "description": "rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
                     "500": {
                         "description": "error creating server did",
                         "schema": {
@@ -163,6 +181,12 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "VC not found",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "429": {
+                        "description": "rate limit exceeded",
                         "schema": {
                             "$ref": "#/definitions/api.ApiError"
                         }
@@ -218,6 +242,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/types.VCValidationResponse"
                         }
+                    },
+                    "429": {
+                        "description": "rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
                     }
                 }
             }
@@ -249,6 +279,12 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/types.OutputFindAddress"
+                        }
+                    },
+                    "429": {
+                        "description": "rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
                         }
                     }
                 }
@@ -288,6 +324,12 @@ const docTemplate = `{
                         "description": "Created",
                         "schema": {
                             "$ref": "#/definitions/types.Handshake"
+                        }
+                    },
+                    "429": {
+                        "description": "rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
                         }
                     }
                 }
@@ -370,6 +412,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/types.Handshake"
                         }
+                    },
+                    "429": {
+                        "description": "rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
                     }
                 }
             },
@@ -396,6 +444,12 @@ const docTemplate = `{
                 "responses": {
                     "204": {
                         "description": "No Content"
+                    },
+                    "429": {
+                        "description": "rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
                     }
                 }
             }
@@ -448,6 +502,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/api.ApiError"
                         }
+                    },
+                    "429": {
+                        "description": "rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
                     }
                 }
             }
@@ -470,6 +530,12 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/types.NonceResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
                         }
                     },
                     "500": {
@@ -530,6 +596,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/api.ApiError"
                         }
                     },
+                    "429": {
+                        "description": "rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
@@ -576,6 +648,12 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "DID not found",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "429": {
+                        "description": "rate limit exceeded",
                         "schema": {
                             "$ref": "#/definitions/api.ApiError"
                         }

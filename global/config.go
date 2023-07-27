@@ -3,6 +3,7 @@ package global
 import (
 	"crypto/ed25519"
 
+	"github.com/go-redis/redis_rate/v10"
 	mailiodid "github.com/mailio/go-mailio-core/did"
 	cfg "github.com/mailio/go-web3-kit/config"
 )
@@ -16,6 +17,9 @@ var PrivateKey ed25519.PrivateKey
 var MailioKeysCreated int64
 var MailioDID *mailiodid.DID
 
+// Global rate limiter
+var RateLimiter *redis_rate.Limiter
+
 type Config struct {
 	cfg.YamlConfig `yaml:",inline"`
 	CouchDB        CouchDBConfig    `yaml:"couchdb"`
@@ -23,6 +27,7 @@ type Config struct {
 	Grpc           GrpcConfig       `yaml:"grpc"`
 	Mailio         MailioConfig     `yaml:"mailio"`
 	Prometheus     PrometheusConfig `yaml:"prometheus"`
+	Redis          RedisConfig      `yaml:"redis"`
 }
 
 type CouchDBConfig struct {
@@ -72,4 +77,11 @@ type ServerHandshakeConfig struct {
 type ServerHandshakeSubtypeConfig struct {
 	Subtype          int `yaml:"subtype"`
 	FrequencyMinutes int `yaml:"frequencyMinutes,omitempty"`
+}
+
+type RedisConfig struct {
+	Host     string `yaml:"host"`
+	Port     int    `yaml:"port"`
+	Password string `yaml:"password"`
+	Username string `yaml:"username"`
 }

@@ -265,6 +265,10 @@ paths:
       produces:
       - application/json
       responses:
+        "429":
+          description: rate limit exceeded
+          schema:
+            $ref: '#/definitions/api.ApiError'
         "500":
           description: error creating server did configuration
           schema:
@@ -284,6 +288,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/did.Document'
+        "429":
+          description: rate limit exceeded
+          schema:
+            $ref: '#/definitions/api.ApiError'
         "500":
           description: error creating server did
           schema:
@@ -317,6 +325,10 @@ paths:
           description: DID not found
           schema:
             $ref: '#/definitions/api.ApiError'
+        "429":
+          description: rate limit exceeded
+          schema:
+            $ref: '#/definitions/api.ApiError'
       summary: Resolve users DID document
       tags:
       - Decentralized Identifiers
@@ -340,6 +352,10 @@ paths:
             $ref: '#/definitions/did.VerifiableCredential'
         "404":
           description: VC not found
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "429":
+          description: rate limit exceeded
           schema:
             $ref: '#/definitions/api.ApiError'
         "500":
@@ -375,6 +391,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/types.VCValidationResponse'
+        "429":
+          description: rate limit exceeded
+          schema:
+            $ref: '#/definitions/api.ApiError'
       security:
       - Bearer: []
       summary: Verify a verifiable credential
@@ -406,6 +426,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/did.Document'
+        "429":
+          description: rate limit exceeded
+          schema:
+            $ref: '#/definitions/api.ApiError'
         "500":
           description: error creating server did
           schema:
@@ -433,6 +457,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/types.OutputFindAddress'
+        "429":
+          description: rate limit exceeded
+          schema:
+            $ref: '#/definitions/api.ApiError'
       summary: Find user by base64 scrypt email address
       tags:
       - User Account
@@ -455,6 +483,10 @@ paths:
           description: Created
           schema:
             $ref: '#/definitions/types.Handshake'
+        "429":
+          description: rate limit exceeded
+          schema:
+            $ref: '#/definitions/api.ApiError'
       security:
       - Bearer: []
       summary: Create a new handshake
@@ -472,6 +504,10 @@ paths:
       responses:
         "204":
           description: No Content
+        "429":
+          description: rate limit exceeded
+          schema:
+            $ref: '#/definitions/api.ApiError'
       security:
       - Bearer: []
       summary: Delete a handshake
@@ -522,6 +558,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/types.Handshake'
+        "429":
+          description: rate limit exceeded
+          schema:
+            $ref: '#/definitions/api.ApiError'
       security:
       - Bearer: []
       summary: Update a handshake
@@ -558,6 +598,10 @@ paths:
           description: Failed to login (valid signature, no valid VC)
           schema:
             $ref: '#/definitions/api.ApiError'
+        "429":
+          description: rate limit exceeded
+          schema:
+            $ref: '#/definitions/api.ApiError'
       summary: Login with username and password
       tags:
       - User Account
@@ -573,6 +617,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/types.NonceResponse'
+        "429":
+          description: rate limit exceeded
+          schema:
+            $ref: '#/definitions/api.ApiError'
         "500":
           description: Internal server error
           schema:
@@ -609,6 +657,10 @@ paths:
             $ref: '#/definitions/api.ApiError'
         "409":
           description: User already exists
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "429":
+          description: rate limit exceeded
           schema:
             $ref: '#/definitions/api.ApiError'
         "500":

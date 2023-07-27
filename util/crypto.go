@@ -2,11 +2,11 @@ package util
 
 import (
 	"crypto/ed25519"
-	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
+	src "math/rand"
 
 	"github.com/mailio/go-mailio-server/global"
 	"golang.org/x/crypto/scrypt"
@@ -43,15 +43,32 @@ func ScryptEmail(email string) ([]byte, error) {
 	return dk, nil
 }
 
-// Generates a random nonce of custom length in bytes
-func GenerateNonce(lengthInBytes int) (string, error) {
-	nonce := make([]byte, lengthInBytes)
+const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+const (
+	letterIdxBits = 6                    // 6 bits to represent a letter index
+	letterIdxMask = 1<<letterIdxBits - 1 // All 1-bits, as many as letterIdxBits
+	letterIdxMax  = 63 / letterIdxBits   // # of letter indices fitting in 63 bits
+)
 
-	if _, err := rand.Read(nonce); err != nil {
-		return "", err
+// Generates a random nonce of custom length in bytes
+// method based on https://stackoverflow.com/questions/22892120/how-to-generate-a-random-string-of-a-fixed-length-in-go
+// 5. Masking improved version
+func GenerateNonce(n int) string {
+	b := make([]byte, n)
+	// A src.Int63() generates 63 random bits, enough for letterIdxMax characters!
+	for i, cache, remain := n-1, src.Int63(), letterIdxMax; i >= 0; {
+		if remain == 0 {
+			cache, remain = src.Int63(), letterIdxMax
+		}
+		if idx := int(cache & letterIdxMask); idx < len(letterBytes) {
+			b[i] = letterBytes[idx]
+			i--
+		}
+		cache >>= letterIdxBits
+		remain--
 	}
 
-	return base64.URLEncoding.EncodeToString(nonce), nil
+	return string(b)
 }
 
 // Check if a base64 string is an ed25519 public key.

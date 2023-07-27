@@ -9,3 +9,11 @@ services:
     volumes:
       - ./deployment/couchdb/couchdb_local.ini:/opt/couchdb/etc/local.ini
       - ./deployment/couchdb/data:/opt/couchdb/data
+  redis:
+    image: redis:7.0.12-alpine
+    restart: always
+    command: redis-server --save 20 1 --loglevel warning --requirepass YOURPASSWORD
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./deployment/redis/data:/data

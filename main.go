@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/ed25519"
 	"encoding/base64"
 	"encoding/json"
@@ -11,7 +12,10 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
+	"time"
 
+	"github.com/go-redis/redis_rate/v10"
 	"github.com/mailio/go-mailio-server/apiroutes"
 	"github.com/mailio/go-mailio-server/docs"
 	"github.com/mailio/go-mailio-server/global"
@@ -19,6 +23,7 @@ import (
 	"github.com/mailio/go-mailio-server/util"
 	cfg "github.com/mailio/go-web3-kit/config"
 	w3srv "github.com/mailio/go-web3-kit/gingonic"
+	"github.com/redis/go-redis/v9"
 	"google.golang.org/grpc"
 )
 
@@ -50,6 +55,25 @@ func loadServerEd25519Keys(conf global.Config) {
 	global.MailioDID = &mailioDid.ID
 }
 
+func initRedisRateLimiter(conf global.Config) {
+	redisRateLimitClient := redis.NewClient(&redis.Options{
+		Addr:     conf.Redis.Host + ":" + strconv.Itoa(conf.Redis.Port),
+		Username: conf.Redis.Username,
+		Password: conf.Redis.Password,
+		DB:       1,
+	})
+
+	// configure rate limiting
+	// clears all data in the Redis database associated with the 'redisRateLimitClient' ignoring potential errors
+	rCtx, rCancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer rCancel()
+
+	_ = redisRateLimitClient.FlushDB(rCtx).Err()
+
+	limiter := redis_rate.NewLimiter(redisRateLimitClient)
+	global.RateLimiter = limiter
+}
+
 // @title Mailio Server API
 // @version 1.0
 // @description Implements the Mailio server based on https://mirs.mail.io/ specifications
@@ -78,6 +102,7 @@ func main() {
 
 	// loads server keys into global variables for signing and signature validation
 	loadServerEd25519Keys(global.Conf)
+	initRedisRateLimiter(global.Conf)
 
 	// programmatically set swagger info
 	docs.SwaggerInfo.Title = "Mailio Server"

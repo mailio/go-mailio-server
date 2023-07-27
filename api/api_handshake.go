@@ -45,6 +45,7 @@ func (ha *HandshakeApi) GetHandshake(c *gin.Context) {
 // @Produce json
 // @Param handshake body types.Handshake true "Handshake"
 // @Success 201 {object} types.Handshake
+// @Failure 429 {object} api.ApiError "rate limit exceeded"
 // @Router /api/v1/handshake [post]
 func (ha *HandshakeApi) CreateHandshake(c *gin.Context) {
 	// Get the request body and decode it into a Handshake struct
@@ -74,6 +75,7 @@ func (ha *HandshakeApi) CreateHandshake(c *gin.Context) {
 // @Param id path string true "Handshake ID"
 // @Param handshake body types.Handshake true "Handshake"
 // @Success 200 {object} types.Handshake
+// @Failure 429 {object} api.ApiError "rate limit exceeded"
 // @Router /api/v1/handshake/{id} [put]
 func (ha *HandshakeApi) UpdateHandshake(c *gin.Context) {
 	var handshake types.Handshake
@@ -102,6 +104,7 @@ func (ha *HandshakeApi) UpdateHandshake(c *gin.Context) {
 // @Tags Handshake
 // @Param id path string true "Handshake ID"
 // @Success 204
+// @Failure 429 {object} api.ApiError "rate limit exceeded"
 // @Router /api/v1/handshake/{id} [delete]
 func (ha *HandshakeApi) DeleteHandshake(c *gin.Context) {
 	id := c.Param("id")
