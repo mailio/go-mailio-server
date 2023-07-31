@@ -4,16 +4,18 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/mailio/go-mailio-server/repository"
+	"github.com/mailio/go-mailio-server/services"
 	"github.com/mailio/go-mailio-server/types"
 )
 
 type HandshakeApi struct {
-	repo repository.Repository
+	handshakeService *services.HandshakeService
 }
 
-func NewHandshakeApi() *HandshakeApi {
-	return &HandshakeApi{}
+func NewHandshakeApi(handshakeService *services.HandshakeService) *HandshakeApi {
+	return &HandshakeApi{
+		handshakeService: handshakeService,
+	}
 }
 
 // Get Handshake method
@@ -34,6 +36,30 @@ func (ha *HandshakeApi) GetHandshake(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, types.Handshake{BaseDocument: types.BaseDocument{ID: id}})
+}
+
+// List logged in users handshake
+// @Security Bearer
+// @Summary List handshakes
+// @Description List all handshakes
+// @Tags Handshake
+// @Success 200 {object} types.Handshake
+// @Accept json
+// @Produce json
+// @Router /api/v1/handshake [get]
+func (ha *HandshakeApi) ListHandshakes(c *gin.Context) {
+	// TODO: extract address from JWS token
+	address, exists := c.Get("subjectAddress")
+	if !exists {
+		ApiErrorf(c, http.StatusInternalServerError, "jwt invalid")
+		return
+	}
+	handshakes, err := ha.handshakeService.ListHandshakes(address.(string))
+	if err != nil {
+		ApiErrorf(c, http.StatusInternalServerError, "error while fetching handshakes: %s", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, handshakes)
 }
 
 // Create Handshake method

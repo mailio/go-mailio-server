@@ -3,8 +3,10 @@ package api
 import (
 	"crypto/ed25519"
 	"encoding/base64"
+	"errors"
 	"net/http"
 	"net/mail"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
@@ -39,6 +41,11 @@ func (us *UserAccountApi) validateSignature(loginInput *types.InputLogin) (bool,
 	foundNonce, fnErr := us.nonceService.GetNonce(loginInput.Nonce)
 	if fnErr != nil {
 		return false, fnErr
+	}
+
+	millisecondsNow := time.Now().UTC().UnixMilli() - int64(5*60*1000) // 5 mintes ago
+	if foundNonce.Created < millisecondsNow {
+		return false, errors.New("nonce expired")
 	}
 
 	if !util.IsEd25519PublicKey(loginInput.Ed25519SigningPublicKeyBase64) {

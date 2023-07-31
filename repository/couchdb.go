@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -101,7 +102,6 @@ func (c *CouchDBRepository) Save(ctx context.Context, docID string, data interfa
 	var ok types.OK
 	var dbErr types.CouchDBError
 
-	// c.client.Debug = true
 	resp, rErr := c.client.R().SetBody(data).SetResult(&ok).SetError(&dbErr).Put(fmt.Sprintf("%s/%s", c.dbName, docID))
 	if rErr != nil {
 		return rErr
@@ -114,18 +114,30 @@ func (c *CouchDBRepository) Save(ctx context.Context, docID string, data interfa
 }
 
 // Update updates an existing document
-func (c *CouchDBRepository) Update(ctx context.Context, id string, data interface{}) error {
-	var ok types.OK
+func (c *CouchDBRepository) Update(ctx context.Context, id string, data interface{}) (interface{}, error) {
+	// var ok types.OK
 	var dbErr types.CouchDBError
-	resp, rErr := c.client.R().SetBody(data).SetResult(&ok).SetError(&dbErr).Put(fmt.Sprintf("%s/%s", c.dbName, id))
+
+	c.client.Debug = true
+	resp, rErr := c.client.R().SetBody(data).SetError(&dbErr).Post(fmt.Sprintf("%s/%s", c.dbName, id))
 	if rErr != nil {
-		return rErr
+		return nil, rErr
 	}
+
 	if resp.IsError() {
 		outErr := handleError(resp)
-		return outErr
+		return nil, outErr
 	}
-	return nil
+
+	// body to interface
+	body := resp.Body()
+	var updated interface{}
+	mErr := json.Unmarshal(body, &updated)
+	if mErr != nil {
+		return nil, mErr
+	}
+
+	return updated, nil
 }
 
 // Delete deletes a document by its ID

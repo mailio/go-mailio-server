@@ -4,6 +4,7 @@ import (
 	"crypto/ed25519"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -57,6 +58,14 @@ func JWSMiddleware() gin.HandlerFunc {
 			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Failed to parse JWS payload (exp missing)"})
 			return
 		}
+		subjectAddress := ""
+		if sub, ok := plMap["sub"]; ok {
+			addr := sub.(string)
+			subjectAddress = strings.Replace(addr, "did:mailio:", "", 1)
+		} else {
+			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Failed to parse JWS payload (sub missing)"})
+		}
+		c.Set("subjectAddress", subjectAddress)
 		c.Next()
 	}
 }

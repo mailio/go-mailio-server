@@ -28,6 +28,7 @@ func CreateUserDatabaseFolderCreatedIndex(userRepo Repository, mailioAddressHex 
 	return nil
 }
 
+// CreateVcsCredentialSubjectIDIndex creates an index on the vcs database for the credentialSubject.id field
 func CreateVcsCredentialSubjectIDIndex(vcsRepo Repository) error {
 	dbName := VCS
 	// create index on database
@@ -41,6 +42,30 @@ func CreateVcsCredentialSubjectIDIndex(vcsRepo Repository) error {
 	}
 	c := vcsRepo.GetClient().(*resty.Client)
 	resp, rErr := c.R().SetBody(credentialSubjectIDIndex).Post(fmt.Sprintf("%s/%s", dbName, "_index"))
+	if rErr != nil {
+		return rErr
+	}
+	if resp.IsError() {
+		outErr := handleError(resp)
+		return outErr
+	}
+	return nil
+}
+
+// create indexes on handshakes database for the address field
+func CreateHandshakeIndex(handshakeRepo Repository) error {
+	dbName := Handshake
+	// create index on database
+	addressIndex := map[string]interface{}{
+		"index": map[string]interface{}{
+			"fields": []map[string]interface{}{{"ownerAddress": "desc"}, {"created": "desc"}},
+		},
+		"name": "ownerAddress-index",
+		"type": "json",
+		"ddoc": "ownerAddress-index",
+	}
+	c := handshakeRepo.GetClient().(*resty.Client)
+	resp, rErr := c.R().SetBody(addressIndex).Post(fmt.Sprintf("%s/%s", dbName, "_index"))
 	if rErr != nil {
 		return rErr
 	}

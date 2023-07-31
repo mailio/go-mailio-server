@@ -16,6 +16,7 @@ import (
 	"github.com/mailio/go-mailio-server/repository"
 	"github.com/mailio/go-mailio-server/services"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/robfig/cron/v3"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
@@ -79,22 +80,35 @@ func ConfigRoutes(router *gin.Engine) *gin.Engine {
 	userService := services.NewUserService(dbSelector)
 	nonceService := services.NewNonceService(dbSelector)
 	ssiService := services.NewSelfSovereignService(dbSelector)
+	handshakeService := services.NewHandshakeService(dbSelector)
 
 	// Create INDEXES
-	repository.CreateVcsCredentialSubjectIDIndex(vcsRepo)
+	icVcsErr := repository.CreateVcsCredentialSubjectIDIndex(vcsRepo)
+	hiErr := repository.CreateHandshakeIndex(handshakeRepo)
+	iErr := errors.Join(icVcsErr, hiErr)
+	if iErr != nil {
+		panic(iErr)
+	}
 
 	// Create DESIGN DOCUMENTS
 	// create a design document to return all documents older than N minutes
 	repository.CreateDesign_DeleteExpiredRecordsByCreatedDate(nonceRepo, 5)
 
 	// API definitions
-	handshakeApi := api.NewHandshakeApi()
+	handshakeApi := api.NewHandshakeApi(handshakeService)
 	accountApi := api.NewUserAccountApi(userService, nonceService, ssiService)
 	didApi := api.NewDIDApi(ssiService)
 	vcApi := api.NewVCApi(ssiService)
 
+	// cron jobs
+	// run cron jobs
+	cr := cron.New()
+	// defer cr.Stop()
+	cr.AddFunc("@every 5m", nonceService.RemoveExpiredNonces) // remove expired tokens every 5 minutes
+	cr.Start()
+
 	// PUBLIC ROOT API
-	rootPublicApi := router.Group("/", restinterceptors.RateLimitMiddleware())
+	rootPublicApi := router.Group("/", restinterceptors.RateLimitMiddleware(), metrics.MetricsMiddleware())
 	{
 		rootPublicApi.GET(".well-known/did.json", didApi.CreateServerDID)
 		rootPublicApi.GET(".well-known/did-configuration.json", didApi.CreateServerDIDConfiguration)
@@ -102,7 +116,7 @@ func ConfigRoutes(router *gin.Engine) *gin.Engine {
 	}
 
 	// PUBLIC API
-	publicApi := router.Group("/api", metrics.MetricsMiddleware(), restinterceptors.RateLimitMiddleware())
+	publicApi := router.Group("/api", restinterceptors.RateLimitMiddleware(), metrics.MetricsMiddleware())
 	{
 		publicApi.POST("/v1/register", accountApi.Register)
 		publicApi.POST("/v1/login", accountApi.Login)
@@ -114,6 +128,7 @@ func ConfigRoutes(router *gin.Engine) *gin.Engine {
 	{
 		// Handshakes
 		rootApi.GET("/v1/handshake/:id", handshakeApi.GetHandshake)
+		rootApi.GET("v1/handshake", handshakeApi.ListHandshakes)
 
 		// VCs
 		rootApi.GET("/v1/credentials/list/:address", vcApi.ListVCs)

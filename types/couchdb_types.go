@@ -18,6 +18,7 @@ type BaseDocument struct {
 	ID            string `json:"id,omitempty"`
 	UnderstoreID  string `json:"_id,omitempty"`
 	OK            bool   `json:"ok,omitempty"`
+	Deleted       bool   `json:"_deleted,omitempty"`
 }
 
 // Index is a MonboDB-style index definition.

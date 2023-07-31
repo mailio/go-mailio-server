@@ -46,10 +46,9 @@ func CreateDesign_DeleteExpiredRecordsByCreatedDate(dbRepo Repository, olderThan
 			"older_than": {
 				Map: fmt.Sprintf(`function(doc) 
 					{ 
-						var now = Date.now();
-						var before = now - %d * 60 * 1000;
-						if (doc.created && doc.created <= before) {
-							emit(doc.created, doc.nonce); 
+						var minutesAgo = Date.now() - (%d * 60 * 1000);
+						if (doc.created < minutesAgo) {
+							emit(doc.created, doc._rev); 
 						}
 					}`, olderThanMinutes),
 			},

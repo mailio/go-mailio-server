@@ -164,6 +164,8 @@ definitions:
     type: object
   types.Handshake:
     properties:
+      _deleted:
+        type: boolean
       _id:
         type: string
       _rev:
@@ -465,6 +467,22 @@ paths:
       tags:
       - User Account
   /api/v1/handshake:
+    get:
+      consumes:
+      - application/json
+      description: List all handshakes
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Handshake'
+      security:
+      - Bearer: []
+      summary: List handshakes
+      tags:
+      - Handshake
     post:
       consumes:
       - application/json

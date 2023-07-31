@@ -291,6 +291,32 @@ const docTemplate = `{
             }
         },
         "/api/v1/handshake": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "List all handshakes",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Handshake"
+                ],
+                "summary": "List handshakes",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Handshake"
+                        }
+                    }
+                }
+            },
             "post": {
                 "security": [
                     {
@@ -910,6 +936,9 @@ const docTemplate = `{
         "types.Handshake": {
             "type": "object",
             "properties": {
+                "_deleted": {
+                    "type": "boolean"
+                },
                 "_id": {
                     "type": "string"
                 },

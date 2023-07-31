@@ -38,7 +38,7 @@ func (us *UserService) CreateUser(user *types.User, databasePassword string) (*t
 	if rErr != nil {
 		return nil, rErr
 	}
-	err := userRepo.Save(ctx, fmt.Sprintf("%s:%s", "org.couchdb.user", user.MailioAddress), map[string]interface{}{"name": user.MailioAddress, "password": databasePassword, "roles": []string{}, "type": "user", "encryptedEmail": user.EncryptedEmail})
+	err := userRepo.Save(ctx, fmt.Sprintf("%s:%s", "org.couchdb.user", user.MailioAddress), map[string]interface{}{"name": user.MailioAddress, "password": databasePassword, "roles": []string{}, "type": "user", "encryptedEmail": user.EncryptedEmail, "created": user.Created})
 	if err != nil {
 		global.Logger.Log(err, "Failed to register user")
 		return nil, err
