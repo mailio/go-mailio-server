@@ -366,6 +366,18 @@ const docTemplate = `{
                             "$ref": "#/definitions/types.Handshake"
                         }
                     },
+                    "400": {
+                        "description": "bad request",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "401": {
+                        "description": "invalid signature",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
                     "429": {
                         "description": "rate limit exceeded",
                         "schema": {
@@ -981,58 +993,16 @@ const docTemplate = `{
                 }
             }
         },
-        "models.HandshakeOriginServer": {
+        "models.Handshake": {
             "type": "object",
             "properties": {
-                "domain": {
-                    "description": "domain of the server",
-                    "type": "string"
-                },
-                "p2pAddress": {
-                    "description": "P2P address of the server",
-                    "type": "string"
-                },
-                "serverIp": {
-                    "description": "server IP address",
-                    "type": "string"
-                }
-            }
-        },
-        "models.HandshakeSignupRules": {
-            "type": "object",
-            "properties": {
-                "frequencyMinutes": {
-                    "description": "frequency of the signup requests in seconds",
-                    "type": "integer"
-                }
-            }
-        },
-        "types.Handshake": {
-            "type": "object",
-            "properties": {
-                "_deleted": {
-                    "type": "boolean"
-                },
-                "_id": {
-                    "type": "string"
-                },
-                "_rev": {
-                    "description": "Rev is the revision number returned",
-                    "type": "string"
-                },
                 "handshakeId": {
                     "description": "handshake ID",
-                    "type": "string"
-                },
-                "id": {
                     "type": "string"
                 },
                 "level": {
                     "description": "handshake level",
                     "type": "integer"
-                },
-                "ok": {
-                    "type": "boolean"
                 },
                 "originServer": {
                     "description": "origin server",
@@ -1048,9 +1018,6 @@ const docTemplate = `{
                 },
                 "ownerPublicKey": {
                     "description": "owner public key of the owner of the handshake",
-                    "type": "string"
-                },
-                "rev": {
                     "type": "string"
                 },
                 "senderMailioAddress": {
@@ -1092,6 +1059,65 @@ const docTemplate = `{
                 "type": {
                     "description": "handshake type",
                     "type": "integer"
+                }
+            }
+        },
+        "models.HandshakeOriginServer": {
+            "type": "object",
+            "properties": {
+                "domain": {
+                    "description": "domain of the server",
+                    "type": "string"
+                },
+                "p2pAddress": {
+                    "description": "P2P address of the server",
+                    "type": "string"
+                },
+                "serverIp": {
+                    "description": "server IP address",
+                    "type": "string"
+                }
+            }
+        },
+        "models.HandshakeSignupRules": {
+            "type": "object",
+            "properties": {
+                "frequencyMinutes": {
+                    "description": "frequency of the signup requests in seconds",
+                    "type": "integer"
+                }
+            }
+        },
+        "types.Handshake": {
+            "type": "object",
+            "properties": {
+                "_deleted": {
+                    "type": "boolean"
+                },
+                "_id": {
+                    "type": "string"
+                },
+                "_rev": {
+                    "description": "Rev is the revision number returned",
+                    "type": "string"
+                },
+                "cborPayload": {
+                    "type": "string"
+                },
+                "content": {
+                    "$ref": "#/definitions/models.Handshake"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "ok": {
+                    "type": "boolean"
+                },
+                "rev": {
+                    "type": "string"
+                },
+                "signature": {
+                    "type": "string"
                 }
             }
         },

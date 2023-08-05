@@ -165,7 +165,7 @@ func (ua *UserAccountApi) Login(c *gin.Context) {
 	}
 
 	// Sign the payload with servers private key.
-	token, err := interceptors.GenerateJWSToken(global.PrivateKey, mk.DID(), inputLogin.Nonce)
+	token, err := interceptors.GenerateJWSToken(global.PrivateKey, mk.DID(), inputLogin.Nonce, inputLogin.Ed25519SigningPublicKeyBase64)
 	if err != nil {
 		ApiErrorf(c, http.StatusInternalServerError, "Failed to sign token")
 		return
@@ -314,7 +314,7 @@ func (ua *UserAccountApi) Register(c *gin.Context) {
 		return
 	}
 
-	token, tErr := interceptors.GenerateJWSToken(global.PrivateKey, mk.DID(), inputRegister.Nonce)
+	token, tErr := interceptors.GenerateJWSToken(global.PrivateKey, mk.DID(), inputRegister.Nonce, inputRegister.X25519PublicKeyBase64)
 	if tErr != nil {
 		ApiErrorf(c, http.StatusInternalServerError, "Failed to sign token")
 		return

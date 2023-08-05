@@ -162,43 +162,14 @@ definitions:
       type:
         type: string
     type: object
-  models.HandshakeOriginServer:
+  models.Handshake:
     properties:
-      domain:
-        description: domain of the server
-        type: string
-      p2pAddress:
-        description: P2P address of the server
-        type: string
-      serverIp:
-        description: server IP address
-        type: string
-    type: object
-  models.HandshakeSignupRules:
-    properties:
-      frequencyMinutes:
-        description: frequency of the signup requests in seconds
-        type: integer
-    type: object
-  types.Handshake:
-    properties:
-      _deleted:
-        type: boolean
-      _id:
-        type: string
-      _rev:
-        description: Rev is the revision number returned
-        type: string
       handshakeId:
         description: handshake ID
-        type: string
-      id:
         type: string
       level:
         description: handshake level
         type: integer
-      ok:
-        type: boolean
       originServer:
         allOf:
         - $ref: '#/definitions/models.HandshakeOriginServer'
@@ -208,8 +179,6 @@ definitions:
         type: string
       ownerPublicKey:
         description: owner public key of the owner of the handshake
-        type: string
-      rev:
         type: string
       senderMailioAddress:
         description: senders mailio address
@@ -239,6 +208,46 @@ definitions:
       type:
         description: handshake type
         type: integer
+    type: object
+  models.HandshakeOriginServer:
+    properties:
+      domain:
+        description: domain of the server
+        type: string
+      p2pAddress:
+        description: P2P address of the server
+        type: string
+      serverIp:
+        description: server IP address
+        type: string
+    type: object
+  models.HandshakeSignupRules:
+    properties:
+      frequencyMinutes:
+        description: frequency of the signup requests in seconds
+        type: integer
+    type: object
+  types.Handshake:
+    properties:
+      _deleted:
+        type: boolean
+      _id:
+        type: string
+      _rev:
+        description: Rev is the revision number returned
+        type: string
+      cborPayload:
+        type: string
+      content:
+        $ref: '#/definitions/models.Handshake'
+      id:
+        type: string
+      ok:
+        type: boolean
+      rev:
+        type: string
+      signature:
+        type: string
     type: object
   types.InputLogin:
     properties:
@@ -580,6 +589,14 @@ paths:
           description: Created
           schema:
             $ref: '#/definitions/types.Handshake'
+        "400":
+          description: bad request
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "401":
+          description: invalid signature
+          schema:
+            $ref: '#/definitions/api.ApiError'
         "429":
           description: rate limit exceeded
           schema:

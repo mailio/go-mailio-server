@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	coreErrors "github.com/mailio/go-mailio-core/errors"
 	"github.com/mailio/go-mailio-server/services"
 	"github.com/mailio/go-mailio-server/types"
 )
@@ -51,7 +52,7 @@ func (ha *HandshakeApi) GetHandshake(c *gin.Context) {
 // @Produce json
 // @Router /api/v1/handshake [get]
 func (ha *HandshakeApi) ListHandshakes(c *gin.Context) {
-	// TODO: extract address from JWS token
+	// extract address from JWS token
 	address, exists := c.Get("subjectAddress")
 	if !exists {
 		ApiErrorf(c, http.StatusInternalServerError, "jwt invalid")
@@ -81,6 +82,8 @@ func (ha *HandshakeApi) ListHandshakes(c *gin.Context) {
 // @Produce json
 // @Param handshake body types.Handshake true "Handshake"
 // @Success 201 {object} types.Handshake
+// @Failure 401 {object} api.ApiError "invalid signature"
+// @Failure 400 {object} api.ApiError "bad request"
 // @Failure 429 {object} api.ApiError "rate limit exceeded"
 // @Router /api/v1/handshake [post]
 func (ha *HandshakeApi) CreateHandshake(c *gin.Context) {
@@ -90,12 +93,21 @@ func (ha *HandshakeApi) CreateHandshake(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	pubKey, exists := c.Get("usrPubKey")
+	if !exists {
+		ApiErrorf(c, http.StatusUnauthorized, "jwt invalid")
+		return
+	}
 
-	// Save the handshake to the database
-	// if err := ha.DB.Save(&handshake).Error; err != nil {
-	// 	c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-	// 	return
-	// }
+	sErr := ha.handshakeService.Save(&handshake, pubKey.(string))
+	if sErr != nil {
+		if sErr == coreErrors.ErrSignatureInvalid {
+			ApiErrorf(c, http.StatusUnauthorized, "invalid signature")
+			return
+		}
+		ApiErrorf(c, http.StatusBadRequest, "failed to store handhake")
+		return
+	}
 
 	// Return the created handshake
 	c.JSON(http.StatusCreated, handshake)

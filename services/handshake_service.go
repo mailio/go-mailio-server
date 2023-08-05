@@ -2,12 +2,15 @@ package services
 
 import (
 	"context"
+	"crypto/ed25519"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/go-kit/log/level"
 	"github.com/go-resty/resty/v2"
+	coreErrors "github.com/mailio/go-mailio-core/errors"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/repository"
 	"github.com/mailio/go-mailio-server/types"
@@ -27,11 +30,30 @@ func NewHandshakeService(dbSelector repository.DBSelector) *HandshakeService {
 }
 
 // Save a handshake into a database
-func (hs *HandshakeService) Save(handshake *types.Handshake) error {
+func (hs *HandshakeService) Save(handshake *types.Handshake, userPublicKeyEd25519Base64 string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
-	return hs.handshakeRepo.Save(ctx, handshake.ID, handshake)
+	// Verify signature
+	signature, sErr := base64.StdEncoding.DecodeString(handshake.SignatureBase64)
+	if sErr != nil {
+		return sErr
+	}
+	pk, pkErr := base64.StdEncoding.DecodeString(userPublicKeyEd25519Base64)
+	if pkErr != nil {
+		return pkErr
+	}
+	cborPayloadBytes, cbErr := base64.StdEncoding.DecodeString(handshake.CborPayloadBase64)
+	if cbErr != nil {
+		return cbErr
+	}
+
+	isValid := ed25519.Verify(ed25519.PublicKey(pk), cborPayloadBytes, signature)
+	if !isValid {
+		return coreErrors.ErrSignatureInvalid
+	}
+
+	return hs.handshakeRepo.Save(ctx, handshake.Content.HandshakeID, handshake)
 }
 
 // List all handshakes by specific address

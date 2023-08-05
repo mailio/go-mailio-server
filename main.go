@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
@@ -28,7 +27,7 @@ import (
 )
 
 func loadServerEd25519Keys(conf global.Config) {
-	serverKeysBytes, err := ioutil.ReadFile(conf.Mailio.ServerKeysPath)
+	serverKeysBytes, err := os.ReadFile(conf.Mailio.ServerKeysPath)
 	if err != nil {
 		panic(err)
 	}

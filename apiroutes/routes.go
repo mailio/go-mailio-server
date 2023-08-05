@@ -129,6 +129,7 @@ func ConfigRoutes(router *gin.Engine) *gin.Engine {
 		// Handshakes
 		rootApi.GET("/v1/handshake/:id", handshakeApi.GetHandshake)
 		rootApi.GET("v1/handshake", handshakeApi.ListHandshakes)
+		rootApi.POST("/v1/handshake", handshakeApi.CreateHandshake)
 
 		// VCs
 		rootApi.GET("/v1/credentials/list/:address", vcApi.ListVCs)

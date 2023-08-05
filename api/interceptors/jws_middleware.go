@@ -65,19 +65,26 @@ func JWSMiddleware() gin.HandlerFunc {
 		} else {
 			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Failed to parse JWS payload (sub missing)"})
 		}
+		if usrPubKey, ok := plMap["usrPubKey"]; ok {
+			usrPubKeyStr := usrPubKey.(string)
+			c.Set("usrPubKey", usrPubKeyStr) // base64 encoded users public key
+		} else {
+			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Failed to parse JWS payload (usrPubKey missing)"})
+		}
 		c.Set("subjectAddress", subjectAddress)
 		c.Next()
 	}
 }
 
-func GenerateJWSToken(serverPrivateKey ed25519.PrivateKey, userDid, challenge string) (string, error) {
+func GenerateJWSToken(serverPrivateKey ed25519.PrivateKey, userDid, challenge, userPublicKeyEd25519 string) (string, error) {
 	pl := map[string]interface{}{
-		"iss": global.MailioDID.String(),
-		"sub": userDid,
-		"iat": time.Now().Unix(),
-		"jti": challenge,
-		"exp": time.Now().Add(time.Hour * tokenExpiryHours).Unix(),
-		"aud": "mailio",
+		"iss":       global.MailioDID.String(),
+		"sub":       userDid,
+		"iat":       time.Now().Unix(),
+		"jti":       challenge,
+		"exp":       time.Now().Add(time.Hour * tokenExpiryHours).Unix(),
+		"aud":       "mailio",
+		"usrPubKey": userPublicKeyEd25519,
 	}
 	signer, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.EdDSA, Key: serverPrivateKey}, nil)
 	if err != nil {
