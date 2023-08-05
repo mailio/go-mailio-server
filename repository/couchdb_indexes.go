@@ -62,7 +62,7 @@ func CreateHandshakeIndex(handshakeRepo Repository) error {
 		},
 		"name": "ownerAddress-index",
 		"type": "json",
-		"ddoc": "ownerAddress-index",
+		"ddoc": "ownerAddressDesign",
 	}
 	c := handshakeRepo.GetClient().(*resty.Client)
 	resp, rErr := c.R().SetBody(addressIndex).Post(fmt.Sprintf("%s/%s", dbName, "_index"))

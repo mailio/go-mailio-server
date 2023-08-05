@@ -1,8 +1,10 @@
 package services
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/go-kit/log/level"
 	"github.com/go-resty/resty/v2"
@@ -24,13 +26,32 @@ func NewHandshakeService(dbSelector repository.DBSelector) *HandshakeService {
 	return &HandshakeService{handshakeRepo: handshakeRepo}
 }
 
+// Save a handshake into a database
+func (hs *HandshakeService) Save(handshake *types.Handshake) error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
+	return hs.handshakeRepo.Save(ctx, handshake.ID, handshake)
+}
+
 // List all handshakes by specific address
-func (hs *HandshakeService) ListHandshakes(address string) ([]*types.Handshake, error) {
+func (hs *HandshakeService) ListHandshakes(address string, bookmark string, limit int) (*types.PagingResults, error) {
 
 	var couchdbError types.CouchDBError
 
 	cl := hs.handshakeRepo.GetClient().(*resty.Client)
-	response, err := cl.R().SetError(&couchdbError).Get(fmt.Sprintf("%s/_find", hs.handshakeRepo.GetDBName()))
+	query := map[string]interface{}{
+		"selector": map[string]interface{}{
+			"ownerAddress": address,
+		},
+		"use_index": []string{"ownerAddressDesign", "ownerAddress-index"},
+		"limit":     limit,
+		"sort":      []map[string]string{{"created": "desc"}},
+	}
+	if bookmark != "" {
+		query["bookmark"] = bookmark
+	}
+	response, err := cl.R().SetError(&couchdbError).SetBody(query).Post(fmt.Sprintf("%s/_find?bookmark=%s", hs.handshakeRepo.GetDBName(), bookmark))
 	if err != nil {
 		return nil, err
 	}
@@ -44,20 +65,23 @@ func (hs *HandshakeService) ListHandshakes(address string) ([]*types.Handshake, 
 		return nil, mErr
 	}
 
-	handshakes := make([]*types.Handshake, 0)
-	if rows, ok := respObj["rows"]; ok {
+	handshakes := []interface{}{}
+	if rows, ok := respObj["docs"]; ok {
 		for _, row := range rows.([]interface{}) {
 			r := row.(map[string]interface{})
 			if value, ok := r["value"]; ok {
-				var handshake types.Handshake
-				moErr := repository.MapToObject(value.(map[string]interface{}), &handshake)
-				if moErr != nil {
-					return nil, moErr
-				}
-				handshakes = append(handshakes, &handshake)
+				handshakes = append(handshakes, value)
 			}
 		}
 	}
+	results := &types.PagingResults{
+		Docs: handshakes,
+	}
+	if bm, ok := respObj["bookmark"]; ok {
+		if bm != nil && "nil" != bm.(string) {
+			results.Bookmark = bm.(string)
+		}
+	}
 
-	return handshakes, nil
+	return results, nil
 }

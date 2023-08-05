@@ -298,12 +298,26 @@
                 "tags": [
                     "Handshake"
                 ],
-                "summary": "List handshakes",
+                "summary": "List handshakes (default 10 results)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "max number of results",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "paging token",
+                        "name": "bookmark",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/types.Handshake"
+                            "$ref": "#/definitions/types.PagingResults"
                         }
                     }
                 }
@@ -628,6 +642,40 @@
                 }
             }
         },
+        "/api/v1/user/me": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Get logged in users basic information",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "User Account"
+                ],
+                "summary": "Get logged inusers basic information",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.OutputFindAddress"
+                        }
+                    },
+                    "429": {
+                        "description": "rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    }
+                }
+            }
+        },
         "/{address}/did.json": {
             "get": {
                 "description": "Returns users DID document based on mailio address",
@@ -924,6 +972,32 @@
                 }
             }
         },
+        "models.HandshakeOriginServer": {
+            "type": "object",
+            "properties": {
+                "domain": {
+                    "description": "domain of the server",
+                    "type": "string"
+                },
+                "p2pAddress": {
+                    "description": "P2P address of the server",
+                    "type": "string"
+                },
+                "serverIp": {
+                    "description": "server IP address",
+                    "type": "string"
+                }
+            }
+        },
+        "models.HandshakeSignupRules": {
+            "type": "object",
+            "properties": {
+                "frequencyMinutes": {
+                    "description": "frequency of the signup requests in seconds",
+                    "type": "integer"
+                }
+            }
+        },
         "types.Handshake": {
             "type": "object",
             "properties": {
@@ -937,14 +1011,78 @@
                     "description": "Rev is the revision number returned",
                     "type": "string"
                 },
+                "handshakeId": {
+                    "description": "handshake ID",
+                    "type": "string"
+                },
                 "id": {
                     "type": "string"
+                },
+                "level": {
+                    "description": "handshake level",
+                    "type": "integer"
                 },
                 "ok": {
                     "type": "boolean"
                 },
+                "originServer": {
+                    "description": "origin server",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/models.HandshakeOriginServer"
+                        }
+                    ]
+                },
+                "ownerAddress": {
+                    "description": "mailio address of the owner of the handshake",
+                    "type": "string"
+                },
+                "ownerPublicKey": {
+                    "description": "owner public key of the owner of the handshake",
+                    "type": "string"
+                },
                 "rev": {
                     "type": "string"
+                },
+                "senderMailioAddress": {
+                    "description": "senders mailio address",
+                    "type": "string"
+                },
+                "senderSha512Address": {
+                    "description": "senders sha512 address",
+                    "type": "string"
+                },
+                "signature": {
+                    "description": "owners signature of the handshake",
+                    "type": "string"
+                },
+                "signatureScheme": {
+                    "description": "handshake signature scheme",
+                    "type": "integer"
+                },
+                "signupRules": {
+                    "description": "handshake signup rules",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/models.HandshakeSignupRules"
+                        }
+                    ]
+                },
+                "signupSubType": {
+                    "description": "handshake signup sub type",
+                    "type": "integer"
+                },
+                "status": {
+                    "description": "handshake status",
+                    "type": "integer"
+                },
+                "timestamp": {
+                    "description": "timestamp of the handshake",
+                    "type": "integer"
+                },
+                "type": {
+                    "description": "handshake type",
+                    "type": "integer"
                 }
             }
         },
@@ -1037,6 +1175,18 @@
             "properties": {
                 "address": {
                     "type": "string"
+                }
+            }
+        },
+        "types.PagingResults": {
+            "type": "object",
+            "properties": {
+                "bookmark": {
+                    "type": "string"
+                },
+                "docs": {
+                    "type": "array",
+                    "items": {}
                 }
             }
         },

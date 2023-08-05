@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/mailio/go-mailio-server/services"
@@ -40,10 +41,12 @@ func (ha *HandshakeApi) GetHandshake(c *gin.Context) {
 
 // List logged in users handshake
 // @Security Bearer
-// @Summary List handshakes
+// @Summary List handshakes (default 10 results)
 // @Description List all handshakes
 // @Tags Handshake
-// @Success 200 {object} types.Handshake
+// @Param limit query integer false "max number of results"
+// @Param bookmark query string false "paging token"
+// @Success 200 {object} types.PagingResults
 // @Accept json
 // @Produce json
 // @Router /api/v1/handshake [get]
@@ -54,7 +57,14 @@ func (ha *HandshakeApi) ListHandshakes(c *gin.Context) {
 		ApiErrorf(c, http.StatusInternalServerError, "jwt invalid")
 		return
 	}
-	handshakes, err := ha.handshakeService.ListHandshakes(address.(string))
+	limitStr := c.DefaultQuery("limit", "10")
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil {
+		ApiErrorf(c, http.StatusBadRequest, "invalid limit: %s", limitStr)
+		return
+	}
+	bookmark := c.DefaultQuery("bookmark", "")
+	handshakes, err := ha.handshakeService.ListHandshakes(address.(string), bookmark, limit)
 	if err != nil {
 		ApiErrorf(c, http.StatusInternalServerError, "error while fetching handshakes: %s", err.Error())
 		return

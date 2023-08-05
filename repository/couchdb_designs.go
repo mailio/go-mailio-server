@@ -2,11 +2,9 @@ package repository
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/go-resty/resty/v2"
-	coreErrors "github.com/mailio/go-mailio-core/errors"
 	"github.com/mailio/go-mailio-server/types"
 )
 
@@ -30,27 +28,28 @@ func GetDesignDocumentByID(id string, dbRepo Repository) (*types.DesignDocument,
 
 // Map-Reduce methods for couchdb (called designs)
 func CreateDesign_DeleteExpiredRecordsByCreatedDate(dbRepo Repository, olderThanMinutes int64) {
-	existing, eErr := GetDesignDocumentByID("/_design/nonce", dbRepo)
+	c := dbRepo.GetClient().(*resty.Client)
+	existing, eErr := c.R().Head(dbRepo.GetDBName() + "/_design/nonce/_view/NonceByCreated")
 	if eErr != nil {
-		if eErr != coreErrors.ErrNotFound {
-			panic(eErr)
-		}
+		panic(eErr)
 	}
-	if existing != nil {
-		return // already exists
+	if existing.IsError() {
+		panic(existing.Error())
+	}
+	if existing.StatusCode() == 200 {
+		return // view already exists
 	}
 	// create a design document and a view
 	ddoc := &types.DesignDocument{
 		Language: "javascript",
 		Views: map[string]types.MapFunction{
-			"older_than": {
-				Map: fmt.Sprintf(`function(doc) 
+			"NonceByCreated": {
+				Map: `function(doc) 
 					{ 
-						var minutesAgo = Date.now() - (%d * 60 * 1000);
-						if (doc.created < minutesAgo) {
+						if (doc.created) {
 							emit(doc.created, doc._rev); 
 						}
-					}`, olderThanMinutes),
+					}`,
 			},
 		},
 	}

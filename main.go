@@ -55,7 +55,7 @@ func loadServerEd25519Keys(conf global.Config) {
 	global.MailioDID = &mailioDid.ID
 }
 
-func initRedisRateLimiter(conf global.Config) {
+func initRedisRateLimiter(conf global.Config) *redis.Client {
 	redisRateLimitClient := redis.NewClient(&redis.Options{
 		Addr:     conf.Redis.Host + ":" + strconv.Itoa(conf.Redis.Port),
 		Username: conf.Redis.Username,
@@ -72,6 +72,8 @@ func initRedisRateLimiter(conf global.Config) {
 
 	limiter := redis_rate.NewLimiter(redisRateLimitClient)
 	global.RateLimiter = limiter
+
+	return redisRateLimitClient
 }
 
 // @title Mailio Server API
@@ -102,7 +104,8 @@ func main() {
 
 	// loads server keys into global variables for signing and signature validation
 	loadServerEd25519Keys(global.Conf)
-	initRedisRateLimiter(global.Conf)
+	rrClient := initRedisRateLimiter(global.Conf)
+	defer rrClient.Close()
 
 	// programmatically set swagger info
 	docs.SwaggerInfo.Title = "Mailio Server"

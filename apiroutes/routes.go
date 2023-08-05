@@ -133,6 +133,9 @@ func ConfigRoutes(router *gin.Engine) *gin.Engine {
 		// VCs
 		rootApi.GET("/v1/credentials/list/:address", vcApi.ListVCs)
 		rootApi.GET("/v1/credentials/:id", vcApi.GetVC)
+
+		// user account
+		rootApi.GET("/v1/user/me", accountApi.GetUserAddress)
 	}
 
 	router.StaticFile("./well-known/did.json", "./well-known/did.json")

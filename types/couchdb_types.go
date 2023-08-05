@@ -29,6 +29,11 @@ type Index struct {
 	Definition interface{} `json:"def"`
 }
 
+type PagingResults struct {
+	Docs     []interface{} `json:"docs"`
+	Bookmark string        `json:"bookmark,omitempty"`
+}
+
 // // Attachment represents a file attachment to a document.
 // type Attachment struct {
 // 	Filename        string        `json:"-"`

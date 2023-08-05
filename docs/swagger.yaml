@@ -162,6 +162,24 @@ definitions:
       type:
         type: string
     type: object
+  models.HandshakeOriginServer:
+    properties:
+      domain:
+        description: domain of the server
+        type: string
+      p2pAddress:
+        description: P2P address of the server
+        type: string
+      serverIp:
+        description: server IP address
+        type: string
+    type: object
+  models.HandshakeSignupRules:
+    properties:
+      frequencyMinutes:
+        description: frequency of the signup requests in seconds
+        type: integer
+    type: object
   types.Handshake:
     properties:
       _deleted:
@@ -171,12 +189,56 @@ definitions:
       _rev:
         description: Rev is the revision number returned
         type: string
+      handshakeId:
+        description: handshake ID
+        type: string
       id:
         type: string
+      level:
+        description: handshake level
+        type: integer
       ok:
         type: boolean
+      originServer:
+        allOf:
+        - $ref: '#/definitions/models.HandshakeOriginServer'
+        description: origin server
+      ownerAddress:
+        description: mailio address of the owner of the handshake
+        type: string
+      ownerPublicKey:
+        description: owner public key of the owner of the handshake
+        type: string
       rev:
         type: string
+      senderMailioAddress:
+        description: senders mailio address
+        type: string
+      senderSha512Address:
+        description: senders sha512 address
+        type: string
+      signature:
+        description: owners signature of the handshake
+        type: string
+      signatureScheme:
+        description: handshake signature scheme
+        type: integer
+      signupRules:
+        allOf:
+        - $ref: '#/definitions/models.HandshakeSignupRules'
+        description: handshake signup rules
+      signupSubType:
+        description: handshake signup sub type
+        type: integer
+      status:
+        description: handshake status
+        type: integer
+      timestamp:
+        description: timestamp of the handshake
+        type: integer
+      type:
+        description: handshake type
+        type: integer
     type: object
   types.InputLogin:
     properties:
@@ -242,6 +304,14 @@ definitions:
     properties:
       address:
         type: string
+    type: object
+  types.PagingResults:
+    properties:
+      bookmark:
+        type: string
+      docs:
+        items: {}
+        type: array
     type: object
   types.VCValidationResponse:
     properties:
@@ -471,16 +541,25 @@ paths:
       consumes:
       - application/json
       description: List all handshakes
+      parameters:
+      - description: max number of results
+        in: query
+        name: limit
+        type: integer
+      - description: paging token
+        in: query
+        name: bookmark
+        type: string
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/types.Handshake'
+            $ref: '#/definitions/types.PagingResults'
       security:
       - Bearer: []
-      summary: List handshakes
+      summary: List handshakes (default 10 results)
       tags:
       - Handshake
     post:
@@ -686,6 +765,27 @@ paths:
           schema:
             $ref: '#/definitions/api.ApiError'
       summary: Register user
+      tags:
+      - User Account
+  /api/v1/user/me:
+    get:
+      consumes:
+      - application/json
+      description: Get logged in users basic information
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.OutputFindAddress'
+        "429":
+          description: rate limit exceeded
+          schema:
+            $ref: '#/definitions/api.ApiError'
+      security:
+      - Bearer: []
+      summary: Get logged inusers basic information
       tags:
       - User Account
 securityDefinitions:

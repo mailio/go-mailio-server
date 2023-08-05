@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/go-kit/log/level"
@@ -97,7 +98,9 @@ func (ns *NonceService) RemoveExpiredNonces() {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 		defer cancel()
 
-		response, err := ns.nonceRepo.GetByID(ctx, "/_design/nonce/_view/older_than?limit=500")
+		time_ago := time.Now().UnixMilli() - (5 * 60 * 1000) // 5 seconds ago and older
+		query := fmt.Sprintf("_design/nonce/_view/older_than?descending=true&startkey=%d&limit=100", time_ago)
+		response, err := ns.nonceRepo.GetByID(ctx, query)
 		if err != nil {
 			return
 		}
@@ -107,7 +110,7 @@ func (ns *NonceService) RemoveExpiredNonces() {
 		if mErr != nil {
 			return
 		}
-		if expiredNonces.TotalRows > 0 {
+		if len(expiredNonces.Rows) > 0 {
 			global.Logger.Log("expired nonces: ", expiredNonces.TotalRows)
 			bulkDelete := []types.BaseDocument{}
 			for _, nonceDoc := range expiredNonces.Rows {
@@ -127,7 +130,7 @@ func (ns *NonceService) RemoveExpiredNonces() {
 				return
 			}
 		}
-		totalRows = expiredNonces.TotalRows
+		totalRows = int64(len(expiredNonces.Rows))
 	}
 
 	return

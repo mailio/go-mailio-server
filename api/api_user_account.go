@@ -350,3 +350,25 @@ func (ua *UserAccountApi) FindUsersAddressByEmail(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, output)
 }
+
+// Get logged in users basic information
+// @Security Bearer
+// @Summary Get logged inusers basic information
+// @Description Get logged in users basic information
+// @Tags User Account
+// @Success 200 {object} types.OutputFindAddress
+// @Failure 429 {object} api.ApiError "rate limit exceeded"
+// @Accept json
+// @Produce json
+// @Router /api/v1/user/me [get]
+func (ua *UserAccountApi) GetUserAddress(c *gin.Context) {
+	address := c.GetString("subjectAddress")
+	if address == "" {
+		ApiErrorf(c, http.StatusUnauthorized, "address not found")
+		return
+	}
+	output := &types.OutputFindAddress{
+		Address: address,
+	}
+	c.JSON(http.StatusOK, output)
+}
