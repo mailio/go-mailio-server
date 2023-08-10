@@ -2,15 +2,18 @@ package services
 
 import (
 	"context"
-	"crypto/ed25519"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/go-kit/log/level"
 	"github.com/go-resty/resty/v2"
 	coreErrors "github.com/mailio/go-mailio-core/errors"
+	"github.com/mailio/go-mailio-core/models"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/repository"
 	"github.com/mailio/go-mailio-server/types"
@@ -18,39 +21,66 @@ import (
 
 type HandshakeService struct {
 	handshakeRepo repository.Repository
+	env           *types.Environment
 }
 
-func NewHandshakeService(dbSelector repository.DBSelector) *HandshakeService {
+func NewHandshakeService(dbSelector repository.DBSelector, environment *types.Environment) *HandshakeService {
 	handshakeRepo, err := dbSelector.ChooseDB(repository.Handshake)
 	if err != nil {
 		level.Error(global.Logger).Log("msg", "error while choosing db", "err", err)
 		panic(err)
 	}
-	return &HandshakeService{handshakeRepo: handshakeRepo}
+	return &HandshakeService{handshakeRepo: handshakeRepo, env: environment}
 }
 
 // Save a handshake into a database
 func (hs *HandshakeService) Save(handshake *types.Handshake, userPublicKeyEd25519Base64 string) error {
+	// basic sanity check
+	if handshake == nil || handshake.Content.HandshakeID == "" {
+		return coreErrors.ErrBadRequest
+	}
+	if handshake.Content.SenderAddress == "" {
+		return coreErrors.ErrBadRequest
+	}
+
+	ownerMailioAddr, mErr := hs.env.MailioCrypto.PublicKeyToMailioAddress(userPublicKeyEd25519Base64)
+	if mErr != nil {
+		return mErr
+	}
+	if *ownerMailioAddr != handshake.Content.OwnerAddressHex {
+		return errors.New("owner address does not match")
+	}
+	handshakeIDConcat := *ownerMailioAddr + handshake.Content.SenderAddress
+	s256 := sha256.Sum256([]byte(handshakeIDConcat))
+	handshakeID := hex.EncodeToString(s256[:])
+	handshake.Content.HandshakeID = handshakeID
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
-	// Verify signature
-	signature, sErr := base64.StdEncoding.DecodeString(handshake.SignatureBase64)
-	if sErr != nil {
-		return sErr
+	vfHandshake := &models.Handshake{
+		Content:     handshake.Content,
+		Signature:   handshake.SignatureBase64,
+		CborPayload: handshake.CborPayloadBase64,
 	}
-	pk, pkErr := base64.StdEncoding.DecodeString(userPublicKeyEd25519Base64)
-	if pkErr != nil {
-		return pkErr
-	}
-	cborPayloadBytes, cbErr := base64.StdEncoding.DecodeString(handshake.CborPayloadBase64)
-	if cbErr != nil {
-		return cbErr
+	isValid, vErr := hs.env.MailioCrypto.VerifyHandshake(vfHandshake, userPublicKeyEd25519Base64)
+	if vErr != nil {
+		return vErr
 	}
 
-	isValid := ed25519.Verify(ed25519.PublicKey(pk), cborPayloadBytes, signature)
 	if !isValid {
 		return coreErrors.ErrSignatureInvalid
+	}
+
+	// check if handshake already exists (overide if it does)
+	existingHs, eErr := hs.GetByID(handshake.Content.HandshakeID)
+	if eErr != nil {
+		if eErr != coreErrors.ErrNotFound {
+			return eErr
+		}
+	}
+	if existingHs != nil {
+		handshake.UnderscoreRev = existingHs.UnderscoreRev
 	}
 
 	return hs.handshakeRepo.Save(ctx, handshake.Content.HandshakeID, handshake)
@@ -106,4 +136,77 @@ func (hs *HandshakeService) ListHandshakes(address string, bookmark string, limi
 	}
 
 	return results, nil
+}
+
+// Lookup handshake in the local database (local meaning this servers database)
+// lookup by senderAddress (either mailio address or an email address) or by handshakeID (if handshakeID is provided, senderAddress is ignored)
+func (hs *HandshakeService) LookupHandshake(userOwnerMailioAddress string, senderAddress string) (*models.Handshake, error) {
+	if senderAddress == "" || userOwnerMailioAddress == "" {
+		return nil, coreErrors.ErrBadRequest
+	}
+
+	shake, err := hs.GetByMailioAddress(userOwnerMailioAddress, senderAddress)
+	if err != nil {
+		if err == coreErrors.ErrNotFound {
+			// return default server handshake
+			b64PublicKey := base64.StdEncoding.EncodeToString(global.PublicKey)
+			b64PrivateKey := base64.StdEncoding.EncodeToString(global.PrivateKey)
+			handshake, hsErr := hs.env.MailioCrypto.ServerSideHandshake(b64PublicKey, b64PrivateKey, global.Conf.Mailio.Domain, senderAddress)
+			if hsErr != nil {
+				level.Error(global.Logger).Log("msg", "error while creating handshake", "err", hsErr)
+				return nil, hsErr
+			}
+			return handshake, nil
+		}
+		return nil, err
+	}
+	out := &models.Handshake{
+		Content:     shake.Content,
+		Signature:   shake.SignatureBase64,
+		CborPayload: shake.CborPayloadBase64,
+	}
+	return out, nil
+}
+
+// returns default server handshake (used when there is no users handshake related to the sender)
+func (hs *HandshakeService) GetServerHandshake(senderAddress string) (*models.Handshake, error) {
+	handshake, hErr := hs.env.MailioCrypto.ServerSideHandshake(string(global.PublicKey), string(global.PrivateKey), global.Conf.Mailio.Domain, senderAddress)
+	if hErr != nil {
+		level.Error(global.Logger).Log("msg", "error while creating handshake", "err", hErr)
+		return nil, hErr
+	}
+	return handshake, nil
+}
+
+// Get handshake by ID
+func (hs *HandshakeService) GetByID(handshakeID string) (*types.Handshake, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+	handshakeResponse, err := hs.handshakeRepo.GetByID(ctx, handshakeID)
+	if err != nil {
+		return nil, err
+	}
+	var handshake types.Handshake
+	mErr := repository.MapToObject(handshakeResponse, &handshake)
+	if mErr != nil {
+		return nil, mErr
+	}
+
+	return &handshake, nil
+}
+
+// get handshake by mailio address (where ID of the handshake is constructed from userOwnerAddress and senderAddress)
+// senderAddress can be either mailio address or email address
+func (hs *HandshakeService) GetByMailioAddress(userOwnerAddress string, senderAddress string) (*types.Handshake, error) {
+
+	handshakeIDConcat := userOwnerAddress + senderAddress
+	s256 := sha256.Sum256([]byte(handshakeIDConcat))
+	handshakeID := hex.EncodeToString(s256[:])
+
+	handshake, err := hs.GetByID(handshakeID)
+	if err != nil {
+		return nil, err
+	}
+
+	return handshake, nil
 }

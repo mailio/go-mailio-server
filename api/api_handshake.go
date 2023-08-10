@@ -36,8 +36,43 @@ func (ha *HandshakeApi) GetHandshake(c *gin.Context) {
 		ApiErrorf(c, http.StatusBadRequest, "invalid id: %s", id)
 		return
 	}
+	handshake, err := ha.handshakeService.GetByID(id)
+	if err != nil {
+		if err == coreErrors.ErrNotFound {
+			ApiErrorf(c, http.StatusNotFound, "handshake not found: %s", id)
+			return
+		}
+		ApiErrorf(c, http.StatusInternalServerError, "error while getting handshake: %s", err)
+		return
+	}
+	c.JSON(http.StatusOK, handshake)
+}
 
-	c.JSON(http.StatusOK, types.Handshake{BaseDocument: types.BaseDocument{ID: id}})
+// Lookup handshake is public and looksup handshake by ownerAddress and sender scrypted (hashed) address
+// @Summary Lookup handshake by ownerAddress and sender scrypted (hashed) address (or mailio address)
+// @Description Lookup handshake is public and looksup handshake by ownerAddress and sender scrypted (hashed) address or mailio address. If nothing found default server handshake returned
+// @Tags Handshake
+// @Param ownerAddress path string true "Owners mailio address"
+// @Param senderAddress path string true "Senders scrypt address or mailio address (not hashed)"
+// @Success 200 {object} types.Handshake
+// @Accept json
+// @Produce json
+// @Router /api/v1/handshake/lookup/{ownerAddress}/{senderAddress} [get]
+func (ha *HandshakeApi) LookupHandshake(c *gin.Context) {
+	ownerAddress := c.Param("ownerAddress")
+	senderAddress := c.Param("senderAddress")
+	if ownerAddress == "" || senderAddress == "" {
+		ApiErrorf(c, http.StatusBadRequest, "invalid address: %s/%s", ownerAddress, senderAddress)
+		return
+	}
+
+	handshake, err := ha.handshakeService.LookupHandshake(ownerAddress, senderAddress)
+	if err != nil {
+		// cannot be not found (default handshake should be returned)
+		ApiErrorf(c, http.StatusInternalServerError, "error while getting handshake: %s", err)
+		return
+	}
+	c.JSON(http.StatusOK, handshake)
 }
 
 // List logged in users handshake

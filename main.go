@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/go-redis/redis_rate/v10"
+	"github.com/mailio/go-mailio-core/crypto"
 	"github.com/mailio/go-mailio-server/apiroutes"
 	"github.com/mailio/go-mailio-server/docs"
 	"github.com/mailio/go-mailio-server/global"
@@ -106,6 +107,9 @@ func main() {
 	rrClient := initRedisRateLimiter(global.Conf)
 	defer rrClient.Close()
 
+	mc := crypto.NewMailioCrypto()
+	env := types.NewEnvironment(rrClient, mc)
+
 	// programmatically set swagger info
 	docs.SwaggerInfo.Title = "Mailio Server"
 	docs.SwaggerInfo.Description = "Mailio Server implements the Mailio server based on https://mirs.mail.io/ specifications"
@@ -129,7 +133,7 @@ func main() {
 	// init routing (for RESTful API endpoints)
 	router := w3srv.NewAPIRouter(&global.Conf.YamlConfig)
 
-	router = apiroutes.ConfigRoutes(router)
+	router = apiroutes.ConfigRoutes(router, env)
 	grpcServer := apiroutes.ConfigGrpcRoutes()
 
 	// start server

@@ -162,7 +162,7 @@ definitions:
       type:
         type: string
     type: object
-  models.Handshake:
+  models.HandshakeContent:
     properties:
       handshakeId:
         description: handshake ID
@@ -180,11 +180,8 @@ definitions:
       ownerPublicKey:
         description: owner public key of the owner of the handshake
         type: string
-      senderMailioAddress:
-        description: senders mailio address
-        type: string
       senderSha512Address:
-        description: senders sha512 address
+        description: senders scrypted email address or mailio address
         type: string
       signature:
         description: owners signature of the handshake
@@ -239,7 +236,7 @@ definitions:
       cborPayload:
         type: string
       content:
-        $ref: '#/definitions/models.Handshake'
+        $ref: '#/definitions/models.HandshakeContent'
       id:
         type: string
       ok:
@@ -679,6 +676,35 @@ paths:
       security:
       - Bearer: []
       summary: Update a handshake
+      tags:
+      - Handshake
+  /api/v1/handshake/lookup/{ownerAddress}/{senderAddress}:
+    get:
+      consumes:
+      - application/json
+      description: Lookup handshake is public and looksup handshake by ownerAddress
+        and sender scrypted (hashed) address or mailio address. If nothing found default
+        server handshake returned
+      parameters:
+      - description: Owners mailio address
+        in: path
+        name: ownerAddress
+        required: true
+        type: string
+      - description: Senders scrypt address or mailio address (not hashed)
+        in: path
+        name: senderAddress
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Handshake'
+      summary: Lookup handshake by ownerAddress and sender scrypted (hashed) address
+        (or mailio address)
       tags:
       - Handshake
   /api/v1/login:

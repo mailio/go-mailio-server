@@ -387,6 +387,45 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/handshake/lookup/{ownerAddress}/{senderAddress}": {
+            "get": {
+                "description": "Lookup handshake is public and looksup handshake by ownerAddress and sender scrypted (hashed) address or mailio address. If nothing found default server handshake returned",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Handshake"
+                ],
+                "summary": "Lookup handshake by ownerAddress and sender scrypted (hashed) address (or mailio address)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Owners mailio address",
+                        "name": "ownerAddress",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Senders scrypt address or mailio address (not hashed)",
+                        "name": "senderAddress",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Handshake"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/handshake/{id}": {
             "get": {
                 "security": [
@@ -993,7 +1032,7 @@ const docTemplate = `{
                 }
             }
         },
-        "models.Handshake": {
+        "models.HandshakeContent": {
             "type": "object",
             "properties": {
                 "handshakeId": {
@@ -1020,12 +1059,8 @@ const docTemplate = `{
                     "description": "owner public key of the owner of the handshake",
                     "type": "string"
                 },
-                "senderMailioAddress": {
-                    "description": "senders mailio address",
-                    "type": "string"
-                },
                 "senderSha512Address": {
-                    "description": "senders sha512 address",
+                    "description": "senders scrypted email address or mailio address",
                     "type": "string"
                 },
                 "signature": {
@@ -1105,7 +1140,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "content": {
-                    "$ref": "#/definitions/models.Handshake"
+                    "$ref": "#/definitions/models.HandshakeContent"
                 },
                 "id": {
                     "type": "string"

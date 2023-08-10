@@ -91,6 +91,7 @@ github.com/go-stack/stack v1.8.0/go.mod h1:v0f6uXyyMGvRgIKkXu+yp6POWl0qKG85gN/me
 github.com/goccy/go-json v0.9.7/go.mod h1:6MelG93GURQebXPDq3khkgXZkazVtN9CRI+MGFi0w8I=
 github.com/goccy/go-json v0.10.2 h1:CrxCmQqYDkv1z7lO7Wbh2HN93uovUHgrECaO5ZrCXAU=
 github.com/goccy/go-json v0.10.2/go.mod h1:6MelG93GURQebXPDq3khkgXZkazVtN9CRI+MGFi0w8I=
+github.com/gogo/protobuf v1.3.2 h1:Ov1cvc58UF3b5XjBnZv7+opcTcQFZebYjWzi34vdm4Q=
 github.com/gogo/protobuf v1.3.2/go.mod h1:P1XiOD3dCwIKUDQYPy72D8LYyHL2YPYrpS2s69NZV8Q=
 github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b/go.mod h1:SBH7ygxi8pfUlaOkMMuAQtPIUF8ecWP5IEl/CR7VP2Q=
 github.com/golang/mock v1.1.1/go.mod h1:oTYuIxOrZwtPieC+H1uAHpcLFnEyAGVDL/k47Jfbm0A=
@@ -152,8 +153,8 @@ github.com/lestrrat-go/jwx/v2 v2.0.11/go.mod h1:ZtPtMFlrfDrH2Y0iwfa3dRFn8VzwBrB+
 github.com/lestrrat-go/option v1.0.0/go.mod h1:5ZHFbivi4xwXxhxY9XHDe2FHo6/Z7WWmtT7T5nBBp3I=
 github.com/lestrrat-go/option v1.0.1 h1:oAzP2fvZGQKWkvHa1/SAcFolBEca1oN+mQ7eooNBEYU=
 github.com/lestrrat-go/option v1.0.1/go.mod h1:5ZHFbivi4xwXxhxY9XHDe2FHo6/Z7WWmtT7T5nBBp3I=
-github.com/mailio/go-mailio-core v0.2.0 h1:64ZvN52nFvv3BKsawjZXrkZElF/ALhAwozTbDZiS7hQ=
-github.com/mailio/go-mailio-core v0.2.0/go.mod h1:40mpPPnUYzxySzOmr2HaVM+42VFFU64U0zGM5LGgTyo=
+github.com/mailio/go-mailio-core v0.2.2 h1:WMdfnyCZ8Nad9RxERw9QasA0LwZ2lFDt2KMvR5aULVA=
+github.com/mailio/go-mailio-core v0.2.2/go.mod h1:AXQSY3WINXVm9exDLSB7i4uYtq0CRYGLHc59OxvKvr0=
 github.com/mailio/go-web3-kit v0.0.0-20230302165532-057a45112b37 h1:5JGzR1JKKV6Q/a+qhlGf8XLykR0EsgrPGsSsRJ9appk=
 github.com/mailio/go-web3-kit v0.0.0-20230302165532-057a45112b37/go.mod h1:Ifq8SY22NEf70R8M/F26nluqPKwx3gh3kY3gyRDl/GI=
 github.com/mailru/easyjson v0.0.0-20190614124828-94de47d64c63/go.mod h1:C1wdFJiN94OJF2b5HbByQZoLdCWB1Yqtg26g4irojpc=

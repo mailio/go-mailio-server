@@ -8,7 +8,7 @@ import (
 // GrpcSignatureValidator is a struct that implements SignatureValidator interface
 type GrpcSignatureValidator struct {
 	sv interceptors.SignatureValidator
-	mc crypto.MailioCrypto
+	mc crypto.IMailioCrypto
 }
 
 func NewGrpcSignatureValidator() *GrpcSignatureValidator {

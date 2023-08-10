@@ -20,7 +20,7 @@ type CouchDBRepository struct {
 }
 
 func NewCouchDBRepository(url, DBName string, username string, password string, mock bool) (Repository, error) {
-	cl := resty.New().SetHostURL(url).SetTimeout(time.Second * 10)
+	cl := resty.New().SetBaseURL(url).SetTimeout(time.Second * 10)
 	cl.SetHeader("Content-Type", "application/json")
 	cl.SetHeader("Accept", "application/json")
 	cl.SetHeader("User-Agent", "go-web3-kit/1.0.0")

@@ -15,6 +15,7 @@ import (
 	"github.com/mailio/go-mailio-server/metrics"
 	"github.com/mailio/go-mailio-server/repository"
 	"github.com/mailio/go-mailio-server/services"
+	"github.com/mailio/go-mailio-server/types"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/robfig/cron/v3"
 	"google.golang.org/grpc"
@@ -40,7 +41,7 @@ func ConfigGrpcRoutes() *grpc.Server {
 }
 
 // REST API routes
-func ConfigRoutes(router *gin.Engine) *gin.Engine {
+func ConfigRoutes(router *gin.Engine, environment *types.Environment) *gin.Engine {
 	// init metrics
 	if global.Conf.Prometheus.Enabled {
 
@@ -80,7 +81,7 @@ func ConfigRoutes(router *gin.Engine) *gin.Engine {
 	userService := services.NewUserService(dbSelector)
 	nonceService := services.NewNonceService(dbSelector)
 	ssiService := services.NewSelfSovereignService(dbSelector)
-	handshakeService := services.NewHandshakeService(dbSelector)
+	handshakeService := services.NewHandshakeService(dbSelector, environment)
 
 	// Create INDEXES
 	icVcsErr := repository.CreateVcsCredentialSubjectIDIndex(vcsRepo)
@@ -128,8 +129,10 @@ func ConfigRoutes(router *gin.Engine) *gin.Engine {
 	{
 		// Handshakes
 		rootApi.GET("/v1/handshake/:id", handshakeApi.GetHandshake)
-		rootApi.GET("v1/handshake", handshakeApi.ListHandshakes)
+		rootApi.GET("/v1/handshake", handshakeApi.ListHandshakes)
+		rootApi.GET("/v1/handshake/lookup/:ownerAddress/:targetAddress", handshakeApi.LookupHandshake)
 		rootApi.POST("/v1/handshake", handshakeApi.CreateHandshake)
+		rootApi.DELETE("/v1/handshake/:id", handshakeApi.DeleteHandshake)
 
 		// VCs
 		rootApi.GET("/v1/credentials/list/:address", vcApi.ListVCs)
