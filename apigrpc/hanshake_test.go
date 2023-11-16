@@ -76,7 +76,7 @@ func TestHandshakeRequest_SignatureValid(t *testing.T) {
 
 	// prearing request
 	byId := &v1.HandshakeLookup{HandshakeLookup: &v1.HandshakeLookup_HandshakeId{HandshakeId: "2134567890"}}
-	byEmail := &v1.HandshakeLookup{HandshakeLookup: &v1.HandshakeLookup_BcryptLookupEmail{BcryptLookupEmail: "bcryptemail"}}
+	byEmail := &v1.HandshakeLookup{HandshakeLookup: &v1.HandshakeLookup_ScryptLookupEmail{ScryptLookupEmail: "bcryptemail"}}
 	byAddress := &v1.HandshakeLookup{HandshakeLookup: &v1.HandshakeLookup_Address{Address: "0xabc"}}
 
 	request := &v1.HandshakeRequest{}
@@ -84,7 +84,7 @@ func TestHandshakeRequest_SignatureValid(t *testing.T) {
 
 		SignatureScheme:         v1.SigScheme_EdDSA_X25519,
 		Created:                 &timestamppb.Timestamp{Seconds: time.Now().Unix()},
-		EmailBcryptLookupScheme: v1.EmailLookupBcryptScheme_BC_14_B64,
+		EmailScryptLookupScheme: v1.EmailLookupScryptScheme_SC_N32768_R8_P1_L32_B64,
 	}
 	request.Lookup = []*v1.HandshakeLookup{
 		byId,
