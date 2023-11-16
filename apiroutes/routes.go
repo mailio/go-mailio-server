@@ -123,6 +123,8 @@ func ConfigRoutes(router *gin.Engine, environment *types.Environment) *gin.Engin
 		publicApi.POST("/v1/login", accountApi.Login)
 		publicApi.GET("/v1/nonce", accountApi.ChallengeNonce)
 		publicApi.GET("/v1/findaddress", accountApi.FindUsersAddressByEmail)
+
+		publicApi.GET("/v1/handshake/lookup/:ownerAddress/:senderAddress", handshakeApi.LookupHandshake)
 	}
 
 	rootApi := router.Group("/api", metrics.MetricsMiddleware(), restinterceptors.RateLimitMiddleware(), restinterceptors.JWSMiddleware())
@@ -130,13 +132,13 @@ func ConfigRoutes(router *gin.Engine, environment *types.Environment) *gin.Engin
 		// Handshakes
 		rootApi.GET("/v1/handshake/:id", handshakeApi.GetHandshake)
 		rootApi.GET("/v1/handshake", handshakeApi.ListHandshakes)
-		rootApi.GET("/v1/handshake/lookup/:ownerAddress/:targetAddress", handshakeApi.LookupHandshake)
 		rootApi.POST("/v1/handshake", handshakeApi.CreateHandshake)
 		rootApi.DELETE("/v1/handshake/:id", handshakeApi.DeleteHandshake)
 
 		// VCs
 		rootApi.GET("/v1/credentials/list/:address", vcApi.ListVCs)
 		rootApi.GET("/v1/credentials/:id", vcApi.GetVC)
+		rootApi.POST("/v1/credentials/:requestId/verify", vcApi.VerifyVC)
 
 		// user account
 		rootApi.GET("/v1/user/me", accountApi.GetUserAddress)
