@@ -152,8 +152,8 @@ github.com/lestrrat-go/jwx/v2 v2.0.11/go.mod h1:ZtPtMFlrfDrH2Y0iwfa3dRFn8VzwBrB+
 github.com/lestrrat-go/option v1.0.0/go.mod h1:5ZHFbivi4xwXxhxY9XHDe2FHo6/Z7WWmtT7T5nBBp3I=
 github.com/lestrrat-go/option v1.0.1 h1:oAzP2fvZGQKWkvHa1/SAcFolBEca1oN+mQ7eooNBEYU=
 github.com/lestrrat-go/option v1.0.1/go.mod h1:5ZHFbivi4xwXxhxY9XHDe2FHo6/Z7WWmtT7T5nBBp3I=
-github.com/mailio/go-mailio-core v0.2.4 h1:HZwdSEEJYqdZH0hQWBt/5DBsQaPA7jYdAeGSMaVbY8A=
-github.com/mailio/go-mailio-core v0.2.4/go.mod h1:AXQSY3WINXVm9exDLSB7i4uYtq0CRYGLHc59OxvKvr0=
+github.com/mailio/go-mailio-core v0.2.8 h1:I5s8PU1wg/Hf2Zu+mHfSrUBesWsdTIGCYtymBC9B3LQ=
+github.com/mailio/go-mailio-core v0.2.8/go.mod h1:AXQSY3WINXVm9exDLSB7i4uYtq0CRYGLHc59OxvKvr0=
 github.com/mailio/go-web3-kit v0.0.0-20230302165532-057a45112b37 h1:5JGzR1JKKV6Q/a+qhlGf8XLykR0EsgrPGsSsRJ9appk=
 github.com/mailio/go-web3-kit v0.0.0-20230302165532-057a45112b37/go.mod h1:Ifq8SY22NEf70R8M/F26nluqPKwx3gh3kY3gyRDl/GI=
 github.com/mailru/easyjson v0.0.0-20190614124828-94de47d64c63/go.mod h1:C1wdFJiN94OJF2b5HbByQZoLdCWB1Yqtg26g4irojpc=

@@ -5,14 +5,13 @@ import (
 	"errors"
 
 	"github.com/go-resty/resty/v2"
-	coreErrors "github.com/mailio/go-mailio-core/errors"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/types"
 )
 
 func handleError(reqErr *resty.Response) error {
 	if reqErr.StatusCode() == 404 {
-		return coreErrors.ErrNotFound
+		return types.ErrNotFound
 	}
 	if reqErr.StatusCode() == 409 {
 		return types.ErrConflict
@@ -27,7 +26,7 @@ func handleError(reqErr *resty.Response) error {
 		if errDesc, ok := mytest["error"]; ok {
 			return errors.New(errDesc.(string))
 		}
-		return coreErrors.ErrBadRequest
+		return types.ErrBadRequest
 	}
 	return nil
 }

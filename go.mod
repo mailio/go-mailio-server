@@ -15,7 +15,7 @@ require (
 	github.com/hashicorp/golang-lru/v2 v2.0.2
 	github.com/jarcoal/httpmock v1.3.0
 	github.com/lestrrat-go/jwx/v2 v2.0.11
-	github.com/mailio/go-mailio-core v0.2.4
+	github.com/mailio/go-mailio-core v0.2.8
 	github.com/mailio/go-web3-kit v0.0.0-20230302165532-057a45112b37
 	github.com/prometheus/client_golang v1.15.0
 	github.com/redis/go-redis/v9 v9.0.5

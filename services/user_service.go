@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/go-resty/resty/v2"
-	coreErrors "github.com/mailio/go-mailio-core/errors"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/repository"
 	"github.com/mailio/go-mailio-server/types"
@@ -92,7 +91,7 @@ func (us *UserService) MapEmailToMailioAddress(user *types.User) (*types.EmailTo
 	// Check if email already exists
 	existingResponse, eErr := repo.GetByID(ctx, mapping.EncryptedEmail)
 	if eErr != nil {
-		if eErr != coreErrors.ErrNotFound {
+		if eErr != types.ErrNotFound {
 			return nil, eErr
 		}
 	}
@@ -118,16 +117,5 @@ func (us *UserService) FindUserByScryptEmail(scryptEmail string) (*types.EmailTo
 	if err != nil {
 		return nil, err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-	defer cancel()
-	response, eErr := repo.GetByID(ctx, scryptEmail)
-	if eErr != nil {
-		return nil, eErr
-	}
-	var userMapping types.EmailToMailioMapping
-	mErr := repository.MapToObject(response, &userMapping)
-	if mErr != nil {
-		return nil, mErr
-	}
-	return &userMapping, nil
+	return getUserByScryptEmail(repo, scryptEmail)
 }

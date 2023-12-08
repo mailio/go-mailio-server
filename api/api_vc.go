@@ -6,7 +6,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/mailio/go-mailio-core/did"
-	coreErrors "github.com/mailio/go-mailio-core/errors"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/services"
 	"github.com/mailio/go-mailio-server/types"
@@ -44,7 +43,7 @@ func (vc *VC) GetVC(c *gin.Context) {
 	}
 	output, err := vc.ssiService.GetVCByID(id)
 	if err != nil {
-		if err == coreErrors.ErrNotFound {
+		if err == types.ErrNotFound {
 			ApiErrorf(c, http.StatusNotFound, "vc not found")
 			return
 		}

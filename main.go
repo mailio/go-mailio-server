@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -19,6 +18,7 @@ import (
 	"github.com/mailio/go-mailio-server/apiroutes"
 	"github.com/mailio/go-mailio-server/docs"
 	"github.com/mailio/go-mailio-server/global"
+	"github.com/mailio/go-mailio-server/repository"
 	"github.com/mailio/go-mailio-server/types"
 	"github.com/mailio/go-mailio-server/util"
 	cfg "github.com/mailio/go-web3-kit/config"
@@ -109,6 +109,7 @@ func main() {
 
 	mc := crypto.NewMailioCrypto()
 	env := types.NewEnvironment(rrClient, mc)
+	defer env.Cron.Stop()
 
 	// programmatically set swagger info
 	docs.SwaggerInfo.Title = "Mailio Server"
@@ -124,31 +125,18 @@ func main() {
 
 	signal.Notify(quit, os.Interrupt)
 
-	// init gRPC server including gRPC reflection service
-	gprcListener, grpcErr := net.Listen("tcp", fmt.Sprintf(":%d", global.Conf.Grpc.Port))
-	if grpcErr != nil {
-		panic(fmt.Sprintf("Could not listen on %d: %v\n", global.Conf.Grpc.Port, grpcErr))
-	}
-
 	// init routing (for RESTful API endpoints)
 	router := w3srv.NewAPIRouter(&global.Conf.YamlConfig)
 
-	router = apiroutes.ConfigRoutes(router, env)
-	grpcServer := apiroutes.ConfigGrpcRoutes()
+	dbSelector := ConfigDBSelector()
+	ConfigDBIndexing(dbSelector.(*repository.CouchDBSelector), env)
+
+	router = apiroutes.ConfigRoutes(router, dbSelector.(*repository.CouchDBSelector), env)
 
 	// start server
 	srv := w3srv.Start(&global.Conf.YamlConfig, router)
 	// wait for server shutdown
 	go w3srv.Shutdown(srv, quit, done)
-
-	go grpcShutdown(grpcServer, quit, done)
-
-	go func() {
-		global.Logger.Log("Server is ready to handle GRPC requests at", global.Conf.Grpc.Port)
-		if err := grpcServer.Serve(gprcListener); err != nil {
-			panic(fmt.Sprintf("%v\n", err))
-		}
-	}()
 
 	global.Logger.Log("Server is ready to handle requests at", global.Conf.Port)
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {

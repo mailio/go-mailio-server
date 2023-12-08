@@ -3,7 +3,6 @@ package services
 import (
 	"context"
 	"crypto/sha256"
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -12,7 +11,6 @@ import (
 
 	"github.com/go-kit/log/level"
 	"github.com/go-resty/resty/v2"
-	coreErrors "github.com/mailio/go-mailio-core/errors"
 	"github.com/mailio/go-mailio-core/models"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/repository"
@@ -21,6 +19,7 @@ import (
 
 type HandshakeService struct {
 	handshakeRepo repository.Repository
+	userRepo      repository.Repository
 	env           *types.Environment
 }
 
@@ -30,17 +29,22 @@ func NewHandshakeService(dbSelector repository.DBSelector, environment *types.En
 		level.Error(global.Logger).Log("msg", "error while choosing db", "err", err)
 		panic(err)
 	}
-	return &HandshakeService{handshakeRepo: handshakeRepo, env: environment}
+	userRepo, err := dbSelector.ChooseDB(repository.User)
+	if err != nil {
+		level.Error(global.Logger).Log("msg", "error while choosing db", "err", err)
+		panic(err)
+	}
+	return &HandshakeService{handshakeRepo: handshakeRepo, userRepo: userRepo, env: environment}
 }
 
 // Save a handshake into a database
 func (hs *HandshakeService) Save(handshake *types.Handshake, userPublicKeyEd25519Base64 string) error {
 	// basic sanity check
 	if handshake == nil || handshake.Content.HandshakeID == "" {
-		return coreErrors.ErrBadRequest
+		return types.ErrBadRequest
 	}
 	if handshake.Content.SenderAddress == "" {
-		return coreErrors.ErrBadRequest
+		return types.ErrBadRequest
 	}
 
 	ownerMailioAddr, mErr := hs.env.MailioCrypto.PublicKeyToMailioAddress(userPublicKeyEd25519Base64)
@@ -69,13 +73,13 @@ func (hs *HandshakeService) Save(handshake *types.Handshake, userPublicKeyEd2551
 	}
 
 	if !isValid {
-		return coreErrors.ErrSignatureInvalid
+		return types.ErrSignatureInvalid
 	}
 
 	// check if handshake already exists (overide if it does)
 	existingHs, eErr := hs.GetByID(handshake.Content.HandshakeID)
 	if eErr != nil {
-		if eErr != coreErrors.ErrNotFound {
+		if eErr != types.ErrNotFound {
 			return eErr
 		}
 	}
@@ -138,36 +142,6 @@ func (hs *HandshakeService) ListHandshakes(address string, bookmark string, limi
 	return results, nil
 }
 
-// Lookup handshake in the local database (local meaning this servers database)
-// lookup by senderAddress (either mailio address or an email address) or by handshakeID (if handshakeID is provided, senderAddress is ignored)
-func (hs *HandshakeService) LookupHandshake(userOwnerMailioAddress string, senderAddress string) (*models.Handshake, error) {
-	if senderAddress == "" || userOwnerMailioAddress == "" {
-		return nil, coreErrors.ErrBadRequest
-	}
-
-	shake, err := hs.GetByMailioAddress(userOwnerMailioAddress, senderAddress)
-	if err != nil {
-		if err == coreErrors.ErrNotFound {
-			// return default server handshake
-			b64PublicKey := base64.StdEncoding.EncodeToString(global.PublicKey)
-			b64PrivateKey := base64.StdEncoding.EncodeToString(global.PrivateKey)
-			handshake, hsErr := hs.env.MailioCrypto.ServerSideHandshake(b64PublicKey, b64PrivateKey, global.Conf.Mailio.Domain, senderAddress)
-			if hsErr != nil {
-				level.Error(global.Logger).Log("msg", "error while creating handshake", "err", hsErr)
-				return nil, hsErr
-			}
-			return handshake, nil
-		}
-		return nil, err
-	}
-	out := &models.Handshake{
-		Content:     shake.Content,
-		Signature:   shake.SignatureBase64,
-		CborPayload: shake.CborPayloadBase64,
-	}
-	return out, nil
-}
-
 // returns default server handshake (used when there is no users handshake related to the sender)
 func (hs *HandshakeService) GetServerHandshake(senderAddress string) (*models.Handshake, error) {
 	handshake, hErr := hs.env.MailioCrypto.ServerSideHandshake(string(global.PublicKey), string(global.PrivateKey), global.Conf.Mailio.Domain, senderAddress)
@@ -209,4 +183,59 @@ func (hs *HandshakeService) GetByMailioAddress(userOwnerAddress string, senderAd
 	}
 
 	return handshake, nil
+}
+
+// Handshake lookup method for Mailio Transfer Protocol
+func (hs *HandshakeService) LookupHandshakeForMTP(request *types.HandshakeRequest) ([]*types.Handshake, error) {
+	lookups := request.HandshakeLookups
+
+	handshakes := []*types.Handshake{}
+	for _, lookup := range lookups {
+		// lookup by handshakeID
+		if lookup.ID != "" {
+			shake, err := hs.GetByID(lookup.ID)
+			if err != nil {
+				level.Error(global.Logger).Log("error while getting handshake by ID", err)
+				return nil, err
+			}
+			handshakes = append(handshakes, shake)
+		} else if lookup.Address != "" {
+			// lookup by email address
+			shake, err := hs.GetByMailioAddress(lookup.Address, request.SenderAddress)
+			if err != nil {
+				//TODO! add server handshake in case of not found (or nothing or something?)
+				if err == types.ErrNotFound {
+					continue
+				}
+				level.Error(global.Logger).Log("error while getting handshake by Address", err)
+				return nil, err
+			}
+			handshakes = append(handshakes, shake)
+		} else if lookup.EmailHash != "" {
+			// lookup by email hash
+			mappedUser, err := getUserByScryptEmail(hs.handshakeRepo, lookup.EmailHash)
+			if err != nil {
+				if err == types.ErrNotFound {
+
+					// not found is ok
+					continue
+				}
+				level.Error(global.Logger).Log("error while getting user by email hash", err)
+				return nil, err
+			}
+			shake, err := hs.GetByMailioAddress(mappedUser.MailioAddress, request.SenderAddress)
+			if err != nil {
+				if err == types.ErrNotFound {
+					continue
+				}
+				level.Error(global.Logger).Log("error while getting handshake by mailio address", err)
+				return nil, err
+			}
+			handshakes = append(handshakes, shake)
+		} else {
+			// error
+			return nil, types.ErrBadRequest
+		}
+	}
+	return handshakes, nil
 }

@@ -8,7 +8,6 @@ import (
 
 	"github.com/go-resty/resty/v2"
 	"github.com/jarcoal/httpmock"
-	coreErrors "github.com/mailio/go-mailio-core/errors"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/types"
 )
@@ -143,11 +142,11 @@ func (c *CouchDBRepository) Update(ctx context.Context, id string, data interfac
 // Delete deletes a document by its ID
 func (c *CouchDBRepository) Delete(ctx context.Context, id string) error {
 	if id == "" {
-		return coreErrors.ErrNotFound
+		return types.ErrNotFound
 	}
 	doc, err := c.GetByID(ctx, id)
 	if err != nil {
-		if err != coreErrors.ErrNotFound {
+		if err != types.ErrNotFound {
 			return err
 		}
 		return nil

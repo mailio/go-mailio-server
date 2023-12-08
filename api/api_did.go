@@ -9,9 +9,9 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwt"
 	"github.com/mailio/go-mailio-core/did"
-	coreErrors "github.com/mailio/go-mailio-core/errors"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/services"
+	"github.com/mailio/go-mailio-server/types"
 	"github.com/mailio/go-mailio-server/util"
 )
 
@@ -125,7 +125,7 @@ func (did *DIDApi) GetDIDDocument(c *gin.Context) {
 
 	resolved, err := did.ssiService.GetDIDDocument(address)
 	if err != nil {
-		if err == coreErrors.ErrNotFound {
+		if err == types.ErrNotFound {
 			ApiErrorf(c, http.StatusNotFound, "did not found")
 			return
 		}

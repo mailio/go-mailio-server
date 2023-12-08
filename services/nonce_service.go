@@ -42,7 +42,12 @@ func NewNonceService(dbSelector repository.DBSelector) *NonceService {
 
 // function creates a new nonce and stores it in the database with the time of creation
 func (ns *NonceService) CreateNonce() (*types.Nonce, error) {
-	n := util.GenerateNonce(64)
+	return ns.CreateCustomNonce(64)
+}
+
+// function creates a new nonce and stores it in the database with the time of creation
+func (ns *NonceService) CreateCustomNonce(nonceSizeInBytes int) (*types.Nonce, error) {
+	n := util.GenerateNonce(nonceSizeInBytes)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()

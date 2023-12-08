@@ -9,7 +9,6 @@ import (
 
 	"github.com/go-resty/resty/v2"
 	"github.com/mailio/go-mailio-core/did"
-	coreErrors "github.com/mailio/go-mailio-core/errors"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/repository"
 	"github.com/mailio/go-mailio-server/types"
@@ -43,7 +42,7 @@ func (ssi *SelfSovereignService) SaveDID(did *did.Document) (*did.Document, erro
 	defer cancel()
 	response, eErr := ssi.didRepo.GetByID(ctx, did.ID.String())
 	if eErr != nil { // only error allowed is not found error
-		if eErr != coreErrors.ErrNotFound {
+		if eErr != types.ErrNotFound {
 			return nil, eErr
 		}
 	}
@@ -73,7 +72,7 @@ func (ssi *SelfSovereignService) SaveVC(vc *did.VerifiableCredential) (*did.Veri
 	defer cancel()
 	response, eErr := ssi.vcsRepo.GetByID(ctx, vc.ID)
 	if eErr != nil { // only error allowed is not found error
-		if eErr != coreErrors.ErrNotFound {
+		if eErr != types.ErrNotFound {
 			return nil, eErr
 		}
 	}

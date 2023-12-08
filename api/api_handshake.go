@@ -5,18 +5,20 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	coreErrors "github.com/mailio/go-mailio-core/errors"
+	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/services"
 	"github.com/mailio/go-mailio-server/types"
 )
 
 type HandshakeApi struct {
 	handshakeService *services.HandshakeService
+	nonceService     *services.NonceService
 }
 
-func NewHandshakeApi(handshakeService *services.HandshakeService) *HandshakeApi {
+func NewHandshakeApi(handshakeService *services.HandshakeService, nonceService *services.NonceService) *HandshakeApi {
 	return &HandshakeApi{
 		handshakeService: handshakeService,
+		nonceService:     nonceService,
 	}
 }
 
@@ -38,7 +40,7 @@ func (ha *HandshakeApi) GetHandshake(c *gin.Context) {
 	}
 	handshake, err := ha.handshakeService.GetByID(id)
 	if err != nil {
-		if err == coreErrors.ErrNotFound {
+		if err == types.ErrNotFound {
 			ApiErrorf(c, http.StatusNotFound, "handshake not found: %s", id)
 			return
 		}
@@ -48,12 +50,12 @@ func (ha *HandshakeApi) GetHandshake(c *gin.Context) {
 	c.JSON(http.StatusOK, handshake)
 }
 
-// Lookup handshake is public and looksup handshake by ownerAddress and sender scrypted (hashed) address
+// Lookup handshake is public and looksup handshake by ownerAddress and sender scrypted email address or mailio address
 // @Summary Lookup handshake by ownerAddress and sender scrypted (hashed) address (or mailio address)
 // @Description Lookup handshake is public and looksup handshake by ownerAddress and sender scrypted (hashed) address or mailio address. If nothing found default server handshake returned
 // @Tags Handshake
 // @Param ownerAddress path string true "Owners mailio address"
-// @Param senderAddress path string true "Senders scrypt address or mailio address (not hashed)"
+// @Param senderAddress path string true "Senders scrypt address or Mailio address"
 // @Success 200 {object} types.Handshake
 // @Accept json
 // @Produce json
@@ -66,7 +68,7 @@ func (ha *HandshakeApi) LookupHandshake(c *gin.Context) {
 		return
 	}
 
-	handshake, err := ha.handshakeService.LookupHandshake(ownerAddress, senderAddress)
+	handshake, err := ha.handshakeService.GetByMailioAddress(ownerAddress, senderAddress)
 	if err != nil {
 		// cannot be not found (default handshake should be returned)
 		ApiErrorf(c, http.StatusInternalServerError, "error while getting handshake: %s", err)
@@ -136,7 +138,7 @@ func (ha *HandshakeApi) CreateHandshake(c *gin.Context) {
 
 	sErr := ha.handshakeService.Save(&handshake, pubKey.(string))
 	if sErr != nil {
-		if sErr == coreErrors.ErrSignatureInvalid {
+		if sErr == types.ErrSignatureInvalid {
 			ApiErrorf(c, http.StatusUnauthorized, "invalid signature")
 			return
 		}
@@ -198,4 +200,24 @@ func (ha *HandshakeApi) DeleteHandshake(c *gin.Context) {
 	// delete the handshake with given id
 	// ha.DB.Delete(&types.Handshake{}, id)
 	c.Status(http.StatusNoContent)
+}
+
+func (ha *HandshakeApi) PersonalHandshakeLink(c *gin.Context) {
+	// extract address from JWS token
+	address, exists := c.Get("subjectAddress")
+	if !exists {
+		ApiErrorf(c, http.StatusUnauthorized, "not authorized to create personal handshake")
+		return
+	}
+	// create a personal handshake link
+	domain := global.Conf.Mailio.Domain
+	// nonces are typically deleted within 5 minutes. That should be enough time to use the link
+	nonce, nErr := ha.nonceService.CreateCustomNonce(32)
+	if nErr != nil {
+		ApiErrorf(c, http.StatusInternalServerError, "error while creating nonce")
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"link": nonce.Nonce + address.(string) + domain,
+	})
 }

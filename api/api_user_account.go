@@ -12,7 +12,6 @@ import (
 	"github.com/go-playground/validator/v10"
 	mailiocrypto "github.com/mailio/go-mailio-core/crypto"
 	"github.com/mailio/go-mailio-core/did"
-	coreErrors "github.com/mailio/go-mailio-core/errors"
 	"github.com/mailio/go-mailio-server/api/interceptors"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/services"
@@ -49,13 +48,13 @@ func (us *UserAccountApi) validateSignature(loginInput *types.InputLogin) (bool,
 	}
 
 	if !util.IsEd25519PublicKey(loginInput.Ed25519SigningPublicKeyBase64) {
-		return false, coreErrors.ErrInvalidPublicKey
+		return false, types.ErrInvalidPublicKey
 	}
 	signingKeyBytes, _ := base64.StdEncoding.DecodeString(loginInput.Ed25519SigningPublicKeyBase64)
 
 	signatureBytes, sErr := base64.StdEncoding.DecodeString(loginInput.SignatureBase64)
 	if sErr != nil {
-		return false, coreErrors.ErrSignatureInvalid
+		return false, types.ErrSignatureInvalid
 	}
 
 	// verify signature
@@ -126,13 +125,13 @@ func (ua *UserAccountApi) Login(c *gin.Context) {
 
 	isValid, validErr := ua.validateSignature(&inputLogin)
 	if validErr != nil {
-		if validErr == coreErrors.ErrSignatureInvalid {
+		if validErr == types.ErrSignatureInvalid {
 			ApiErrorf(c, http.StatusUnauthorized, "invalid signature")
 			return
-		} else if validErr == coreErrors.ErrInvalidPublicKey {
+		} else if validErr == types.ErrInvalidPublicKey {
 			ApiErrorf(c, http.StatusUnauthorized, "invalid public key")
 			return
-		} else if validErr == coreErrors.ErrNotFound {
+		} else if validErr == types.ErrNotFound {
 			ApiErrorf(c, http.StatusUnauthorized, "nonce not found")
 			return
 		}
@@ -147,7 +146,7 @@ func (ua *UserAccountApi) Login(c *gin.Context) {
 	// validate also VC for the user (is user was registered at mail.io)
 	vc, vcErr := ua.ssiService.GetAuthorizedAppVCByAddress(inputLogin.MailioAddress, global.MailioDID.String())
 	if vcErr != nil {
-		if vcErr == coreErrors.ErrNotFound {
+		if vcErr == types.ErrNotFound {
 			ApiErrorf(c, http.StatusForbidden, "failed to login (valid signature, no valid VC)")
 			return
 		}
@@ -228,13 +227,13 @@ func (ua *UserAccountApi) Register(c *gin.Context) {
 	// validate siganture
 	isValid, validErr := ua.validateSignature(&inputRegister.InputLogin)
 	if validErr != nil {
-		if validErr == coreErrors.ErrSignatureInvalid {
+		if validErr == types.ErrSignatureInvalid {
 			ApiErrorf(c, http.StatusBadRequest, "invalid signature")
 			return
-		} else if validErr == coreErrors.ErrInvalidPublicKey {
+		} else if validErr == types.ErrInvalidPublicKey {
 			ApiErrorf(c, http.StatusBadRequest, "invalid public key")
 			return
-		} else if validErr == coreErrors.ErrNotFound {
+		} else if validErr == types.ErrNotFound {
 			ApiErrorf(c, http.StatusBadRequest, "nonce not found")
 			return
 		}
@@ -274,7 +273,7 @@ func (ua *UserAccountApi) Register(c *gin.Context) {
 	// create user database
 	_, errCU := ua.userService.CreateUser(user, inputRegister.DatabasePassword)
 	if errCU != nil {
-		if errCU == coreErrors.ErrUserExists {
+		if errCU == types.ErrUserExists {
 			ApiErrorf(c, http.StatusConflict, "user already exists")
 			return
 		}
@@ -289,7 +288,7 @@ func (ua *UserAccountApi) Register(c *gin.Context) {
 	// map sacrypt (encrryped email) address to mailio address
 	_, errMu := ua.userService.MapEmailToMailioAddress(user)
 	if errMu != nil {
-		if errMu == coreErrors.ErrUserExists {
+		if errMu == types.ErrUserExists {
 			ApiErrorf(c, http.StatusBadRequest, "user already exists")
 			return
 		}

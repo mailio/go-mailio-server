@@ -72,7 +72,7 @@ func UnaryServerSignatureInterceptor(sigValidator SignatureValidator) grpc.Unary
 			}
 			cborPayload = handshake.GetCborPayload()
 			signature = handshake.GetSignature()
-			cb, err := models.HandshakeRequestProtoToStruct(handshake.Requests)
+			cb, err := models.HandshakeRequestProtoToStruct(handshake.Request)
 			if err != nil {
 				return nil, status.Error(codes.Internal, "failed to convert request proto message to map message in HandshakeSignedRequest")
 			}
