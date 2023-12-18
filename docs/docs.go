@@ -355,7 +355,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/types.Handshake"
+                            "$ref": "#/definitions/models.Handshake"
                         }
                     }
                 ],
@@ -363,7 +363,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/types.Handshake"
+                            "$ref": "#/definitions/models.Handshake"
                         }
                     },
                     "400": {
@@ -410,7 +410,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Senders scrypt address or mailio address (not hashed)",
+                        "description": "Senders scrypt address or Mailio address",
                         "name": "senderAddress",
                         "in": "path",
                         "required": true
@@ -420,7 +420,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/types.Handshake"
+                            "$ref": "#/definitions/models.Handshake"
                         }
                     }
                 }
@@ -457,7 +457,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/types.Handshake"
+                            "$ref": "#/definitions/models.Handshake"
                         }
                     }
                 }
@@ -493,7 +493,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/types.Handshake"
+                            "$ref": "#/definitions/models.Handshake"
                         }
                     }
                 ],
@@ -501,7 +501,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/types.Handshake"
+                            "$ref": "#/definitions/models.Handshake"
                         }
                     },
                     "429": {
@@ -590,6 +590,58 @@ const docTemplate = `{
                     },
                     "403": {
                         "description": "Failed to login (valid signature, no valid VC)",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "429": {
+                        "description": "rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/mtp/handshakelookup": {
+            "post": {
+                "description": "Request handshake from server (digitally signed)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Mailio Transfer Protocol"
+                ],
+                "summary": "Request handshake from server (digitally signed)",
+                "parameters": [
+                    {
+                        "description": "HandshakeSignedRequest",
+                        "name": "handshake",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.HandshakeSignedRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.HandshakeSignedResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "bad request",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "401": {
+                        "description": "invalid signature",
                         "schema": {
                             "$ref": "#/definitions/api.ApiError"
                         }
@@ -1032,6 +1084,20 @@ const docTemplate = `{
                 }
             }
         },
+        "models.Handshake": {
+            "type": "object",
+            "properties": {
+                "cborPayloadBase64": {
+                    "type": "string"
+                },
+                "content": {
+                    "$ref": "#/definitions/models.HandshakeContent"
+                },
+                "signatureBase64": {
+                    "type": "string"
+                }
+            }
+        },
         "models.HandshakeContent": {
             "type": "object",
             "properties": {
@@ -1063,7 +1129,7 @@ const docTemplate = `{
                     "description": "senders scrypted email address or mailio address",
                     "type": "string"
                 },
-                "signature": {
+                "signatureBase64": {
                     "description": "owners signature of the handshake",
                     "type": "string"
                 },
@@ -1099,17 +1165,16 @@ const docTemplate = `{
         },
         "models.HandshakeOriginServer": {
             "type": "object",
+            "required": [
+                "domain"
+            ],
             "properties": {
                 "domain": {
-                    "description": "domain of the server",
+                    "description": "required",
                     "type": "string"
                 },
-                "p2pAddress": {
-                    "description": "P2P address of the server",
-                    "type": "string"
-                },
-                "serverIp": {
-                    "description": "server IP address",
+                "ip": {
+                    "description": "optional",
                     "type": "string"
                 }
             }
@@ -1118,40 +1183,130 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "frequencyMinutes": {
-                    "description": "frequency of the signup requests in seconds",
+                    "description": "optional",
                     "type": "integer"
                 }
             }
         },
-        "types.Handshake": {
+        "types.HandshakeHeader": {
+            "type": "object",
+            "required": [
+                "signatureScheme",
+                "timestamp"
+            ],
+            "properties": {
+                "emailLookupHashScheme": {
+                    "type": "string"
+                },
+                "signatureScheme": {
+                    "type": "string",
+                    "enum": [
+                        "EdDSA_X25519"
+                    ]
+                },
+                "timestamp": {
+                    "type": "integer"
+                }
+            }
+        },
+        "types.HandshakeLookup": {
             "type": "object",
             "properties": {
-                "_deleted": {
-                    "type": "boolean"
-                },
-                "_id": {
+                "address": {
                     "type": "string"
                 },
-                "_rev": {
-                    "description": "Rev is the revision number returned",
+                "emailHash": {
                     "type": "string"
-                },
-                "cborPayload": {
-                    "type": "string"
-                },
-                "content": {
-                    "$ref": "#/definitions/models.HandshakeContent"
                 },
                 "id": {
                     "type": "string"
+                }
+            }
+        },
+        "types.HandshakeRequest": {
+            "type": "object",
+            "required": [
+                "handshakeHeader",
+                "handshakeLookups",
+                "senderAddress"
+            ],
+            "properties": {
+                "handshakeHeader": {
+                    "$ref": "#/definitions/types.HandshakeHeader"
                 },
-                "ok": {
+                "handshakeLookups": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.HandshakeLookup"
+                    }
+                },
+                "returnDefaultServerHandshake": {
+                    "description": "default false",
                     "type": "boolean"
                 },
-                "rev": {
+                "senderAddress": {
+                    "description": "intended senders Mailio address",
+                    "type": "string"
+                }
+            }
+        },
+        "types.HandshakeResponse": {
+            "type": "object",
+            "required": [
+                "handshakeHeader",
+                "handshakes"
+            ],
+            "properties": {
+                "handshakeHeader": {
+                    "$ref": "#/definitions/types.HandshakeHeader"
+                },
+                "handshakes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.HandshakeContent"
+                    }
+                }
+            }
+        },
+        "types.HandshakeSignedRequest": {
+            "type": "object",
+            "required": [
+                "cborPayloadBase64",
+                "handshakeRequest",
+                "senderDomain",
+                "signatureBase64"
+            ],
+            "properties": {
+                "cborPayloadBase64": {
                     "type": "string"
                 },
-                "signature": {
+                "handshakeRequest": {
+                    "$ref": "#/definitions/types.HandshakeRequest"
+                },
+                "senderDomain": {
+                    "description": "origin of the request (where DNS is published with Mailio public key)",
+                    "type": "string"
+                },
+                "signatureBase64": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.HandshakeSignedResponse": {
+            "type": "object",
+            "required": [
+                "cborPayloadBase64",
+                "handshakeResponse",
+                "signatureBase64"
+            ],
+            "properties": {
+                "cborPayloadBase64": {
+                    "type": "string"
+                },
+                "handshakeResponse": {
+                    "$ref": "#/definitions/types.HandshakeResponse"
+                },
+                "signatureBase64": {
                     "type": "string"
                 }
             }

@@ -7,6 +7,7 @@ const (
 	Handshake     = "handshake"
 	Nonce         = "nonce"
 	User          = "_users"
+	Domain        = "domains"
 	MailioMapping = "mailio_mapping"
 	DID           = "did" // decentralized identifiers
 	VCS           = "vcs" // verifiable credentials

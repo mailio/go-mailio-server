@@ -162,6 +162,15 @@ definitions:
       type:
         type: string
     type: object
+  models.Handshake:
+    properties:
+      cborPayloadBase64:
+        type: string
+      content:
+        $ref: '#/definitions/models.HandshakeContent'
+      signatureBase64:
+        type: string
+    type: object
   models.HandshakeContent:
     properties:
       handshakeId:
@@ -183,7 +192,7 @@ definitions:
       senderSha512Address:
         description: senders scrypted email address or mailio address
         type: string
-      signature:
+      signatureBase64:
         description: owners signature of the handshake
         type: string
       signatureScheme:
@@ -209,42 +218,104 @@ definitions:
   models.HandshakeOriginServer:
     properties:
       domain:
-        description: domain of the server
+        description: required
         type: string
-      p2pAddress:
-        description: P2P address of the server
+      ip:
+        description: optional
         type: string
-      serverIp:
-        description: server IP address
-        type: string
+    required:
+    - domain
     type: object
   models.HandshakeSignupRules:
     properties:
       frequencyMinutes:
-        description: frequency of the signup requests in seconds
+        description: optional
         type: integer
     type: object
-  types.Handshake:
+  types.HandshakeHeader:
     properties:
-      _deleted:
-        type: boolean
-      _id:
+      emailLookupHashScheme:
         type: string
-      _rev:
-        description: Rev is the revision number returned
+      signatureScheme:
+        enum:
+        - EdDSA_X25519
         type: string
-      cborPayload:
+      timestamp:
+        type: integer
+    required:
+    - signatureScheme
+    - timestamp
+    type: object
+  types.HandshakeLookup:
+    properties:
+      address:
         type: string
-      content:
-        $ref: '#/definitions/models.HandshakeContent'
+      emailHash:
+        type: string
       id:
         type: string
-      ok:
+    type: object
+  types.HandshakeRequest:
+    properties:
+      handshakeHeader:
+        $ref: '#/definitions/types.HandshakeHeader'
+      handshakeLookups:
+        items:
+          $ref: '#/definitions/types.HandshakeLookup'
+        type: array
+      returnDefaultServerHandshake:
+        description: default false
         type: boolean
-      rev:
+      senderAddress:
+        description: intended senders Mailio address
         type: string
-      signature:
+    required:
+    - handshakeHeader
+    - handshakeLookups
+    - senderAddress
+    type: object
+  types.HandshakeResponse:
+    properties:
+      handshakeHeader:
+        $ref: '#/definitions/types.HandshakeHeader'
+      handshakes:
+        items:
+          $ref: '#/definitions/models.HandshakeContent'
+        type: array
+    required:
+    - handshakeHeader
+    - handshakes
+    type: object
+  types.HandshakeSignedRequest:
+    properties:
+      cborPayloadBase64:
         type: string
+      handshakeRequest:
+        $ref: '#/definitions/types.HandshakeRequest'
+      senderDomain:
+        description: origin of the request (where DNS is published with Mailio public
+          key)
+        type: string
+      signatureBase64:
+        type: string
+    required:
+    - cborPayloadBase64
+    - handshakeRequest
+    - senderDomain
+    - signatureBase64
+    type: object
+  types.HandshakeSignedResponse:
+    properties:
+      cborPayloadBase64:
+        type: string
+      handshakeResponse:
+        $ref: '#/definitions/types.HandshakeResponse'
+      signatureBase64:
+        type: string
+    required:
+    - cborPayloadBase64
+    - handshakeResponse
+    - signatureBase64
     type: object
   types.InputLogin:
     properties:
@@ -578,14 +649,14 @@ paths:
         name: handshake
         required: true
         schema:
-          $ref: '#/definitions/types.Handshake'
+          $ref: '#/definitions/models.Handshake'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/types.Handshake'
+            $ref: '#/definitions/models.Handshake'
         "400":
           description: bad request
           schema:
@@ -640,7 +711,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/types.Handshake'
+            $ref: '#/definitions/models.Handshake'
       security:
       - Bearer: []
       summary: Get handshake by id
@@ -661,14 +732,14 @@ paths:
         name: handshake
         required: true
         schema:
-          $ref: '#/definitions/types.Handshake'
+          $ref: '#/definitions/models.Handshake'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/types.Handshake'
+            $ref: '#/definitions/models.Handshake'
         "429":
           description: rate limit exceeded
           schema:
@@ -691,7 +762,7 @@ paths:
         name: ownerAddress
         required: true
         type: string
-      - description: Senders scrypt address or mailio address (not hashed)
+      - description: Senders scrypt address or Mailio address
         in: path
         name: senderAddress
         required: true
@@ -702,7 +773,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/types.Handshake'
+            $ref: '#/definitions/models.Handshake'
       summary: Lookup handshake by ownerAddress and sender scrypted (hashed) address
         (or mailio address)
       tags:
@@ -745,6 +816,40 @@ paths:
       summary: Login with username and password
       tags:
       - User Account
+  /api/v1/mtp/handshakelookup:
+    post:
+      consumes:
+      - application/json
+      description: Request handshake from server (digitally signed)
+      parameters:
+      - description: HandshakeSignedRequest
+        in: body
+        name: handshake
+        required: true
+        schema:
+          $ref: '#/definitions/types.HandshakeSignedRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.HandshakeSignedResponse'
+        "400":
+          description: bad request
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "401":
+          description: invalid signature
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "429":
+          description: rate limit exceeded
+          schema:
+            $ref: '#/definitions/api.ApiError'
+      summary: Request handshake from server (digitally signed)
+      tags:
+      - Mailio Transfer Protocol
   /api/v1/nonce:
     get:
       consumes:

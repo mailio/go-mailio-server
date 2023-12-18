@@ -11,26 +11,6 @@ Mailio Server implementation based on [Mailio MIRs](https://mirs.mail.io) specif
 curl -sSL "https://github.com/fullstorydev/grpcurl/releases/download/v1.8.7/grpcurl_1.8.7_linux_x86_64.tar.gz" | sudo tar -xz -C /usr/local/bin
 ```
 
-**List services**
-```sh
-grpcurl -plaintext localhost:50051 list
-```
-
-**Describe service**
-```sh
-grpcurl -plaintext localhost:50051 describe pong.PongService
-```
-
-### Ping service
-
-Learning servers local time including timezone
-```sh
-grpcurl -plaintext localhost:50051 pong.PongService.Ping
-{
-  "message": "2023-04-05T17:00:36-06:00"
-}
-```
-
 ## Development
 
 1. Clone this repository

@@ -19,8 +19,9 @@ func ConfigDBSelector() repository.DBSelector {
 	mailioMappingRepo, mappingRepoErr := repository.NewCouchDBRepository(repoUrl, repository.MailioMapping, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
 	didRepo, didRErr := repository.NewCouchDBRepository(repoUrl, repository.DID, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
 	vcsRepo, vscrErr := repository.NewCouchDBRepository(repoUrl, repository.VCS, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
+	domainRepo, dErr := repository.NewCouchDBRepository(repoUrl, repository.Domain, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
 
-	repoErr := errors.Join(handshakeRepoErr, nonceRepoErr, userRepoErr, mappingRepoErr, didRErr, vscrErr)
+	repoErr := errors.Join(handshakeRepoErr, nonceRepoErr, userRepoErr, mappingRepoErr, didRErr, vscrErr, dErr)
 	if repoErr != nil {
 		panic(repoErr)
 	}
@@ -33,6 +34,7 @@ func ConfigDBSelector() repository.DBSelector {
 	dbSelector.AddDB(mailioMappingRepo)
 	dbSelector.AddDB(didRepo)
 	dbSelector.AddDB(vcsRepo)
+	dbSelector.AddDB(domainRepo)
 
 	return dbSelector
 }

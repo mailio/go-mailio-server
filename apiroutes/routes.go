@@ -48,12 +48,16 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, en
 	nonceService := services.NewNonceService(dbSelector)
 	ssiService := services.NewSelfSovereignService(dbSelector)
 	handshakeService := services.NewHandshakeService(dbSelector, environment)
+	domainService := services.NewDomainService(dbSelector, environment)
 
 	// API definitions
 	handshakeApi := api.NewHandshakeApi(handshakeService, nonceService)
 	accountApi := api.NewUserAccountApi(userService, nonceService, ssiService)
 	didApi := api.NewDIDApi(ssiService)
 	vcApi := api.NewVCApi(ssiService)
+
+	// MTP API definitions
+	handshakeMTPApi := api.NewHandshakeMTPApi(handshakeService, domainService, environment)
 
 	// PUBLIC ROOT API
 	rootPublicApi := router.Group("/", restinterceptors.RateLimitMiddleware(), metrics.MetricsMiddleware())
@@ -89,6 +93,12 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, en
 
 		// user account
 		rootApi.GET("/v1/user/me", accountApi.GetUserAddress)
+	}
+
+	mtpRootApi := router.Group("/api", metrics.MetricsMiddleware(), restinterceptors.RateLimitMiddleware(), restinterceptors.JWSMiddleware(), restinterceptors.SignatureMiddleware(environment))
+	{
+		// Handshakes MTP
+		mtpRootApi.POST("/v1/mtp/handshakelookup", handshakeMTPApi.Lookup)
 	}
 
 	router.StaticFile("./well-known/did.json", "./well-known/did.json")

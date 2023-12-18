@@ -2,11 +2,12 @@ package types
 
 import "github.com/mailio/go-mailio-core/models"
 
-type Handshake struct {
+// handshake is a struct that represents a handshake stored in the database
+type StoredHandshake struct {
 	BaseDocument      `json:",inline"`
 	Content           models.HandshakeContent `json:"content"`
-	SignatureBase64   string                  `json:"signature"`
-	CborPayloadBase64 string                  `json:"cborPayload"`
+	SignatureBase64   string                  `json:"signatureBase64"`
+	CborPayloadBase64 string                  `json:"cborPayloadBase64"`
 }
 
 /****
@@ -24,9 +25,9 @@ type HandshakeHeader struct {
 }
 
 type HandshakeLookup struct {
-	ID        string `json:"string"`
-	Address   string `json:"address"`
-	EmailHash string `json:"hash"`
+	ID        string `json:"id,omitempty"`
+	Address   string `json:"address,omitempty"`
+	EmailHash string `json:"emailHash,omitempty"`
 }
 
 type HandshakeRequest struct {
@@ -38,17 +39,18 @@ type HandshakeRequest struct {
 
 type HandshakeSignedRequest struct {
 	HandshakeRequest  HandshakeRequest `json:"handshakeRequest" validate:"required"`
-	SignatureBase64   string           `json:"signature" validate:"required,base64"`
-	CborPayloadBase64 string           `json:"cborPayload" validate:"required,base64"`
+	SignatureBase64   string           `json:"signatureBase64" validate:"required,base64"`
+	CborPayloadBase64 string           `json:"cborPayloadBase64" validate:"required,base64"`
+	SenderDomain      string           `json:"senderDomain" validate:"required"` // origin of the request (where DNS is published with Mailio public key)
 }
 
 type HandshakeResponse struct {
-	HandshakeHeader HandshakeHeader `json:"handshakeHeader" validate:"required"`
-	Handshakes      []*Handshake    `json:"handshakes" validate:"required"`
+	HandshakeHeader HandshakeHeader            `json:"handshakeHeader" validate:"required"`
+	Handshakes      []*models.HandshakeContent `json:"handshakes" validate:"required"`
 }
 
 type HandshakeSignedResponse struct {
 	HandshakeResponse HandshakeResponse `json:"handshakeResponse" validate:"required"`
-	SignatureBase64   string            `json:"signature" validate:"required,base64"`
-	CborPayloadBase64 string            `json:"cborPayload" validate:"required,base64"`
+	SignatureBase64   string            `json:"signatureBase64" validate:"required,base64"`
+	CborPayloadBase64 string            `json:"cborPayloadBase64" validate:"required,base64"`
 }

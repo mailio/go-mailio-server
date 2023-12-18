@@ -5,9 +5,11 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/mailio/go-mailio-core/models"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/services"
 	"github.com/mailio/go-mailio-server/types"
+	"github.com/mailio/go-mailio-server/util"
 )
 
 type HandshakeApi struct {
@@ -28,7 +30,7 @@ func NewHandshakeApi(handshakeService *services.HandshakeService, nonceService *
 // @Description Returns a single handshake by id
 // @Tags Handshake
 // @Param id path string true "Handshake ID"
-// @Success 200 {object} types.Handshake
+// @Success 200 {object} models.Handshake
 // @Accept json
 // @Produce json
 // @Router /api/v1/handshake/{id} [get]
@@ -47,7 +49,8 @@ func (ha *HandshakeApi) GetHandshake(c *gin.Context) {
 		ApiErrorf(c, http.StatusInternalServerError, "error while getting handshake: %s", err)
 		return
 	}
-	c.JSON(http.StatusOK, handshake)
+
+	c.JSON(http.StatusOK, util.StoredHandshakeToModelHandsake(handshake))
 }
 
 // Lookup handshake is public and looksup handshake by ownerAddress and sender scrypted email address or mailio address
@@ -56,7 +59,7 @@ func (ha *HandshakeApi) GetHandshake(c *gin.Context) {
 // @Tags Handshake
 // @Param ownerAddress path string true "Owners mailio address"
 // @Param senderAddress path string true "Senders scrypt address or Mailio address"
-// @Success 200 {object} types.Handshake
+// @Success 200 {object} models.Handshake
 // @Accept json
 // @Produce json
 // @Router /api/v1/handshake/lookup/{ownerAddress}/{senderAddress} [get]
@@ -74,7 +77,7 @@ func (ha *HandshakeApi) LookupHandshake(c *gin.Context) {
 		ApiErrorf(c, http.StatusInternalServerError, "error while getting handshake: %s", err)
 		return
 	}
-	c.JSON(http.StatusOK, handshake)
+	c.JSON(http.StatusOK, util.StoredHandshakeToModelHandsake(handshake))
 }
 
 // List logged in users handshake
@@ -117,15 +120,15 @@ func (ha *HandshakeApi) ListHandshakes(c *gin.Context) {
 // @Tags Handshake
 // @Accept json
 // @Produce json
-// @Param handshake body types.Handshake true "Handshake"
-// @Success 201 {object} types.Handshake
+// @Param handshake body models.Handshake true "Handshake"
+// @Success 201 {object} models.Handshake
 // @Failure 401 {object} api.ApiError "invalid signature"
 // @Failure 400 {object} api.ApiError "bad request"
 // @Failure 429 {object} api.ApiError "rate limit exceeded"
 // @Router /api/v1/handshake [post]
 func (ha *HandshakeApi) CreateHandshake(c *gin.Context) {
 	// Get the request body and decode it into a Handshake struct
-	var handshake types.Handshake
+	var handshake models.Handshake
 	if err := c.ShouldBindJSON(&handshake); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -158,16 +161,17 @@ func (ha *HandshakeApi) CreateHandshake(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param id path string true "Handshake ID"
-// @Param handshake body types.Handshake true "Handshake"
-// @Success 200 {object} types.Handshake
+// @Param handshake body models.Handshake true "Handshake"
+// @Success 200 {object} models.Handshake
 // @Failure 429 {object} api.ApiError "rate limit exceeded"
 // @Router /api/v1/handshake/{id} [put]
 func (ha *HandshakeApi) UpdateHandshake(c *gin.Context) {
-	var handshake types.Handshake
+	var handshake models.Handshake
 	if err := c.ShouldBindJSON(&handshake); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	//TODO! finish this
 
 	// Get the handshake with the given id
 	// if err := ha.DB.First(&handshake, c.Param("id")).Error; err != nil {
