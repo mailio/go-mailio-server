@@ -20,3 +20,7 @@ type InputRegister struct {
 type InputDID struct {
 	DID string `json:"did" validate:"required"`
 }
+
+type InputHandshakeLookup struct {
+	Lookups []HandshakeLookup `json:"lookups" validate:"min=1"`
+}

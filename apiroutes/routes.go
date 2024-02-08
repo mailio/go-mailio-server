@@ -48,7 +48,7 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, en
 	nonceService := services.NewNonceService(dbSelector)
 	ssiService := services.NewSelfSovereignService(dbSelector)
 	handshakeService := services.NewHandshakeService(dbSelector, environment)
-	domainService := services.NewDomainService(dbSelector, environment)
+	mtpService := services.NewMtpService(dbSelector, environment)
 
 	// API definitions
 	handshakeApi := api.NewHandshakeApi(handshakeService, nonceService)
@@ -57,7 +57,7 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, en
 	vcApi := api.NewVCApi(ssiService)
 
 	// MTP API definitions
-	handshakeMTPApi := api.NewHandshakeMTPApi(handshakeService, domainService, environment)
+	handshakeMTPApi := api.NewHandshakeMTPApi(handshakeService, mtpService, environment)
 
 	// PUBLIC ROOT API
 	rootPublicApi := router.Group("/", restinterceptors.RateLimitMiddleware(), metrics.MetricsMiddleware())
@@ -95,10 +95,11 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, en
 		rootApi.GET("/v1/user/me", accountApi.GetUserAddress)
 	}
 
-	mtpRootApi := router.Group("/api", metrics.MetricsMiddleware(), restinterceptors.RateLimitMiddleware(), restinterceptors.JWSMiddleware(), restinterceptors.SignatureMiddleware(environment))
+	// server-to-server communication (aka MTP - Mailio Transfer Protocol)
+	mtpRootApi := router.Group("/api", metrics.MetricsMiddleware(), restinterceptors.RateLimitMiddleware(), restinterceptors.SignatureMiddleware(environment))
 	{
 		// Handshakes MTP
-		mtpRootApi.POST("/v1/mtp/handshakelookup", handshakeMTPApi.Lookup)
+		mtpRootApi.POST("/v1/mtp/handshakelookup", handshakeMTPApi.HandshakeLookup)
 	}
 
 	router.StaticFile("./well-known/did.json", "./well-known/did.json")

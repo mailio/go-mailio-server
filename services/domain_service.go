@@ -25,6 +25,7 @@ func NewDomainService(dbSelector repository.DBSelector, environment *types.Envir
 func (s *DomainService) Save(domain *types.Domain) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
+	domain.Timestamp = time.Now().UnixMilli()
 	err := s.domainRepo.Save(ctx, domain.Name, domain)
 	if err != nil {
 		return err

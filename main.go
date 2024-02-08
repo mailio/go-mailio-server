@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/go-redis/redis_rate/v10"
-	"github.com/mailio/go-mailio-core/crypto"
 	"github.com/mailio/go-mailio-server/apiroutes"
 	"github.com/mailio/go-mailio-server/docs"
 	"github.com/mailio/go-mailio-server/global"
@@ -107,8 +106,7 @@ func main() {
 	rrClient := initRedisRateLimiter(global.Conf)
 	defer rrClient.Close()
 
-	mc := crypto.NewMailioCrypto()
-	env := types.NewEnvironment(rrClient, mc)
+	env := types.NewEnvironment(rrClient)
 	defer env.Cron.Stop()
 
 	// programmatically set swagger info

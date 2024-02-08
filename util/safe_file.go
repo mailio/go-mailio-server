@@ -5,7 +5,6 @@ import (
 	"os"
 	"sync"
 
-	"github.com/mailio/go-mailio-core/errors"
 	"github.com/mailio/go-mailio-server/types"
 )
 
@@ -57,7 +56,7 @@ func (sf *SafeFile) Read() (*Data, error) {
 		return nil, err
 	}
 	if info.Size() == 0 {
-		return nil, errors.ErrNotFound
+		return nil, types.ErrNotFound
 	}
 
 	var data Data

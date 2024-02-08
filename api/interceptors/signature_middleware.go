@@ -1,8 +1,10 @@
 package interceptors
 
 import (
+	"context"
 	"encoding/base64"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -43,7 +45,9 @@ func SignatureMiddleware(env *types.Environment) gin.HandlerFunc {
 			return
 		}
 		// DNS check the host for (extracting the public key)
-		pk, pkErr := util.GetDNSMailioPublicKey(host)
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		pk, pkErr := util.GetDNSMailioPublicKey(ctx, host)
 		if pkErr != nil {
 			level.Error(global.Logger).Log("no Mailio DNS record", err.Error())
 			c.JSON(http.StatusBadRequest, gin.H{"error": "no Mailio DNS record found"})
@@ -52,7 +56,7 @@ func SignatureMiddleware(env *types.Environment) gin.HandlerFunc {
 		}
 		cborPayload, _ := base64.StdEncoding.DecodeString(commonSignature.CborPayloadBase64)
 		signature, _ := base64.StdEncoding.DecodeString(commonSignature.SignatureBase64)
-		isValid, sigErr := env.MailioCrypto.Verify(cborPayload, signature, pk)
+		isValid, sigErr := util.Verify(cborPayload, signature, pk)
 		if sigErr != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "signature verification failed"})
 			c.Abort()

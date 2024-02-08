@@ -355,7 +355,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/models.Handshake"
+                            "$ref": "#/definitions/types.Handshake"
                         }
                     }
                 ],
@@ -363,7 +363,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/models.Handshake"
+                            "$ref": "#/definitions/types.Handshake"
                         }
                     },
                     "400": {
@@ -420,7 +420,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/models.Handshake"
+                            "$ref": "#/definitions/types.Handshake"
                         }
                     }
                 }
@@ -457,7 +457,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/models.Handshake"
+                            "$ref": "#/definitions/types.Handshake"
                         }
                     }
                 }
@@ -493,7 +493,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/models.Handshake"
+                            "$ref": "#/definitions/types.Handshake"
                         }
                     }
                 ],
@@ -501,7 +501,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/models.Handshake"
+                            "$ref": "#/definitions/types.Handshake"
                         }
                     },
                     "429": {
@@ -632,6 +632,61 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/types.HandshakeSignedResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "bad request",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "401": {
+                        "description": "invalid signature",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "429": {
+                        "description": "rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/mtp/requesthandshakelookup": {
+            "post": {
+                "description": "Request handshake from server (digitally signed)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Mailio Transfer Protocol"
+                ],
+                "summary": "Request handshake from server (digitally signed) if missing in local database",
+                "parameters": [
+                    {
+                        "description": "InputHandshakeLookup",
+                        "name": "handshake",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.InputHandshakeLookup"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/types.HandshakeContent"
+                            }
                         }
                     },
                     "400": {
@@ -1084,21 +1139,21 @@ const docTemplate = `{
                 }
             }
         },
-        "models.Handshake": {
+        "types.Handshake": {
             "type": "object",
             "properties": {
                 "cborPayloadBase64": {
                     "type": "string"
                 },
                 "content": {
-                    "$ref": "#/definitions/models.HandshakeContent"
+                    "$ref": "#/definitions/types.HandshakeContent"
                 },
                 "signatureBase64": {
                     "type": "string"
                 }
             }
         },
-        "models.HandshakeContent": {
+        "types.HandshakeContent": {
             "type": "object",
             "properties": {
                 "handshakeId": {
@@ -1113,7 +1168,7 @@ const docTemplate = `{
                     "description": "origin server",
                     "allOf": [
                         {
-                            "$ref": "#/definitions/models.HandshakeOriginServer"
+                            "$ref": "#/definitions/types.HandshakeOriginServer"
                         }
                     ]
                 },
@@ -1125,9 +1180,13 @@ const docTemplate = `{
                     "description": "owner public key of the owner of the handshake",
                     "type": "string"
                 },
-                "senderSha512Address": {
-                    "description": "senders scrypted email address or mailio address",
-                    "type": "string"
+                "sender": {
+                    "description": "senders scrypted email address or mailio address + contact information",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/types.HandshakeSender"
+                        }
+                    ]
                 },
                 "signatureBase64": {
                     "description": "owners signature of the handshake",
@@ -1141,7 +1200,7 @@ const docTemplate = `{
                     "description": "handshake signup rules",
                     "allOf": [
                         {
-                            "$ref": "#/definitions/models.HandshakeSignupRules"
+                            "$ref": "#/definitions/types.HandshakeSignupRules"
                         }
                     ]
                 },
@@ -1159,31 +1218,6 @@ const docTemplate = `{
                 },
                 "type": {
                     "description": "handshake type",
-                    "type": "integer"
-                }
-            }
-        },
-        "models.HandshakeOriginServer": {
-            "type": "object",
-            "required": [
-                "domain"
-            ],
-            "properties": {
-                "domain": {
-                    "description": "required",
-                    "type": "string"
-                },
-                "ip": {
-                    "description": "optional",
-                    "type": "string"
-                }
-            }
-        },
-        "models.HandshakeSignupRules": {
-            "type": "object",
-            "properties": {
-                "frequencyMinutes": {
-                    "description": "optional",
                     "type": "integer"
                 }
             }
@@ -1211,6 +1245,9 @@ const docTemplate = `{
         },
         "types.HandshakeLookup": {
             "type": "object",
+            "required": [
+                "originServer"
+            ],
             "properties": {
                 "address": {
                     "type": "string"
@@ -1219,6 +1256,25 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "id": {
+                    "type": "string"
+                },
+                "originServer": {
+                    "$ref": "#/definitions/types.HandshakeOriginServer"
+                }
+            }
+        },
+        "types.HandshakeOriginServer": {
+            "type": "object",
+            "required": [
+                "domain"
+            ],
+            "properties": {
+                "domain": {
+                    "description": "required",
+                    "type": "string"
+                },
+                "ip": {
+                    "description": "optional",
                     "type": "string"
                 }
             }
@@ -1263,8 +1319,33 @@ const docTemplate = `{
                 "handshakes": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/models.HandshakeContent"
+                        "$ref": "#/definitions/types.HandshakeContent"
                     }
+                }
+            }
+        },
+        "types.HandshakeSender": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "description": "senders scrypted email address or mailio address",
+                    "type": "string"
+                },
+                "email": {
+                    "description": "senders email",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "senders name",
+                    "type": "string"
+                },
+                "phone": {
+                    "description": "senders phone",
+                    "type": "string"
+                },
+                "scryptAddress": {
+                    "description": "senders scrypted email address",
+                    "type": "string"
                 }
             }
         },
@@ -1308,6 +1389,27 @@ const docTemplate = `{
                 },
                 "signatureBase64": {
                     "type": "string"
+                }
+            }
+        },
+        "types.HandshakeSignupRules": {
+            "type": "object",
+            "properties": {
+                "frequencyMinutes": {
+                    "description": "optional",
+                    "type": "integer"
+                }
+            }
+        },
+        "types.InputHandshakeLookup": {
+            "type": "object",
+            "properties": {
+                "lookups": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "$ref": "#/definitions/types.HandshakeLookup"
+                    }
                 }
             }
         },

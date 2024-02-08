@@ -7,8 +7,10 @@ import (
 	"encoding/hex"
 	"errors"
 	src "math/rand"
+	"regexp"
 
 	"github.com/mailio/go-mailio-server/global"
+	"github.com/mailio/go-mailio-server/types"
 	"golang.org/x/crypto/scrypt"
 )
 
@@ -88,18 +90,31 @@ func IsEd25519PublicKey(b64Key string) bool {
 }
 
 func PublicKeyToMailioAddress(pubKeyBase64 string) (string, error) {
-	decoded, err := base64.StdEncoding.DecodeString(pubKeyBase64)
+	// decoded, err := base64.StdEncoding.DecodeString(pubKeyBase64)
+	// if err != nil {
+	// 	return "", err
+	// }
+	// hash := sha256.New()
+	// _, werr := hash.Write(decoded)
+	// if werr != nil {
+	// 	return "", err
+	// }
+	// sh256Bytes := hash.Sum(nil)
+	// ma := BytesToAddress(sh256Bytes)
+	// return hex.EncodeToString(ma[:]), nil
+	pubKey, err := base64.StdEncoding.DecodeString(pubKeyBase64)
 	if err != nil {
 		return "", err
 	}
-	hash := sha256.New()
-	_, werr := hash.Write(decoded)
-	if werr != nil {
-		return "", err
+	if len(pubKey) != 32 {
+		return "", types.ErrInvalidPublicKey
 	}
-	sh256Bytes := hash.Sum(nil)
-	ma := BytesToAddress(sh256Bytes)
-	return hex.EncodeToString(ma[:]), nil
+
+	h := sha256.New()
+	h.Write([]byte(pubKeyBase64))
+	output := hex.EncodeToString(h.Sum(nil))
+	output = "0x" + output[64-40:64]
+	return output, nil
 }
 
 // SetBytes sets the address to the value of b.
@@ -125,4 +140,51 @@ func Sha256Hex(data []byte) string {
 	hash.Write(data)
 	sum := hash.Sum(nil)
 	return hex.EncodeToString(sum)
+}
+
+// Signing message using ed25519
+func Sign(message []byte, privateKeyBase64 string) ([]byte, error) {
+	privKey, err := base64.StdEncoding.DecodeString(privateKeyBase64)
+	if err != nil {
+		return nil, err
+	}
+	if len(privKey) != 64 {
+		return nil, types.ErrInvalidPrivateKey
+	}
+	signature := ed25519.Sign(privKey, message)
+	return signature, nil
+}
+
+// Verify message signature using ed25519
+func Verify(message []byte, signature []byte, publicKeyBase64 string) (bool, error) {
+	pubKey, err := base64.StdEncoding.DecodeString(publicKeyBase64)
+	if err != nil {
+		return false, err
+	}
+	if len(pubKey) != 32 {
+		return false, types.ErrInvalidPublicKey
+	}
+
+	if ed25519.Verify(pubKey, message, signature) {
+		return true, nil
+	}
+	return false, nil
+}
+
+// Generated ed25519 signing key pair and returns base64 public key, private key
+func GenerateEd25519KeyPair() (*string, *string, error) {
+	pubKey, privKey, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	pubKeyBase64 := base64.StdEncoding.EncodeToString(pubKey)
+	privKeyBase64 := base64.StdEncoding.EncodeToString(privKey)
+	return &pubKeyBase64, &privKeyBase64, nil
+}
+
+// helper to check if the mailio address is valid
+func IsValidMailioAddress(address string) bool {
+	re := regexp.MustCompile("^0x[0-9a-fA-F]{40}$")
+	return re.MatchString(address)
 }

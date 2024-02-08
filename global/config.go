@@ -4,7 +4,7 @@ import (
 	"crypto/ed25519"
 
 	"github.com/go-redis/redis_rate/v10"
-	mailiodid "github.com/mailio/go-mailio-core/did"
+	mailiodid "github.com/mailio/go-mailio-did/did"
 	cfg "github.com/mailio/go-web3-kit/config"
 )
 

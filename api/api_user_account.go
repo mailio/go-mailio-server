@@ -10,8 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
-	mailiocrypto "github.com/mailio/go-mailio-core/crypto"
-	"github.com/mailio/go-mailio-core/did"
+	"github.com/mailio/go-mailio-did/did"
 	"github.com/mailio/go-mailio-server/api/interceptors"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/services"
@@ -245,13 +244,13 @@ func (ua *UserAccountApi) Register(c *gin.Context) {
 		return
 	}
 
-	mailioAddress, err := mailiocrypto.NewMailioCrypto().PublicKeyToMailioAddress(inputRegister.Ed25519SigningPublicKeyBase64)
+	mailioAddress, err := util.PublicKeyToMailioAddress(inputRegister.Ed25519SigningPublicKeyBase64)
 	if err != nil {
 		ApiErrorf(c, http.StatusInternalServerError, "failed to generate mailio address")
 		return
 	}
 	// validate mailio address format
-	if inputRegister.MailioAddress != *mailioAddress {
+	if inputRegister.MailioAddress != mailioAddress {
 		ApiErrorf(c, http.StatusBadRequest, "invalid mailio address")
 		return
 	}

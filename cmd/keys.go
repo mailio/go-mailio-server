@@ -8,7 +8,7 @@ import (
 	"os"
 	"time"
 
-	mCrypto "github.com/mailio/go-mailio-core/crypto"
+	"github.com/mailio/go-mailio-server/util"
 	"github.com/spf13/cobra"
 )
 
@@ -26,8 +26,7 @@ var keysCmd = &cobra.Command{
 	Long:  "Generate ed25519 keys for use with Mailio Server",
 	Run: func(cmd *cobra.Command, args []string) {
 		// Generate ed25519 keys
-		mc := mCrypto.NewMailioCrypto()
-		_, private, err := mc.GenerateKeyPair()
+		_, private, err := util.GenerateEd25519KeyPair()
 		if err != nil {
 			panic(err)
 		}

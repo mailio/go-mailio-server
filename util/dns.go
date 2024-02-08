@@ -2,14 +2,14 @@ package util
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
+	"net"
 	"os"
-	"time"
+	"strings"
 
 	lru "github.com/hashicorp/golang-lru/v2"
-	discovery "github.com/mailio/go-mailio-core/discovery/dns"
-	err "github.com/mailio/go-mailio-core/errors"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/types"
 )
@@ -19,7 +19,7 @@ var (
 	// {key:value} = {domain:public key}
 	l *lru.Cache[string, string]
 	// discovery
-	dnsDiscovery = discovery.NewDiscoverer()
+	// dnsDiscovery = discovery.NewDiscoverer()
 	// I/O thread-safe file
 	cacheFile *SafeFile
 )
@@ -38,7 +38,7 @@ func init() {
 
 	data, rErr := cf.Read()
 	if rErr != nil {
-		if rErr == err.ErrNotFound {
+		if rErr == types.ErrNotFound {
 			l = lr
 		} else {
 			panic(rErr)
@@ -53,12 +53,10 @@ func init() {
 
 }
 
-func GetDNSMailioPublicKey(domain string) (string, error) {
+func GetDNSMailioPublicKey(ctx context.Context, domain string) (string, error) {
 	var pk string
 	if publicKey, ok := l.Get(domain); !ok {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		discovery, err := dnsDiscovery.Discover(ctx, domain)
+		discovery, err := MailioDNSDiscover(ctx, domain)
 		if err != nil {
 			return "", errors.New(fmt.Sprintf("no public key in DNS for authority %s found", domain))
 		}
@@ -92,4 +90,104 @@ func GetDNSMailioPublicKey(domain string) (string, error) {
 	}
 
 	return pk, nil
+}
+
+// DNS discovery of the domain.
+// Returns Discovery object with the following fields:
+// - Domain: domain name
+// - IsMailio: true if the domain supports Mailio exchange protocol
+// - PublicKeyType: type of the public key (currently only ed25519 is supported)
+// - PublicKey: base64 encoded public key
+// - Ips: IP addresses of the domain
+func MailioDNSDiscover(ctx context.Context, domain string) (*types.Discovery, error) {
+	var r net.Resolver
+
+	txts, err := r.LookupTXT(ctx, "mailio._mailiokey."+domain)
+	if err != nil {
+		return nil, err
+	}
+	if len(txts) == 0 {
+		return nil, types.ErrNotFound
+	}
+	ips, _ := r.LookupIPAddr(ctx, domain)
+	// read IP address
+	ipAddresses := []string{}
+	if ips != nil {
+		for _, ip := range ips {
+			if ipv4 := ip.IP.To4(); ipv4 != nil {
+				ipAddress := ipv4.String()
+				ipAddresses = append(ipAddresses, ipAddress)
+			}
+		}
+	}
+	// parse TXT record
+	for _, txt := range txts {
+		if strings.Contains(txt, "v=MAILIO1") {
+
+			disc, err := MailioDNSParseTxtV1(txt)
+			if err != nil {
+				return nil, err
+			}
+			pkErr := validatePublicKeyLength(disc.PublicKey)
+			if pkErr != nil {
+				return nil, types.ErrInvalidPublicKey
+			}
+			disc.Domain = domain
+			disc.Ips = ipAddresses
+			return disc, nil
+		}
+	}
+	return nil, types.ErrNotFound
+}
+
+// helper parsing function for MAILIO1 (version 1)
+func MailioDNSParseTxtV1(txt string) (*types.Discovery, error) {
+	split := strings.Split(txt, ";")
+	if len(split) < 3 {
+		return nil, types.ErrInvalidFormat
+	}
+	keyType := strings.Trim(split[1], " ")
+	publicKey := strings.Trim(split[2], " ")
+
+	if !strings.HasPrefix(keyType, "k=") {
+		return nil, types.ErrInvalidFormat
+	}
+	if !strings.HasPrefix(publicKey, "p=") {
+		return nil, types.ErrInvalidFormat
+	}
+
+	return &types.Discovery{
+		IsMailio:      true,
+		PublicKeyType: strings.Replace(keyType, "k=", "", 1),
+		PublicKey:     strings.Replace(publicKey, "p=", "", 1),
+	}, nil
+}
+
+// simple verification of the public key (only checks the length).
+func validatePublicKeyLength(publicKey string) error {
+	pbBytes, err := base64.StdEncoding.DecodeString(publicKey)
+	if err != nil {
+		return types.ErrInvalidFormat
+	}
+	if len(pbBytes) != 32 {
+		return types.ErrInvalidPublicKey
+	}
+	return nil
+}
+
+func GenerateTXTRecord(domain string, publicKeyBase64 string) (*string, error) {
+
+	decoded, err := base64.StdEncoding.DecodeString(publicKeyBase64)
+	if err != nil {
+		return nil, err
+	}
+	if len(decoded) != 32 {
+		return nil, types.ErrInvalidPublicKey
+	}
+
+	txt := "v=MAILIO1; k=ed25519; p=" + publicKeyBase64
+	txtRecord := fmt.Sprintf("\"%s\"", txt)
+
+	txtRR := fmt.Sprintf("mailio._mailiokey.%s.\tIN\tTXT\t%s", domain, txtRecord)
+	return &txtRR, nil
 }

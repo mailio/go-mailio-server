@@ -1,6 +1,6 @@
 package types
 
-import "github.com/mailio/go-mailio-core/did"
+import "github.com/mailio/go-mailio-did/did"
 
 type DidDocument struct {
 	BaseDocument `json:",inline"`

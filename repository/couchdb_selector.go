@@ -1,6 +1,6 @@
 package repository
 
-import "github.com/mailio/go-mailio-core/errors"
+import "github.com/mailio/go-mailio-server/types"
 
 const (
 	// CouchDB is the name of the CouchDB database
@@ -29,12 +29,12 @@ func (c *CouchDBSelector) AddDB(db Repository) {
 // returns the required database
 func (c *CouchDBSelector) ChooseDB(dbName string) (Repository, error) {
 	if len(c.dbs) == 0 {
-		return nil, errors.ErrNotFound
+		return nil, types.ErrNotFound
 	}
 	for i, r := range c.dbs {
 		if r.GetDBName() == dbName {
 			return c.dbs[i], nil
 		}
 	}
-	return nil, errors.ErrNotFound
+	return nil, types.ErrNotFound
 }

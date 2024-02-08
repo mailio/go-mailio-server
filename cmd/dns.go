@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	discovery "github.com/mailio/go-mailio-core/discovery/dns"
+	"github.com/mailio/go-mailio-server/util"
 	"github.com/spf13/cobra"
 )
 
@@ -35,8 +35,6 @@ var dnsCmd = &cobra.Command{
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 
-		dns := discovery.NewDiscoverer()
-
 		if publicKey == "" {
 			content, err := os.ReadFile(keyFile)
 			check(err)
@@ -62,7 +60,7 @@ var dnsCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		txtRecord, err := dns.GenerateTXTRecord(domain, publicKey)
+		txtRecord, err := util.GenerateTXTRecord(domain, publicKey)
 		check(err)
 		fmt.Printf("TXT record for %s:\n\n%s\n", domain, *txtRecord)
 	},

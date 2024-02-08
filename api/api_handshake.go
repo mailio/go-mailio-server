@@ -1,11 +1,11 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/mailio/go-mailio-core/models"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/services"
 	"github.com/mailio/go-mailio-server/types"
@@ -30,7 +30,7 @@ func NewHandshakeApi(handshakeService *services.HandshakeService, nonceService *
 // @Description Returns a single handshake by id
 // @Tags Handshake
 // @Param id path string true "Handshake ID"
-// @Success 200 {object} models.Handshake
+// @Success 200 {object} types.Handshake
 // @Accept json
 // @Produce json
 // @Router /api/v1/handshake/{id} [get]
@@ -59,7 +59,7 @@ func (ha *HandshakeApi) GetHandshake(c *gin.Context) {
 // @Tags Handshake
 // @Param ownerAddress path string true "Owners mailio address"
 // @Param senderAddress path string true "Senders scrypt address or Mailio address"
-// @Success 200 {object} models.Handshake
+// @Success 200 {object} types.Handshake
 // @Accept json
 // @Produce json
 // @Router /api/v1/handshake/lookup/{ownerAddress}/{senderAddress} [get]
@@ -78,6 +78,50 @@ func (ha *HandshakeApi) LookupHandshake(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, util.StoredHandshakeToModelHandsake(handshake))
+}
+
+// Request handshake from server (digitally signed) if missing in local database
+// @Summary Request handshake from server (digitally signed) if missing in local database
+// @Description Request handshake from server (digitally signed)
+// @Tags Mailio Transfer Protocol
+// @Accept json
+// @Produce json
+// @Param handshake body types.InputHandshakeLookup true "InputHandshakeLookup"
+// @Success 200 {array} types.HandshakeContent
+// @Failure 401 {object} api.ApiError "invalid signature"
+// @Failure 400 {object} api.ApiError "bad request"
+// @Failure 429 {object} api.ApiError "rate limit exceeded"
+// @Router /api/v1/mtp/requesthandshakelookup [post]
+func (hs *HandshakeMTPApi) RequestLookup(c *gin.Context) {
+	// get logged in users address
+	address, exists := c.Get("subjectAddress")
+	if !exists {
+		ApiErrorf(c, http.StatusBadRequest, "not authorized")
+		return
+	}
+	fmt.Printf("address: %s", address.(string))
+	// get the request body and decode it into a InputHandshakeLookup struct
+	var handshakeLookup types.InputHandshakeLookup
+	if err := c.ShouldBindJSON(&handshakeLookup); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	// validate the input
+	err := hs.validate.Struct(handshakeLookup)
+	if err != nil {
+		msg := util.ValidationErrorToMessage(err)
+		ApiErrorf(c, http.StatusBadRequest, msg)
+		return
+	}
+
+	handshakes, hErr := hs.mtpService.LookupHandshakes(address.(string), handshakeLookup.Lookups)
+	if hErr != nil {
+		ApiErrorf(c, http.StatusBadRequest, "failed to request handshake")
+		return
+	}
+	//TODO: save handshakes
+
+	c.JSON(http.StatusOK, handshakes)
 }
 
 // List logged in users handshake
@@ -120,15 +164,15 @@ func (ha *HandshakeApi) ListHandshakes(c *gin.Context) {
 // @Tags Handshake
 // @Accept json
 // @Produce json
-// @Param handshake body models.Handshake true "Handshake"
-// @Success 201 {object} models.Handshake
+// @Param handshake body types.Handshake true "Handshake"
+// @Success 201 {object} types.Handshake
 // @Failure 401 {object} api.ApiError "invalid signature"
 // @Failure 400 {object} api.ApiError "bad request"
 // @Failure 429 {object} api.ApiError "rate limit exceeded"
 // @Router /api/v1/handshake [post]
 func (ha *HandshakeApi) CreateHandshake(c *gin.Context) {
 	// Get the request body and decode it into a Handshake struct
-	var handshake models.Handshake
+	var handshake types.Handshake
 	if err := c.ShouldBindJSON(&handshake); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -161,12 +205,12 @@ func (ha *HandshakeApi) CreateHandshake(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param id path string true "Handshake ID"
-// @Param handshake body models.Handshake true "Handshake"
-// @Success 200 {object} models.Handshake
+// @Param handshake body types.Handshake true "Handshake"
+// @Success 200 {object} types.Handshake
 // @Failure 429 {object} api.ApiError "rate limit exceeded"
 // @Router /api/v1/handshake/{id} [put]
 func (ha *HandshakeApi) UpdateHandshake(c *gin.Context) {
-	var handshake models.Handshake
+	var handshake types.Handshake
 	if err := c.ShouldBindJSON(&handshake); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

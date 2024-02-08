@@ -1,7 +1,7 @@
 package util
 
 import (
-	mailiodid "github.com/mailio/go-mailio-core/did"
+	mailiodid "github.com/mailio/go-mailio-did/did"
 	"github.com/mailio/go-mailio-server/global"
 )
 

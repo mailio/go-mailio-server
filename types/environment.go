@@ -1,23 +1,20 @@
 package types
 
 import (
-	"github.com/mailio/go-mailio-core/crypto"
 	"github.com/redis/go-redis/v9"
 	"github.com/robfig/cron/v3"
 )
 
 type Environment struct {
-	RedisClient  *redis.Client
-	MailioCrypto crypto.IMailioCrypto
-	Cron         *cron.Cron
+	RedisClient *redis.Client
+	Cron        *cron.Cron
 }
 
-func NewEnvironment(redisClient *redis.Client, mailioCrypto crypto.IMailioCrypto) *Environment {
+func NewEnvironment(redisClient *redis.Client) *Environment {
 
 	cr := cron.New()
 	return &Environment{
-		RedisClient:  redisClient,
-		MailioCrypto: mailioCrypto,
-		Cron:         cr,
+		RedisClient: redisClient,
+		Cron:        cr,
 	}
 }
