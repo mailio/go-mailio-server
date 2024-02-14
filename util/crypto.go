@@ -106,12 +106,16 @@ func PublicKeyToMailioAddress(pubKeyBase64 string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	return RawPublicKeyToMailioAddress(pubKey)
+}
+
+func RawPublicKeyToMailioAddress(pubKey ed25519.PublicKey) (string, error) {
 	if len(pubKey) != 32 {
 		return "", types.ErrInvalidPublicKey
 	}
 
 	h := sha256.New()
-	h.Write([]byte(pubKeyBase64))
+	h.Write([]byte(base64.StdEncoding.EncodeToString(pubKey)))
 	output := hex.EncodeToString(h.Sum(nil))
 	output = "0x" + output[64-40:64]
 	return output, nil
@@ -143,15 +147,11 @@ func Sha256Hex(data []byte) string {
 }
 
 // Signing message using ed25519
-func Sign(message []byte, privateKeyBase64 string) ([]byte, error) {
-	privKey, err := base64.StdEncoding.DecodeString(privateKeyBase64)
-	if err != nil {
-		return nil, err
-	}
-	if len(privKey) != 64 {
+func Sign(message []byte, privateKey ed25519.PrivateKey) ([]byte, error) {
+	if len(privateKey) != 64 {
 		return nil, types.ErrInvalidPrivateKey
 	}
-	signature := ed25519.Sign(privKey, message)
+	signature := ed25519.Sign(privateKey, message)
 	return signature, nil
 }
 

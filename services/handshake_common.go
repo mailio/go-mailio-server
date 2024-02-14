@@ -15,7 +15,7 @@ import (
 
 // returns default server handshake (used when there is no users handshake related to the sender)
 func GetServerHandshake(senderAddress string) (*types.Handshake, error) {
-	handshake, hErr := util.ServerSideHandshake(string(global.PublicKey), string(global.PrivateKey), global.Conf.Mailio.Domain, senderAddress)
+	handshake, hErr := util.ServerSideHandshake(global.PublicKey, global.PrivateKey, global.Conf.Mailio.Domain)
 	if hErr != nil {
 		level.Error(global.Logger).Log("msg", "error while creating handshake", "err", hErr)
 		return nil, hErr

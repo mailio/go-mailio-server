@@ -51,13 +51,15 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, en
 	mtpService := services.NewMtpService(dbSelector, environment)
 
 	// API definitions
-	handshakeApi := api.NewHandshakeApi(handshakeService, nonceService)
+	handshakeApi := api.NewHandshakeApi(handshakeService, nonceService, mtpService)
 	accountApi := api.NewUserAccountApi(userService, nonceService, ssiService)
 	didApi := api.NewDIDApi(ssiService)
 	vcApi := api.NewVCApi(ssiService)
+	messageApi := api.NewMessagingApi(handshakeService, mtpService, environment)
 
 	// MTP API definitions
 	handshakeMTPApi := api.NewHandshakeMTPApi(handshakeService, mtpService, environment)
+	messageMTPApi := api.NewMessagingMTPApi(handshakeService, mtpService, environment)
 
 	// PUBLIC ROOT API
 	rootPublicApi := router.Group("/", restinterceptors.RateLimitMiddleware(), metrics.MetricsMiddleware())
@@ -75,7 +77,7 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, en
 		publicApi.GET("/v1/nonce", accountApi.ChallengeNonce)
 		publicApi.GET("/v1/findaddress", accountApi.FindUsersAddressByEmail)
 
-		publicApi.GET("/v1/handshake/lookup/:ownerAddress/:senderAddress", handshakeApi.LookupHandshake)
+		// publicApi.GET("/v1/handshake/lookup/:ownerAddress/:senderAddress", handshakeApi.LookupHandshake)
 	}
 
 	rootApi := router.Group("/api", metrics.MetricsMiddleware(), restinterceptors.RateLimitMiddleware(), restinterceptors.JWSMiddleware())
@@ -85,6 +87,11 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, en
 		rootApi.GET("/v1/handshake", handshakeApi.ListHandshakes)
 		rootApi.POST("/v1/handshake", handshakeApi.CreateHandshake)
 		rootApi.DELETE("/v1/handshake/:id", handshakeApi.DeleteHandshake)
+		rootApi.GET("/v1/handshakeoffer", handshakeApi.PersonalHandshakeLink)
+		rootApi.POST("/v1/handshakefetch", handshakeApi.HandshakeFetch)
+
+		// Messaging
+		rootApi.POST("/v1/didmessage", messageApi.SendDIDMessage)
 
 		// VCs
 		rootApi.GET("/v1/credentials/list/:address", vcApi.ListVCs)
@@ -99,7 +106,8 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, en
 	mtpRootApi := router.Group("/api", metrics.MetricsMiddleware(), restinterceptors.RateLimitMiddleware(), restinterceptors.SignatureMiddleware(environment))
 	{
 		// Handshakes MTP
-		mtpRootApi.POST("/v1/mtp/handshakelookup", handshakeMTPApi.HandshakeLookup)
+		mtpRootApi.POST("/v1/mtp/handshake", handshakeMTPApi.GetLocalHandshakes)
+		mtpRootApi.POST("/v1/mtp/:address/message", messageMTPApi.ReceiveMessage)
 	}
 
 	router.StaticFile("./well-known/did.json", "./well-known/did.json")

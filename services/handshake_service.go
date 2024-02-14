@@ -43,7 +43,7 @@ func (hs *HandshakeService) Save(handshake *types.Handshake, userPublicKeyEd2551
 	if handshake == nil || handshake.Content.HandshakeID == "" {
 		return types.ErrBadRequest
 	}
-	if handshake.Content.Sender == nil {
+	if handshake.Content.SenderMetadata == nil {
 		return types.ErrBadRequest
 	}
 	if handshake.Content.Type < types.HANDSHAKE_TYPE_PERSONAL || handshake.Content.Type > types.HANDSHAKE_TYPE_USER_SPECIFIC {
@@ -58,11 +58,11 @@ func (hs *HandshakeService) Save(handshake *types.Handshake, userPublicKeyEd2551
 		return errors.New("owner address does not match")
 	}
 	senderAddress := ""
-	if handshake.Content.Sender != nil {
-		if handshake.Content.Sender.Address != "" {
-			senderAddress = handshake.Content.Sender.Address
+	if handshake.Content.SenderMetadata != nil {
+		if handshake.Content.SenderMetadata.Address != "" {
+			senderAddress = handshake.Content.SenderMetadata.Address // mailio address
 		} else {
-			senderAddress = handshake.Content.Sender.ScryptAddress
+			senderAddress = handshake.Content.SenderMetadata.EmailHash // script
 		}
 	}
 	handshakeIDConcat := ownerMailioAddr + senderAddress
@@ -93,6 +93,7 @@ func (hs *HandshakeService) Save(handshake *types.Handshake, userPublicKeyEd2551
 	// convert models.Handshake to types.StoredHandshale
 	storedHandshake := types.StoredHandshake{
 		Content:           handshake.Content,
+		OwnerAddress:      ownerMailioAddr,
 		SignatureBase64:   handshake.SignatureBase64,
 		CborPayloadBase64: handshake.CborPayloadBase64,
 	}

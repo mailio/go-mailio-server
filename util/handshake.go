@@ -1,9 +1,8 @@
 package util
 
 import (
-	"crypto/sha256"
+	"crypto/ed25519"
 	"encoding/base64"
-	"encoding/hex"
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
@@ -65,21 +64,17 @@ func CborDecode(payload []byte, output interface{}) error {
 }
 
 // Handshake from the server side (this is usually used when user has no handshake for specific sender)
-func ServerSideHandshake(publicServerKeyBase64 string, privateServerKeyBase64 string, domain string, senderAddress string) (*types.Handshake, error) {
-	pubSk, pubSkErr := base64.StdEncoding.DecodeString(publicServerKeyBase64)
-	if pubSkErr != nil {
-		return nil, pubSkErr
-	}
+func ServerSideHandshake(publicServerKey ed25519.PublicKey, privateServerKey ed25519.PrivateKey, domain string) (*types.Handshake, error) {
 
-	idContent := append(pubSk, []byte(senderAddress)...)
-	s256 := sha256.Sum256(idContent)
+	// idContent := append(publicServerKey, []byte(senderAddress)...)
+	// s256 := sha256.Sum256(idContent)
 
-	addr, err := PublicKeyToMailioAddress(publicServerKeyBase64)
+	addr, err := RawPublicKeyToMailioAddress(publicServerKey)
 	if err != nil {
 		return nil, err
 	}
 
-	ID := hex.EncodeToString(s256[:])
+	ID := addr
 	handshake := &types.Handshake{
 		Content: types.HandshakeContent{
 			HandshakeID: ID,
@@ -89,7 +84,7 @@ func ServerSideHandshake(publicServerKeyBase64 string, privateServerKeyBase64 st
 			Type:                 types.HANDSHAKE_TYPE_SERVER,
 			Status:               types.HANDSHAKE_STATUS_ACCEPTED,
 			Level:                types.HANDSHAKE_LEVEL_NONE,
-			OwnerPublicKeyBase64: publicServerKeyBase64,
+			OwnerPublicKeyBase64: base64.StdEncoding.EncodeToString(publicServerKey),
 			OwnerAddressHex:      addr,
 			Created:              time.Now().UTC().UnixMilli(),
 			SignatureScheme:      types.HANDSHAKE_SIGNATURE_SCHEME_EdDSA_X25519,
@@ -99,7 +94,7 @@ func ServerSideHandshake(publicServerKeyBase64 string, privateServerKeyBase64 st
 	if cErr != nil {
 		return nil, cErr
 	}
-	signature, sErr := Sign(cborPayload, privateServerKeyBase64)
+	signature, sErr := Sign(cborPayload, privateServerKey)
 	if sErr != nil {
 		return nil, sErr
 	}

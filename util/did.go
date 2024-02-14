@@ -14,6 +14,8 @@ func CreateMailioDIDDocument() (*mailiodid.Document, error) {
 		},
 	}
 
-	didDoc, err := mailiodid.NewMailioDIDDocument(mkMailio, global.PublicKey, global.Conf.Mailio.AuthenticationPath, global.Conf.Mailio.MessagingPath)
+	messagingPath := global.Conf.Mailio.Domain + global.Conf.Mailio.MessagingPath
+	authPath := global.Conf.Mailio.Domain + global.Conf.Mailio.AuthenticationPath
+	didDoc, err := mailiodid.NewMailioDIDDocument(mkMailio, global.PublicKey, authPath, messagingPath)
 	return didDoc, err
 }

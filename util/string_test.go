@@ -14,6 +14,6 @@ func TestHexEncode(t *testing.T) {
 }
 
 func TestHexEncodeDBUser(t *testing.T) {
-	str := "userdb-" + HexEncodeToString("org.couchdb.user:kaia")
+	str := "userdb-" + HexEncodeToString("org.couchdb.user:bob")
 	fmt.Printf("encoded: %s", str)
 }

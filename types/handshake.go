@@ -2,32 +2,32 @@ package types
 
 const (
 	// Possible handshake types
-	HANDSHAKE_TYPE_PERSONAL      = 0
-	HANDSHAKE_TYPE_SIGNUP        = 1
-	HANDSHAKE_TYPE_SERVER        = 2
-	HANDSHAKE_TYPE_USER_SPECIFIC = 3
+	HANDSHAKE_TYPE_PERSONAL      = "personal"
+	HANDSHAKE_TYPE_SIGNUP        = "signup"
+	HANDSHAKE_TYPE_SERVER        = "server"
+	HANDSHAKE_TYPE_USER_SPECIFIC = "user"
 
 	// Possible handshake statuses
-	HANDSHAKE_STATUS_ACCEPTED = 0
-	HANDSHAKE_STATUS_REVOKED  = 1
+	HANDSHAKE_STATUS_ACCEPTED = "accepted"
+	HANDSHAKE_STATUS_REVOKED  = "revoked"
 
 	// Possbile handshake signup sub types
-	HANDSHAKE_SIGNUP_SUBTYPE_TRANSACTIONAL = 0
-	HANDSHAKE_SIGNUP_SUBTYPE_PRODUCT       = 1
-	HANDSHAKE_SIGNUP_SUBTYPE_SECURITY      = 2
-	HANDSHAKE_SIGNUP_SUBTYPE_PROMOTION     = 3
-	HANDSHAKE_SIGNUP_SUBTYPE_NEWSLETTER    = 4
-	HANDSHAKE_SIGNUP_SUBTYPE_REQUEST       = 5
-	HANDSHAKE_SIGNUP_SUBTYPE_OTHER         = 6
+	HANDSHAKE_SIGNUP_SUBTYPE_TRANSACTIONAL = "transactional"
+	HANDSHAKE_SIGNUP_SUBTYPE_PRODUCT       = "product"
+	HANDSHAKE_SIGNUP_SUBTYPE_SECURITY      = "security"
+	HANDSHAKE_SIGNUP_SUBTYPE_PROMOTION     = "promotion"
+	HANDSHAKE_SIGNUP_SUBTYPE_NEWSLETTER    = "newsletter"
+	HANDSHAKE_SIGNUP_SUBTYPE_REQUEST       = "request"
+	HANDSHAKE_SIGNUP_SUBTYPE_OTHER         = "other"
 
 	// Possible handshake levels
-	HANDSHAKE_LEVEL_NONE         = 0
-	HANDSHAKE_LEVEL_RECAPTCHAV3  = 1
-	HANDSHAKE_LEVEL_POH          = 2 // proof of humanity
-	HANDSHAKE_LEVEL_FACE_TO_FACE = 3 // face to face created handshake
+	HANDSHAKE_LEVEL_NONE         = "none"
+	HANDSHAKE_LEVEL_RECAPTCHAV3  = "recaptchaV3"
+	HANDSHAKE_LEVEL_POH          = "poh"      // proof of humanity
+	HANDSHAKE_LEVEL_FACE_TO_FACE = "personal" // face to face created handshake
 
 	// Possible signatures schemes
-	HANDSHAKE_SIGNATURE_SCHEME_EdDSA_X25519 = 0
+	HANDSHAKE_SIGNATURE_SCHEME_EdDSA_X25519 = "EdDSA_X25519"
 )
 
 /*
@@ -36,7 +36,7 @@ const (
 type Handshake struct {
 	Content           HandshakeContent `json:"content"`
 	SignatureBase64   string           `json:"signatureBase64"`
-	CborPayloadBase64 string           `json:"cborPayloadBase64"`
+	CborPayloadBase64 string           `json:"cborPayloadBase64"` // payload in cbor format of handshake Content
 }
 
 type HandshakeOriginServer struct {
@@ -54,31 +54,34 @@ type HandshakeContent struct {
 	OriginServer         HandshakeOriginServer `json:"originServer,omitempty"`    // origin server
 	SignupSubType        *int                  `json:"signupSubType,omitempty"`   // handshake signup sub type
 	SignupRules          *HandshakeSignupRules `json:"signupRules,omitempty"`     // handshake signup rules
-	Status               int                   `json:"status"`                    // handshake status
-	Level                int                   `json:"level"`                     // handshake level
+	Status               string                `json:"status"`                    // handshake status
+	Level                string                `json:"level"`                     // handshake level
 	OwnerPublicKeyBase64 string                `json:"ownerPublicKey"`            // owner public key of the owner of the handshake
 	OwnerAddressHex      string                `json:"ownerAddress"`              // mailio address of the owner of the handshake
-	Sender               *HandshakeSender      `json:"sender,omitempty"`          // senders scrypted email address or mailio address + contact information
+	SenderMetadata       *SenderMetadata       `json:"senderMetadata,omitempty"`  // sender meta data (either Mailio address or sha512 email address )
 	SignatureBase64      string                `json:"signatureBase64,omitempty"` // owners signature of the handshake
-	Type                 int                   `json:"type,omitempty"`            // handshake type
-	SignatureScheme      int                   `json:"signatureScheme"`           // handshake signature scheme
+	Type                 string                `json:"type,omitempty"`            // handshake type
+	SignatureScheme      string                `json:"signatureScheme"`           // handshake signature scheme
 	Created              int64                 `json:"timestamp"`                 // timestamp of the handshake
 }
 
-type HandshakeSender struct {
-	Address       string `json:"address,omitempty"`       // senders scrypted email address or mailio address
-	ScryptAddress string `json:"scryptAddress,omitempty"` // senders scrypted email address
-	Name          string `json:"name,omitempty"`          // senders name
-	Phone         string `json:"phone,omitempty"`         // senders phone
-	Email         string `json:"email,omitempty"`         // senders email
+// One of the emailHash or address MUST be present
+type SenderMetadata struct {
+	EmailHash string `json:"emailHash,omitempty"` // scrypt hash of the email address
+	Address   string `json:"address,omitempty"`   // mailio address
 }
 
 // handshake is a struct that represents a handshake stored in the database
 type StoredHandshake struct {
 	BaseDocument      `json:",inline"`
 	Content           HandshakeContent `json:"content"`
+	OwnerAddress      string           `json:"ownerAddress"` // Mailio address of the owner of the handshake
 	SignatureBase64   string           `json:"signatureBase64"`
 	CborPayloadBase64 string           `json:"cborPayloadBase64"`
+}
+
+type HandshakeLink struct {
+	Link string `json:"link"`
 }
 
 /****
@@ -98,7 +101,7 @@ type HandshakeHeader struct {
 type HandshakeLookup struct {
 	ID          string                `json:"id,omitempty"`
 	Address     string                `json:"address,omitempty"`
-	EmailHash   string                `json:"emailHash,omitempty"`
+	EmailHash   string                `json:"emailHash,omitempty"` // scrypt hash of the email address
 	OriginSever HandshakeOriginServer `json:"originServer" validate:"required"`
 }
 

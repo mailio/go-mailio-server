@@ -67,6 +67,10 @@ func (mtp *MtpService) LookupHandshakes(senderAddress string, inputLookups []typ
 	return found, nil
 }
 
+// Request handshake from remote server calling /api/v1/mtp/handshake endpoint
+// returns list of handshakes signed by the remote server
+// if handshake older than 24 hours - it will not be returned
+
 func (mtp *MtpService) requestHandshakeFromRemoteServer(senderAddress string, handshakeLookups []types.HandshakeLookup, domain string) ([]types.HandshakeSignedResponse, error) {
 	output := []types.HandshakeSignedResponse{}
 
@@ -96,7 +100,7 @@ func (mtp *MtpService) requestHandshakeFromRemoteServer(senderAddress string, ha
 		level.Error(global.Logger).Log("msg", "failed to cbor encode request", "err", cErr)
 		return nil, cErr
 	}
-	signature, sErr := util.Sign(cborPayload, base64.StdEncoding.EncodeToString(global.PrivateKey))
+	signature, sErr := util.Sign(cborPayload, global.PrivateKey)
 	if sErr != nil {
 		level.Error(global.Logger).Log("msg", "failed to sign request", "err", sErr)
 		return nil, sErr
@@ -104,10 +108,10 @@ func (mtp *MtpService) requestHandshakeFromRemoteServer(senderAddress string, ha
 	request.CborPayloadBase64 = base64.StdEncoding.EncodeToString(cborPayload)
 	request.SignatureBase64 = base64.StdEncoding.EncodeToString(signature)
 
-	// send request to domain (API endpoint: /api/v1/mtp/handshakelookup)
+	// send request to domain (API endpoint: /api/v1/mtp/handshake)
 	var signedResponse types.HandshakeSignedResponse
 	response, rErr := mtp.restyClient.R().SetHeader("Content-Type", "application/json").
-		SetBody(request).SetResult(&signedResponse).Post("https://" + domainObject.Name + "/api/v1/mtp/handshakelookup")
+		SetBody(request).SetResult(&signedResponse).Post("https://" + domainObject.Name + "/api/v1/mtp/handshake")
 	if rErr != nil {
 		level.Error(global.Logger).Log("msg", "failed to request handshake", "err", rErr)
 		return nil, rErr

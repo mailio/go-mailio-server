@@ -99,8 +99,8 @@ func (ssi *SelfSovereignService) SaveVC(vc *did.VerifiableCredential) (*did.Veri
 // Stores the users DID document and signs a VC with servers private key that proves ownership of the email address
 func (ssi *SelfSovereignService) StoreRegistrationSSI(mk *did.MailioKey) error {
 
-	authPath := "https://" + global.Conf.Mailio.Domain + global.Conf.Mailio.AuthenticationPath
-	messagePath := "https://" + global.Conf.Mailio.Domain + global.Conf.Mailio.MessagingPath
+	authPath := global.Conf.Mailio.Domain + global.Conf.Mailio.AuthenticationPath
+	messagePath := global.Conf.Mailio.Domain + global.Conf.Mailio.MessagingPath
 
 	userDIDDoc, didErr := did.NewMailioDIDDocument(mk, global.PublicKey, authPath, messagePath)
 	if didErr != nil {

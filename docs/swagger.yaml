@@ -162,9 +162,146 @@ definitions:
       type:
         type: string
     type: object
+  types.DIDCommMessage:
+    properties:
+      attachments:
+        description: attachments to the message
+        items:
+          $ref: '#/definitions/types.EncryptedAttachment'
+        type: array
+      body:
+        allOf:
+        - $ref: '#/definitions/types.EncryptedBody'
+        description: the body attribute contains all the data and structure defined
+          uniquely for the schema associated with the type attribute. It MUST be a
+          JSON object conforming to RFC 7159                              // the encrypted
+          message body
+      createdTime:
+        description: time of message creation in UTC milliseconds since epoch
+        type: integer
+      expiresTime:
+        description: sender will abort the protocol if it doesn't get a response by
+          this time (UTC milliseconds since epoch)
+        type: integer
+      from:
+        description: sender DID required because all mailio messages are encrypted
+        type: string
+      fromPrior:
+        description: A DID is rotated by sending a message of any type to the recipient
+          to be notified of the rotation
+        type: string
+      id:
+        description: globally unique message identifier UUID (RFC 4122) recommended
+        type: string
+      next:
+        description: in case forward message
+        type: string
+      pthid:
+        description: parent thread identifier. Uniquely identifies the parent thread
+          that the message belongs to. If not included, the message is the first message
+          in the thread.
+        type: string
+      thid:
+        description: thread identifier. Uniquely identifies the thread that the message
+          belongs to. If not included, the id property of the message MUST be treated
+          as the value of the thid.
+        type: string
+      to:
+        description: 'in format: did:web:mail.io:0xabc -> recipient DIDs'
+        items:
+          type: string
+        minItems: 1
+        type: array
+      type:
+        description: 'a valid message type URI (MUST be: application/didcomm-encrypted+json)'
+        type: string
+    required:
+    - body
+    - from
+    - id
+    - to
+    - type
+    type: object
+  types.EncryptedAttachment:
+    properties:
+      data:
+        allOf:
+        - $ref: '#/definitions/types.EncryptedAttachmentData'
+        description: the encrypted message body
+      description:
+        description: a human-readable description of the attachment (optional)
+        type: string
+      id:
+        description: a globally unique identifier for the attachment
+        type: string
+      mediaType:
+        description: the media type of the attachment
+        type: string
+    required:
+    - data
+    - id
+    - mediaType
+    type: object
+  types.EncryptedAttachmentData:
+    properties:
+      json:
+        $ref: '#/definitions/types.EncryptedBody'
+    required:
+    - json
+    type: object
+  types.EncryptedBody:
+    properties:
+      ciphertext:
+        description: the encrypted message
+        type: string
+      iv:
+        description: the initialization vector (nonce)
+        type: string
+      protected:
+        description: the protected header
+        type: string
+      recipients:
+        description: the recipients of the message (at least one)
+        items:
+          $ref: '#/definitions/types.Recipient'
+        minItems: 1
+        type: array
+      signature:
+        allOf:
+        - $ref: '#/definitions/types.Signature'
+        description: JWS digital signature
+      tag:
+        description: integrity check on the encrypted message
+        type: string
+    required:
+    - ciphertext
+    - iv
+    - protected
+    - recipients
+    - signature
+    - tag
+    type: object
+  types.Epk:
+    properties:
+      crv:
+        description: The curve parameter used for the key
+        type: string
+      kty:
+        description: Key Type, indicating the type of key used, such as an elliptic
+          curve key ("OKP" for Octet Key Pair).
+        type: string
+      x:
+        description: The X coordinate for the elliptic curve point
+        type: string
+    required:
+    - crv
+    - kty
+    - x
+    type: object
   types.Handshake:
     properties:
       cborPayloadBase64:
+        description: payload in cbor format of handshake Content
         type: string
       content:
         $ref: '#/definitions/types.HandshakeContent'
@@ -178,7 +315,7 @@ definitions:
         type: string
       level:
         description: handshake level
-        type: integer
+        type: string
       originServer:
         allOf:
         - $ref: '#/definitions/types.HandshakeOriginServer'
@@ -189,16 +326,17 @@ definitions:
       ownerPublicKey:
         description: owner public key of the owner of the handshake
         type: string
-      sender:
+      senderMetadata:
         allOf:
-        - $ref: '#/definitions/types.HandshakeSender'
-        description: senders scrypted email address or mailio address + contact information
+        - $ref: '#/definitions/types.SenderMetadata'
+        description: sender meta data (either Mailio address or sha512 email address
+          )
       signatureBase64:
         description: owners signature of the handshake
         type: string
       signatureScheme:
         description: handshake signature scheme
-        type: integer
+        type: string
       signupRules:
         allOf:
         - $ref: '#/definitions/types.HandshakeSignupRules'
@@ -208,13 +346,13 @@ definitions:
         type: integer
       status:
         description: handshake status
-        type: integer
+        type: string
       timestamp:
         description: timestamp of the handshake
         type: integer
       type:
         description: handshake type
-        type: integer
+        type: string
     type: object
   types.HandshakeHeader:
     properties:
@@ -230,11 +368,17 @@ definitions:
     - signatureScheme
     - timestamp
     type: object
+  types.HandshakeLink:
+    properties:
+      link:
+        type: string
+    type: object
   types.HandshakeLookup:
     properties:
       address:
         type: string
       emailHash:
+        description: scrypt hash of the email address
         type: string
       id:
         type: string
@@ -285,24 +429,6 @@ definitions:
     - handshakeHeader
     - handshakes
     type: object
-  types.HandshakeSender:
-    properties:
-      address:
-        description: senders scrypted email address or mailio address
-        type: string
-      email:
-        description: senders email
-        type: string
-      name:
-        description: senders name
-        type: string
-      phone:
-        description: senders phone
-        type: string
-      scryptAddress:
-        description: senders scrypted email address
-        type: string
-    type: object
   types.HandshakeSignedRequest:
     properties:
       cborPayloadBase64:
@@ -339,6 +465,31 @@ definitions:
       frequencyMinutes:
         description: optional
         type: integer
+    type: object
+  types.Header:
+    properties:
+      epk:
+        allOf:
+        - $ref: '#/definitions/types.Epk'
+        description: '(Ephemeral Public Key): A temporary public key that was used
+          in conjunction with the recipient''s public key to encrypt the encrypted_key'
+      kid:
+        description: '(Key ID): A hint indicating which key was used to encrypt the'
+        type: string
+    required:
+    - epk
+    - kid
+    type: object
+  types.InputDIDCommMessage:
+    properties:
+      didCommMessage:
+        $ref: '#/definitions/types.DIDCommMessage'
+      handshakes:
+        items:
+          $ref: '#/definitions/types.Handshake'
+        type: array
+    required:
+    - didCommMessage
     type: object
   types.InputHandshakeLookup:
     properties:
@@ -420,6 +571,48 @@ definitions:
       docs:
         items: {}
         type: array
+    type: object
+  types.Recipient:
+    properties:
+      encrypted_key:
+        description: Tthe key used to encrypt the ciphertext, encrypted with the recipient's
+          public key
+        type: string
+      header:
+        allOf:
+        - $ref: '#/definitions/types.Header'
+        description: encryption parameters specific to each recipient
+    required:
+    - encrypted_key
+    - header
+    type: object
+  types.SenderMetadata:
+    properties:
+      address:
+        description: mailio address
+        type: string
+      emailHash:
+        description: scrypt hash of the email address
+        type: string
+    type: object
+  types.Signature:
+    properties:
+      payload:
+        description: The payload that was signed, which is base64URL encoded.
+        type: string
+      signatures:
+        items:
+          $ref: '#/definitions/types.SignatureDetail'
+        type: array
+    type: object
+  types.SignatureDetail:
+    properties:
+      protected:
+        description: Base64URL encoded JSON string containing the header parameters
+          used for the signature
+        type: string
+      signature:
+        type: string
     type: object
   types.VCValidationResponse:
     properties:
@@ -619,6 +812,42 @@ paths:
       summary: List all VCs for a specific mailio address
       tags:
       - Verifiable Credentials
+  /api/v1/didmessage:
+    post:
+      consumes:
+      - application/json
+      description: Send end-to-end encrypted message to DID recipients
+      parameters:
+      - description: didcomm-encrypted+json
+        in: body
+        name: handshake
+        required: true
+        schema:
+          $ref: '#/definitions/types.InputDIDCommMessage'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.InputDIDCommMessage'
+        "400":
+          description: bad request
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "401":
+          description: invalid signature
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "429":
+          description: rate limit exceeded
+          schema:
+            $ref: '#/definitions/api.ApiError'
+      security:
+      - Bearer: []
+      summary: Send end-to-end encrypted message to DID recipients
+      tags:
+      - Messaging
   /api/v1/findaddress:
     get:
       consumes:
@@ -665,6 +894,14 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/types.PagingResults'
+        "401":
+          description: not authorized
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "429":
+          description: rate limit exceeded
+          schema:
+            $ref: '#/definitions/api.ApiError'
       security:
       - Bearer: []
       summary: List handshakes (default 10 results)
@@ -693,7 +930,7 @@ paths:
           schema:
             $ref: '#/definitions/api.ApiError'
         "401":
-          description: invalid signature
+          description: invalid signature/not authorized
           schema:
             $ref: '#/definitions/api.ApiError'
         "429":
@@ -717,6 +954,10 @@ paths:
       responses:
         "204":
           description: No Content
+        "401":
+          description: not authorized
+          schema:
+            $ref: '#/definitions/api.ApiError'
         "429":
           description: rate limit exceeded
           schema:
@@ -771,6 +1012,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/types.Handshake'
+        "401":
+          description: not authorized
+          schema:
+            $ref: '#/definitions/api.ApiError'
         "429":
           description: rate limit exceeded
           schema:
@@ -780,33 +1025,62 @@ paths:
       summary: Update a handshake
       tags:
       - Handshake
-  /api/v1/handshake/lookup/{ownerAddress}/{senderAddress}:
-    get:
+  /api/v1/handshakefetch:
+    post:
       consumes:
       - application/json
-      description: Lookup handshake is public and looksup handshake by ownerAddress
-        and sender scrypted (hashed) address or mailio address. If nothing found default
-        server handshake returned
+      description: Request handshake from origin server (digitally signed)
       parameters:
-      - description: Owners mailio address
-        in: path
-        name: ownerAddress
+      - description: InputHandshakeLookup
+        in: body
+        name: handshake
         required: true
-        type: string
-      - description: Senders scrypt address or Mailio address
-        in: path
-        name: senderAddress
-        required: true
-        type: string
+        schema:
+          $ref: '#/definitions/types.InputHandshakeLookup'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/types.Handshake'
-      summary: Lookup handshake by ownerAddress and sender scrypted (hashed) address
-        (or mailio address)
+            items:
+              $ref: '#/definitions/types.HandshakeContent'
+            type: array
+        "400":
+          description: bad request
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "401":
+          description: invalid signature
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "429":
+          description: rate limit exceeded
+          schema:
+            $ref: '#/definitions/api.ApiError'
+      summary: Request handshake from origin server (digitally signed) if missing
+        in local database
+      tags:
+      - Handshake
+  /api/v1/handshakeoffer:
+    get:
+      description: Create personal handshake link
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.HandshakeLink'
+        "401":
+          description: not authorized
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "429":
+          description: rate limit exceeded
+          schema:
+            $ref: '#/definitions/api.ApiError'
+      security:
+      - Bearer: []
+      summary: Create personal handshake link
       tags:
       - Handshake
   /api/v1/login:
@@ -847,11 +1121,45 @@ paths:
       summary: Login with username and password
       tags:
       - User Account
-  /api/v1/mtp/handshakelookup:
+  /api/v1/mtp/{address}/message:
     post:
       consumes:
       - application/json
-      description: Request handshake from server (digitally signed)
+      description: Receive end-to-end encrypted message
+      parameters:
+      - description: didcomm-encrypted+json
+        in: body
+        name: handshake
+        required: true
+        schema:
+          $ref: '#/definitions/types.DIDCommMessage'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.DIDCommMessage'
+        "400":
+          description: bad request
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "401":
+          description: invalid signature
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "429":
+          description: rate limit exceeded
+          schema:
+            $ref: '#/definitions/api.ApiError'
+      summary: Receive end-to-end encrypted message
+      tags:
+      - Mailio Transfer Protocol
+  /api/v1/mtp/handshake:
+    post:
+      consumes:
+      - application/json
+      description: Request handshake from this server (must be digitally signed)
       parameters:
       - description: HandshakeSignedRequest
         in: body
@@ -878,44 +1186,7 @@ paths:
           description: rate limit exceeded
           schema:
             $ref: '#/definitions/api.ApiError'
-      summary: Request handshake from server (digitally signed)
-      tags:
-      - Mailio Transfer Protocol
-  /api/v1/mtp/requesthandshakelookup:
-    post:
-      consumes:
-      - application/json
-      description: Request handshake from server (digitally signed)
-      parameters:
-      - description: InputHandshakeLookup
-        in: body
-        name: handshake
-        required: true
-        schema:
-          $ref: '#/definitions/types.InputHandshakeLookup'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/types.HandshakeContent'
-            type: array
-        "400":
-          description: bad request
-          schema:
-            $ref: '#/definitions/api.ApiError'
-        "401":
-          description: invalid signature
-          schema:
-            $ref: '#/definitions/api.ApiError'
-        "429":
-          description: rate limit exceeded
-          schema:
-            $ref: '#/definitions/api.ApiError'
-      summary: Request handshake from server (digitally signed) if missing in local
-        database
+      summary: Request handshake from this server (must be digitally signed)
       tags:
       - Mailio Transfer Protocol
   /api/v1/nonce:

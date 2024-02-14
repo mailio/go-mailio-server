@@ -11,10 +11,11 @@ require (
 	github.com/go-playground/validator/v10 v10.14.0
 	github.com/go-redis/redis_rate/v10 v10.0.1
 	github.com/go-resty/resty/v2 v2.7.0
+	github.com/google/uuid v1.3.0
 	github.com/hashicorp/golang-lru/v2 v2.0.2
 	github.com/jarcoal/httpmock v1.3.0
 	github.com/lestrrat-go/jwx/v2 v2.0.19
-	github.com/mailio/go-mailio-did v0.0.0-20240208223628-51d31055376e
+	github.com/mailio/go-mailio-did v0.0.0-20240214184032-ea33341d7033
 	github.com/mailio/go-web3-kit v0.0.0-20230302165532-057a45112b37
 	github.com/prometheus/client_golang v1.15.0
 	github.com/redis/go-redis/v9 v9.0.5

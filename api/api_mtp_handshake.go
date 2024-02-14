@@ -33,8 +33,8 @@ func NewHandshakeMTPApi(handshakeService *services.HandshakeService, mtpService 
 }
 
 // Request handshake from local database (digitally signed)
-// @Summary Request handshake from server (digitally signed)
-// @Description Request handshake from server (digitally signed)
+// @Summary Request handshake from this server (must be digitally signed)
+// @Description Request handshake from this server (must be digitally signed)
 // @Tags Mailio Transfer Protocol
 // @Accept json
 // @Produce json
@@ -43,8 +43,8 @@ func NewHandshakeMTPApi(handshakeService *services.HandshakeService, mtpService 
 // @Failure 401 {object} api.ApiError "invalid signature"
 // @Failure 400 {object} api.ApiError "bad request"
 // @Failure 429 {object} api.ApiError "rate limit exceeded"
-// @Router /api/v1/mtp/handshakelookup [post]
-func (hs *HandshakeMTPApi) HandshakeLookup(c *gin.Context) {
+// @Router /api/v1/mtp/handshake [post]
+func (hs *HandshakeMTPApi) GetLocalHandshakes(c *gin.Context) {
 	var input types.HandshakeSignedRequest
 	if err := c.ShouldBindBodyWith(&input, binding.JSON); err != nil {
 		ApiErrorf(c, http.StatusBadRequest, "invalid format")
@@ -76,7 +76,7 @@ func (hs *HandshakeMTPApi) HandshakeLookup(c *gin.Context) {
 		ApiErrorf(c, http.StatusBadRequest, "failed to cbor encode response")
 		return
 	}
-	signature, sErr := util.Sign(cbBytes, base64.StdEncoding.EncodeToString(global.PrivateKey))
+	signature, sErr := util.Sign(cbBytes, global.PrivateKey)
 	if sErr != nil {
 		ApiErrorf(c, http.StatusBadRequest, "failed to sign response")
 		return

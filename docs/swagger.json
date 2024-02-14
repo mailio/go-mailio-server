@@ -243,6 +243,63 @@
                 }
             }
         },
+        "/api/v1/didmessage": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Send end-to-end encrypted message to DID recipients",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Messaging"
+                ],
+                "summary": "Send end-to-end encrypted message to DID recipients",
+                "parameters": [
+                    {
+                        "description": "didcomm-encrypted+json",
+                        "name": "handshake",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.InputDIDCommMessage"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.InputDIDCommMessage"
+                        }
+                    },
+                    "400": {
+                        "description": "bad request",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "401": {
+                        "description": "invalid signature",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "429": {
+                        "description": "rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/findaddress": {
             "get": {
                 "description": "Returns a mailio address",
@@ -319,6 +376,18 @@
                         "schema": {
                             "$ref": "#/definitions/types.PagingResults"
                         }
+                    },
+                    "401": {
+                        "description": "not authorized",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "429": {
+                        "description": "rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
                     }
                 }
             },
@@ -364,7 +433,7 @@
                         }
                     },
                     "401": {
-                        "description": "invalid signature",
+                        "description": "invalid signature/not authorized",
                         "schema": {
                             "$ref": "#/definitions/api.ApiError"
                         }
@@ -373,45 +442,6 @@
                         "description": "rate limit exceeded",
                         "schema": {
                             "$ref": "#/definitions/api.ApiError"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/handshake/lookup/{ownerAddress}/{senderAddress}": {
-            "get": {
-                "description": "Lookup handshake is public and looksup handshake by ownerAddress and sender scrypted (hashed) address or mailio address. If nothing found default server handshake returned",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Handshake"
-                ],
-                "summary": "Lookup handshake by ownerAddress and sender scrypted (hashed) address (or mailio address)",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Owners mailio address",
-                        "name": "ownerAddress",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Senders scrypt address or Mailio address",
-                        "name": "senderAddress",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/types.Handshake"
                         }
                     }
                 }
@@ -495,6 +525,12 @@
                             "$ref": "#/definitions/types.Handshake"
                         }
                     },
+                    "401": {
+                        "description": "not authorized",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
                     "429": {
                         "description": "rate limit exceeded",
                         "schema": {
@@ -526,6 +562,101 @@
                 "responses": {
                     "204": {
                         "description": "No Content"
+                    },
+                    "401": {
+                        "description": "not authorized",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "429": {
+                        "description": "rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/handshakefetch": {
+            "post": {
+                "description": "Request handshake from origin server (digitally signed)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Handshake"
+                ],
+                "summary": "Request handshake from origin server (digitally signed) if missing in local database",
+                "parameters": [
+                    {
+                        "description": "InputHandshakeLookup",
+                        "name": "handshake",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.InputHandshakeLookup"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/types.HandshakeContent"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "bad request",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "401": {
+                        "description": "invalid signature",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "429": {
+                        "description": "rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/handshakeoffer": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Create personal handshake link",
+                "tags": [
+                    "Handshake"
+                ],
+                "summary": "Create personal handshake link",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.HandshakeLink"
+                        }
+                    },
+                    "401": {
+                        "description": "not authorized",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
                     },
                     "429": {
                         "description": "rate limit exceeded",
@@ -594,9 +725,9 @@
                 }
             }
         },
-        "/api/v1/mtp/handshakelookup": {
+        "/api/v1/mtp/handshake": {
             "post": {
-                "description": "Request handshake from server (digitally signed)",
+                "description": "Request handshake from this server (must be digitally signed)",
                 "consumes": [
                     "application/json"
                 ],
@@ -606,7 +737,7 @@
                 "tags": [
                     "Mailio Transfer Protocol"
                 ],
-                "summary": "Request handshake from server (digitally signed)",
+                "summary": "Request handshake from this server (must be digitally signed)",
                 "parameters": [
                     {
                         "description": "HandshakeSignedRequest",
@@ -646,9 +777,9 @@
                 }
             }
         },
-        "/api/v1/mtp/requesthandshakelookup": {
+        "/api/v1/mtp/{address}/message": {
             "post": {
-                "description": "Request handshake from server (digitally signed)",
+                "description": "Receive end-to-end encrypted message",
                 "consumes": [
                     "application/json"
                 ],
@@ -658,15 +789,15 @@
                 "tags": [
                     "Mailio Transfer Protocol"
                 ],
-                "summary": "Request handshake from server (digitally signed) if missing in local database",
+                "summary": "Receive end-to-end encrypted message",
                 "parameters": [
                     {
-                        "description": "InputHandshakeLookup",
+                        "description": "didcomm-encrypted+json",
                         "name": "handshake",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/types.InputHandshakeLookup"
+                            "$ref": "#/definitions/types.DIDCommMessage"
                         }
                     }
                 ],
@@ -674,10 +805,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/types.HandshakeContent"
-                            }
+                            "$ref": "#/definitions/types.DIDCommMessage"
                         }
                     },
                     "400": {
@@ -1130,10 +1258,190 @@
                 }
             }
         },
+        "types.DIDCommMessage": {
+            "type": "object",
+            "required": [
+                "body",
+                "from",
+                "id",
+                "to",
+                "type"
+            ],
+            "properties": {
+                "attachments": {
+                    "description": "attachments to the message",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.EncryptedAttachment"
+                    }
+                },
+                "body": {
+                    "description": "the body attribute contains all the data and structure defined uniquely for the schema associated with the type attribute. It MUST be a JSON object conforming to RFC 7159                              // the encrypted message body",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/types.EncryptedBody"
+                        }
+                    ]
+                },
+                "createdTime": {
+                    "description": "time of message creation in UTC milliseconds since epoch",
+                    "type": "integer"
+                },
+                "expiresTime": {
+                    "description": "sender will abort the protocol if it doesn't get a response by this time (UTC milliseconds since epoch)",
+                    "type": "integer"
+                },
+                "from": {
+                    "description": "sender DID required because all mailio messages are encrypted",
+                    "type": "string"
+                },
+                "fromPrior": {
+                    "description": "A DID is rotated by sending a message of any type to the recipient to be notified of the rotation",
+                    "type": "string"
+                },
+                "id": {
+                    "description": "globally unique message identifier UUID (RFC 4122) recommended",
+                    "type": "string"
+                },
+                "next": {
+                    "description": "in case forward message",
+                    "type": "string"
+                },
+                "pthid": {
+                    "description": "parent thread identifier. Uniquely identifies the parent thread that the message belongs to. If not included, the message is the first message in the thread.",
+                    "type": "string"
+                },
+                "thid": {
+                    "description": "thread identifier. Uniquely identifies the thread that the message belongs to. If not included, the id property of the message MUST be treated as the value of the thid.",
+                    "type": "string"
+                },
+                "to": {
+                    "description": "in format: did:web:mail.io:0xabc -\u003e recipient DIDs",
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "type": {
+                    "description": "a valid message type URI (MUST be: application/didcomm-encrypted+json)",
+                    "type": "string"
+                }
+            }
+        },
+        "types.EncryptedAttachment": {
+            "type": "object",
+            "required": [
+                "data",
+                "id",
+                "mediaType"
+            ],
+            "properties": {
+                "data": {
+                    "description": "the encrypted message body",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/types.EncryptedAttachmentData"
+                        }
+                    ]
+                },
+                "description": {
+                    "description": "a human-readable description of the attachment (optional)",
+                    "type": "string"
+                },
+                "id": {
+                    "description": "a globally unique identifier for the attachment",
+                    "type": "string"
+                },
+                "mediaType": {
+                    "description": "the media type of the attachment",
+                    "type": "string"
+                }
+            }
+        },
+        "types.EncryptedAttachmentData": {
+            "type": "object",
+            "required": [
+                "json"
+            ],
+            "properties": {
+                "json": {
+                    "$ref": "#/definitions/types.EncryptedBody"
+                }
+            }
+        },
+        "types.EncryptedBody": {
+            "type": "object",
+            "required": [
+                "ciphertext",
+                "iv",
+                "protected",
+                "recipients",
+                "signature",
+                "tag"
+            ],
+            "properties": {
+                "ciphertext": {
+                    "description": "the encrypted message",
+                    "type": "string"
+                },
+                "iv": {
+                    "description": "the initialization vector (nonce)",
+                    "type": "string"
+                },
+                "protected": {
+                    "description": "the protected header",
+                    "type": "string"
+                },
+                "recipients": {
+                    "description": "the recipients of the message (at least one)",
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "$ref": "#/definitions/types.Recipient"
+                    }
+                },
+                "signature": {
+                    "description": "JWS digital signature",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/types.Signature"
+                        }
+                    ]
+                },
+                "tag": {
+                    "description": "integrity check on the encrypted message",
+                    "type": "string"
+                }
+            }
+        },
+        "types.Epk": {
+            "type": "object",
+            "required": [
+                "crv",
+                "kty",
+                "x"
+            ],
+            "properties": {
+                "crv": {
+                    "description": "The curve parameter used for the key",
+                    "type": "string"
+                },
+                "kty": {
+                    "description": "Key Type, indicating the type of key used, such as an elliptic curve key (\"OKP\" for Octet Key Pair).",
+                    "type": "string"
+                },
+                "x": {
+                    "description": "The X coordinate for the elliptic curve point",
+                    "type": "string"
+                }
+            }
+        },
         "types.Handshake": {
             "type": "object",
             "properties": {
                 "cborPayloadBase64": {
+                    "description": "payload in cbor format of handshake Content",
                     "type": "string"
                 },
                 "content": {
@@ -1153,7 +1461,7 @@
                 },
                 "level": {
                     "description": "handshake level",
-                    "type": "integer"
+                    "type": "string"
                 },
                 "originServer": {
                     "description": "origin server",
@@ -1171,11 +1479,11 @@
                     "description": "owner public key of the owner of the handshake",
                     "type": "string"
                 },
-                "sender": {
-                    "description": "senders scrypted email address or mailio address + contact information",
+                "senderMetadata": {
+                    "description": "sender meta data (either Mailio address or sha512 email address )",
                     "allOf": [
                         {
-                            "$ref": "#/definitions/types.HandshakeSender"
+                            "$ref": "#/definitions/types.SenderMetadata"
                         }
                     ]
                 },
@@ -1185,7 +1493,7 @@
                 },
                 "signatureScheme": {
                     "description": "handshake signature scheme",
-                    "type": "integer"
+                    "type": "string"
                 },
                 "signupRules": {
                     "description": "handshake signup rules",
@@ -1201,7 +1509,7 @@
                 },
                 "status": {
                     "description": "handshake status",
-                    "type": "integer"
+                    "type": "string"
                 },
                 "timestamp": {
                     "description": "timestamp of the handshake",
@@ -1209,7 +1517,7 @@
                 },
                 "type": {
                     "description": "handshake type",
-                    "type": "integer"
+                    "type": "string"
                 }
             }
         },
@@ -1234,6 +1542,14 @@
                 }
             }
         },
+        "types.HandshakeLink": {
+            "type": "object",
+            "properties": {
+                "link": {
+                    "type": "string"
+                }
+            }
+        },
         "types.HandshakeLookup": {
             "type": "object",
             "required": [
@@ -1244,6 +1560,7 @@
                     "type": "string"
                 },
                 "emailHash": {
+                    "description": "scrypt hash of the email address",
                     "type": "string"
                 },
                 "id": {
@@ -1315,31 +1632,6 @@
                 }
             }
         },
-        "types.HandshakeSender": {
-            "type": "object",
-            "properties": {
-                "address": {
-                    "description": "senders scrypted email address or mailio address",
-                    "type": "string"
-                },
-                "email": {
-                    "description": "senders email",
-                    "type": "string"
-                },
-                "name": {
-                    "description": "senders name",
-                    "type": "string"
-                },
-                "phone": {
-                    "description": "senders phone",
-                    "type": "string"
-                },
-                "scryptAddress": {
-                    "description": "senders scrypted email address",
-                    "type": "string"
-                }
-            }
-        },
         "types.HandshakeSignedRequest": {
             "type": "object",
             "required": [
@@ -1389,6 +1681,44 @@
                 "frequencyMinutes": {
                     "description": "optional",
                     "type": "integer"
+                }
+            }
+        },
+        "types.Header": {
+            "type": "object",
+            "required": [
+                "epk",
+                "kid"
+            ],
+            "properties": {
+                "epk": {
+                    "description": "(Ephemeral Public Key): A temporary public key that was used in conjunction with the recipient's public key to encrypt the encrypted_key",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/types.Epk"
+                        }
+                    ]
+                },
+                "kid": {
+                    "description": "(Key ID): A hint indicating which key was used to encrypt the",
+                    "type": "string"
+                }
+            }
+        },
+        "types.InputDIDCommMessage": {
+            "type": "object",
+            "required": [
+                "didCommMessage"
+            ],
+            "properties": {
+                "didCommMessage": {
+                    "$ref": "#/definitions/types.DIDCommMessage"
+                },
+                "handshakes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.Handshake"
+                    }
                 }
             }
         },
@@ -1505,6 +1835,67 @@
                 "docs": {
                     "type": "array",
                     "items": {}
+                }
+            }
+        },
+        "types.Recipient": {
+            "type": "object",
+            "required": [
+                "encrypted_key",
+                "header"
+            ],
+            "properties": {
+                "encrypted_key": {
+                    "description": "Tthe key used to encrypt the ciphertext, encrypted with the recipient's public key",
+                    "type": "string"
+                },
+                "header": {
+                    "description": "encryption parameters specific to each recipient",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/types.Header"
+                        }
+                    ]
+                }
+            }
+        },
+        "types.SenderMetadata": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "description": "mailio address",
+                    "type": "string"
+                },
+                "emailHash": {
+                    "description": "scrypt hash of the email address",
+                    "type": "string"
+                }
+            }
+        },
+        "types.Signature": {
+            "type": "object",
+            "properties": {
+                "payload": {
+                    "description": "The payload that was signed, which is base64URL encoded.",
+                    "type": "string"
+                },
+                "signatures": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.SignatureDetail"
+                    }
+                }
+            }
+        },
+        "types.SignatureDetail": {
+            "type": "object",
+            "properties": {
+                "protected": {
+                    "description": "Base64URL encoded JSON string containing the header parameters used for the signature",
+                    "type": "string"
+                },
+                "signature": {
+                    "type": "string"
                 }
             }
         },
