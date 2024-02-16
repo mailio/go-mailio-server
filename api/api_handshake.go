@@ -246,6 +246,7 @@ func (ha *HandshakeApi) PersonalHandshakeLink(c *gin.Context) {
 }
 
 // Request handshake from origin server (digitally signed) if missing in local database
+// @Security Bearer
 // @Summary Request handshake from origin server (digitally signed) if missing in local database
 // @Description Request handshake from origin server (digitally signed)
 // @Tags Handshake

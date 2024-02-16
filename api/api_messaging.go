@@ -9,7 +9,7 @@ import (
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
-	"github.com/mailio/go-mailio-did/did"
+	"github.com/hibiken/asynq"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/services"
 	"github.com/mailio/go-mailio-server/types"
@@ -61,6 +61,10 @@ func (ma *MessagingApi) SendDIDMessage(c *gin.Context) {
 		return
 	}
 
+	if input.Intent == "" {
+		input.Intent = types.DIDCommIntentMessage
+	}
+
 	// validate input
 	err := ma.validate.Struct(input)
 	if err != nil {
@@ -68,43 +72,30 @@ func (ma *MessagingApi) SendDIDMessage(c *gin.Context) {
 		ApiErrorf(c, http.StatusBadRequest, msg)
 		return
 	}
+	input.ID = uuid.New().String()
+	input.CreatedTime = time.Now().UTC().UnixMilli()
 
-	// TODO! create a queue, do the validation there, then send the message (also add MailioIntent System message - e.g. user not found, handshake revoked, ...)
-	// 1. validate sender (if enabled, if signature valid from JWE)
-	// 2. validate recipients (if server understands MTP, if recipients are valid -> use did web format)
-	// 3. Sign message with Mailio private key
-	// 4. send message
-	// 5. return confirmation message from origin server (e.g. mail.io or compatible server). Includes failed messages
-
-	// validate senders DID format (must be: did:mailio:mydomain.com:0xSender)
-	fromDID, didErr := did.ParseDID(input.From)
-	if didErr != nil {
-		global.Logger.Log(didErr.Error(), "sender verification failed")
-		return
+	task := &types.Task{
+		Address:        subjectAddress.(string),
+		DIDCommMessage: &input,
 	}
-	expectedDID := "did:mailio:" + global.Conf.Mailio.Domain + ":" + subjectAddress.(string)
-	if fromDID.String() != expectedDID {
-		ApiErrorf(c, http.StatusBadRequest, "from field invalid")
+	sendTask, tErr := types.NewDIDCommSendTask(task)
+	if tErr != nil {
+		ApiErrorf(c, http.StatusInternalServerError, tErr.Error())
 		return
 	}
 
-	//TODO: validate recipients? What should I validate? Maybe if they are valid DIDs so the message can be posted to the correct URLs (get the URLs from DID docs)?
-	for _, recipient := range input.EncryptedBody.Recipients {
-		kid := recipient.Header.Kid
-		rec, didErr := did.ParseDID(kid)
-		if didErr != nil {
-			ApiErrorf(c, http.StatusBadRequest, fmt.Sprintf("invalid recipient %s", kid))
-			return
-		}
-		fmt.Printf("recipient string: %s\n", rec.String())
-		fmt.Printf("recipient protocol: %s\n", rec.Protocol())
-		fmt.Printf("recipient value: %s\n", rec.Value())
+	taskInfo, tqErr := ma.env.TaskClient.Enqueue(sendTask,
+		asynq.MaxRetry(3),             // max number of times to retry the task
+		asynq.Timeout(30*time.Second), // max time to process the task
+		asynq.TaskID(input.ID),        // unique task id
+		asynq.Unique(time.Second*10))  // unique for 10 seconds (preventing multiple equal messages in the queue)
+	if tqErr != nil {
+		global.Logger.Log(tqErr.Error(), "failed to send message")
+		ApiErrorf(c, http.StatusInternalServerError, "failed to send message")
+		return
 	}
+	global.Logger.Log(fmt.Sprintf("message sent: %s", taskInfo.ID), "message queued")
 
-	// setup server side specific unique IDs
-	input.ID = uuid.NewString()
-	input.CreatedTime = time.Now().UnixMilli()
-
-	// TODO: send message (POST to collected URL for specific recipient)
-	// TODO; response intent message format (check SMTP?)
+	c.JSON(http.StatusAccepted, input)
 }
