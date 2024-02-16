@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -14,16 +15,18 @@ import (
 	"time"
 
 	"github.com/go-redis/redis_rate/v10"
+	"github.com/hibiken/asynq"
 	"github.com/mailio/go-mailio-server/apiroutes"
 	"github.com/mailio/go-mailio-server/docs"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/repository"
+	"github.com/mailio/go-mailio-server/services"
 	"github.com/mailio/go-mailio-server/types"
 	"github.com/mailio/go-mailio-server/util"
 	cfg "github.com/mailio/go-web3-kit/config"
 	w3srv "github.com/mailio/go-web3-kit/gingonic"
 	"github.com/redis/go-redis/v9"
-	"google.golang.org/grpc"
+	"golang.org/x/sys/unix"
 )
 
 func loadServerEd25519Keys(conf global.Config) {
@@ -75,6 +78,33 @@ func initRedisRateLimiter(conf global.Config) *redis.Client {
 	return redisRateLimitClient
 }
 
+// initalizes the async queue
+func initAsyncQueue(conf global.Config, dbSelector repository.DBSelector) (*asynq.Server, *asynq.Client) {
+	queueRedisClient := asynq.RedisClientOpt{
+		Addr:     global.Conf.Redis.Host + ":" + strconv.Itoa(global.Conf.Redis.Port),
+		Username: global.Conf.Redis.Username,
+		Password: global.Conf.Redis.Password,
+		DB:       2,
+	}
+	taskClient := asynq.NewClient(queueRedisClient)
+	// start a task queue server
+	taskServer := asynq.NewServer(
+		queueRedisClient,
+		asynq.Config{Concurrency: 50},
+	)
+
+	taskService := services.NewMessageQueueService(dbSelector)
+	// start a task processing server
+	mux := asynq.NewServeMux()
+	mux.HandleFunc(types.QueueTypeDIDCommRecv, taskService.ProcessTask)
+	mux.HandleFunc(types.QueueTypeDIDCommSend, taskService.ProcessTask)
+
+	if err := taskServer.Start(mux); err != nil {
+		log.Fatalf("could not start server: %v", err)
+	}
+	return taskServer, taskClient
+}
+
 // @title Mailio Server API
 // @version 1.0
 // @description Implements the Mailio server based on https://mirs.mail.io/ specifications
@@ -120,8 +150,10 @@ func main() {
 	// server wait to shutdown monitoring channels
 	done := make(chan bool, 1)
 	quit := make(chan os.Signal, 1)
+	stop := make(chan os.Signal, 1)
 
 	signal.Notify(quit, os.Interrupt)
+	signal.Notify(stop, os.Interrupt)
 
 	// init routing (for RESTful API endpoints)
 	router := w3srv.NewAPIRouter(&global.Conf.YamlConfig)
@@ -129,12 +161,30 @@ func main() {
 	dbSelector := ConfigDBSelector()
 	ConfigDBIndexing(dbSelector.(*repository.CouchDBSelector), env)
 
-	router = apiroutes.ConfigRoutes(router, dbSelector.(*repository.CouchDBSelector), env)
+	taskServer, taskClient := initAsyncQueue(global.Conf, dbSelector)
+	defer taskClient.Close()
+	env.TaskClient = taskClient
+
+	router = apiroutes.ConfigRoutes(router, dbSelector.(*repository.CouchDBSelector), taskServer, env)
 
 	// start server
 	srv := w3srv.Start(&global.Conf.YamlConfig, router)
 	// wait for server shutdown
 	go w3srv.Shutdown(srv, quit, done)
+
+	// stop the async queue server
+	go func() {
+		for {
+			s := <-stop
+			fmt.Printf("shutting down task queue server")
+			if s == unix.SIGTSTP {
+				taskServer.Stop() // Stop processing new tasks
+				continue
+			}
+			break
+		}
+		taskServer.Shutdown()
+	}()
 
 	global.Logger.Log("Server is ready to handle requests at", global.Conf.Port)
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -143,13 +193,6 @@ func main() {
 
 	<-done
 
-}
-
-func grpcShutdown(grpcServer *grpc.Server, quit <-chan os.Signal, done chan<- bool) {
-	<-quit
-	global.Logger.Log("Grpc server is shutting down...")
-	grpcServer.GracefulStop()
-	done <- true
 }
 
 // usage will print out the flag options for the server.

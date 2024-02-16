@@ -2,6 +2,7 @@ package apiroutes
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/hibiken/asynq"
 	"github.com/mailio/go-mailio-server/api"
 	restinterceptors "github.com/mailio/go-mailio-server/api/interceptors"
 	"github.com/mailio/go-mailio-server/global"
@@ -30,7 +31,7 @@ import (
 // }
 
 // REST API routes
-func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, environment *types.Environment) *gin.Engine {
+func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, taskServer *asynq.Server, environment *types.Environment) *gin.Engine {
 	// init metrics
 	if global.Conf.Prometheus.Enabled {
 
