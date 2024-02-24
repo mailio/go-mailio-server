@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
+	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-resty/resty/v2"
@@ -16,12 +19,41 @@ import (
 )
 
 type SelfSovereignService struct {
-	didRepo repository.Repository
-	vcsRepo repository.Repository
+	didRepo     repository.Repository
+	vcsRepo     repository.Repository
+	restyClient *resty.Client
 }
 
 // Self Sovereign Service operates over Mailios DID and VC documents
 func NewSelfSovereignService(dbSelector repository.DBSelector) *SelfSovereignService {
+	initialWaitTime := 1 * time.Second
+	maxWaitTime := 20 * time.Second
+	restyClient := resty.New().
+		SetRetryCount(3).
+		SetRetryWaitTime(initialWaitTime).
+		SetRetryMaxWaitTime(maxWaitTime)
+	// Define a custom exponential backoff strategy
+	restyClient = restyClient.AddRetryCondition(func(response *resty.Response, err error) bool {
+		// Check if the response status code indicates a server error (5xx)
+		if response != nil && response.StatusCode() >= http.StatusConflict {
+			return true
+		}
+		return false
+	})
+	// Optional: Customize the backoff algorithm
+	restyClient = restyClient.SetRetryAfter(func(client *resty.Client, resp *resty.Response) (time.Duration, error) {
+		// Calculate exponential backoff based on the retry attempt
+		retryAttempt := resp.Request.Attempt
+		waitTime := math.Pow(2, float64(retryAttempt)) * float64(initialWaitTime)
+
+		// Ensure the wait time does not exceed the maximum wait time
+		if waitTime > float64(maxWaitTime) {
+			waitTime = float64(maxWaitTime)
+		}
+
+		return time.Duration(waitTime), nil
+	})
+
 	didRepo, err := dbSelector.ChooseDB(repository.DID)
 	if err != nil {
 		panic(err)
@@ -31,8 +63,9 @@ func NewSelfSovereignService(dbSelector repository.DBSelector) *SelfSovereignSer
 		panic(err)
 	}
 	return &SelfSovereignService{
-		didRepo: didRepo,
-		vcsRepo: vcsRepo,
+		didRepo:     didRepo,
+		vcsRepo:     vcsRepo,
+		restyClient: restyClient,
 	}
 }
 
@@ -100,7 +133,7 @@ func (ssi *SelfSovereignService) SaveVC(vc *did.VerifiableCredential) (*did.Veri
 func (ssi *SelfSovereignService) StoreRegistrationSSI(mk *did.MailioKey) error {
 
 	authPath := global.Conf.Mailio.Domain + global.Conf.Mailio.AuthenticationPath
-	messagePath := global.Conf.Mailio.Domain + global.Conf.Mailio.MessagingPath
+	messagePath := global.Conf.Mailio.Domain + global.Conf.Mailio.MessagingPath + "/" + mk.MailioAddress()
 
 	userDIDDoc, didErr := did.NewMailioDIDDocument(mk, global.PublicKey, authPath, messagePath)
 	if didErr != nil {
@@ -217,4 +250,48 @@ func (ssi *SelfSovereignService) ListSubjectVCs(address string, limit int, bookm
 	}
 
 	return list, nil
+}
+
+// FetchRemoteDID parses the WEB did and fetched DID document from the remote server
+// Returns the DID document for the given web mailio address
+// - ErrInvalidFormat when DID address not valid
+// - ErrBadRequest when remote server returns code >= 400
+// - ErrConflict when rate limit of remote server exceeded
+// - ErrNotFound when DID address not found
+func (ssi *SelfSovereignService) FetchRemoteDID(remoteDid *did.DID) (*did.Document, error) {
+	url := remoteDid.Value()
+	if url == global.Conf.Host {
+		return nil, types.ErrBadRequest
+	}
+	protocol := "https"
+	if strings.Contains(url, "localhost") || strings.Contains(url, "127.0.0.1") {
+		protocol = "http"
+	}
+
+	userAddress := remoteDid.Fragment()
+
+	if userAddress == "" {
+		return nil, types.ErrInvalidFormat
+	}
+
+	var didDoc did.Document
+	response, rErr := ssi.restyClient.R().SetResult(&didDoc).Get(fmt.Sprintf("%s://%s/%s/did.json", protocol, url, userAddress))
+	if rErr != nil {
+		global.Logger.Log(rErr.Error(), "failed to validate recipient")
+		return nil, rErr
+	}
+	if response.IsError() {
+		if response.StatusCode() == http.StatusNotFound {
+			global.Logger.Log("recipient not found", "failed to validate recipient")
+			return nil, types.ErrNotFound
+		}
+		if response.StatusCode() == http.StatusConflict {
+			global.Logger.Log(response.String(), "rate limit exceeded")
+			return nil, types.ErrConflict
+		}
+		global.Logger.Log(response.String(), "failed to validate recipient")
+		return nil, types.ErrBadRequest
+
+	}
+	return &didDoc, nil
 }

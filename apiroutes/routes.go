@@ -108,7 +108,7 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 	{
 		// Handshakes MTP
 		mtpRootApi.POST("/v1/mtp/handshake", handshakeMTPApi.GetLocalHandshakes)
-		mtpRootApi.POST("/v1/mtp/:address/message", messageMTPApi.ReceiveMessage)
+		mtpRootApi.POST("/v1/mtp/message/:address", messageMTPApi.ReceiveMessage)
 	}
 
 	router.StaticFile("./well-known/did.json", "./well-known/did.json")

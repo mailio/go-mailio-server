@@ -41,10 +41,10 @@ func NewMessagingApi(handshakeService *services.HandshakeService, mtpService *se
 // @Tags Messaging
 // @Accept json
 // @Produce json
-// @Param handshake body types.InputDIDCommMessage true "didcomm-encrypted+json"
-// @Success 200 {object} types.InputDIDCommMessage
-// @Failure 401 {object} api.ApiError "invalid signature"
+// @Param handshake body types.DIDCommMessage true "didcomm-encrypted+json"
+// @Success 202 {object} types.DIDCommApiResponse
 // @Failure 400 {object} api.ApiError "bad request"
+// @Failure 401 {object} api.ApiError "invalid signature"
 // @Failure 429 {object} api.ApiError "rate limit exceeded"
 // @Router /api/v1/didmessage [post]
 func (ma *MessagingApi) SendDIDMessage(c *gin.Context) {
@@ -87,7 +87,7 @@ func (ma *MessagingApi) SendDIDMessage(c *gin.Context) {
 
 	taskInfo, tqErr := ma.env.TaskClient.Enqueue(sendTask,
 		asynq.MaxRetry(3),             // max number of times to retry the task
-		asynq.Timeout(30*time.Second), // max time to process the task
+		asynq.Timeout(60*time.Second), // max time to process the task
 		asynq.TaskID(input.ID),        // unique task id
 		asynq.Unique(time.Second*10))  // unique for 10 seconds (preventing multiple equal messages in the queue)
 	if tqErr != nil {
@@ -97,5 +97,5 @@ func (ma *MessagingApi) SendDIDMessage(c *gin.Context) {
 	}
 	global.Logger.Log(fmt.Sprintf("message sent: %s", taskInfo.ID), "message queued")
 
-	c.JSON(http.StatusAccepted, input)
+	c.JSON(http.StatusAccepted, types.DIDCommApiResponse{ID: input.ID})
 }

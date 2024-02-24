@@ -159,8 +159,8 @@ func (c *CouchDBRepository) Delete(ctx context.Context, id string) error {
 	}
 
 	rev := ""
-	if baseDoc.UnderscoreRev != "" {
-		rev = baseDoc.UnderscoreRev
+	if baseDoc.Rev != "" {
+		rev = baseDoc.Rev
 	}
 
 	var delErr types.CouchDBError

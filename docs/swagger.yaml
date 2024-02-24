@@ -162,10 +162,16 @@ definitions:
       type:
         type: string
     type: object
+  types.DIDCommApiResponse:
+    properties:
+      id:
+        type: string
+    type: object
   types.DIDCommMessage:
     properties:
       attachments:
-        description: attachments to the message
+        description: attachments to the message                                                //
+          MTP status message
         items:
           $ref: '#/definitions/types.EncryptedAttachment'
         type: array
@@ -192,6 +198,13 @@ definitions:
         type: string
       id:
         description: globally unique message identifier UUID (RFC 4122) recommended
+        type: string
+      intent:
+        description: the intent of the message (if empty, ordinary message
+        enum:
+        - message
+        - handshake
+        - error
         type: string
       next:
         description: in case forward message
@@ -479,17 +492,6 @@ definitions:
     required:
     - epk
     - kid
-    type: object
-  types.InputDIDCommMessage:
-    properties:
-      didCommMessage:
-        $ref: '#/definitions/types.DIDCommMessage'
-      handshakes:
-        items:
-          $ref: '#/definitions/types.Handshake'
-        type: array
-    required:
-    - didCommMessage
     type: object
   types.InputHandshakeLookup:
     properties:
@@ -823,14 +825,14 @@ paths:
         name: handshake
         required: true
         schema:
-          $ref: '#/definitions/types.InputDIDCommMessage'
+          $ref: '#/definitions/types.DIDCommMessage'
       produces:
       - application/json
       responses:
-        "200":
-          description: OK
+        "202":
+          description: Accepted
           schema:
-            $ref: '#/definitions/types.InputDIDCommMessage'
+            $ref: '#/definitions/types.DIDCommApiResponse'
         "400":
           description: bad request
           schema:
@@ -1058,6 +1060,8 @@ paths:
           description: rate limit exceeded
           schema:
             $ref: '#/definitions/api.ApiError'
+      security:
+      - Bearer: []
       summary: Request handshake from origin server (digitally signed) if missing
         in local database
       tags:
@@ -1121,40 +1125,6 @@ paths:
       summary: Login with username and password
       tags:
       - User Account
-  /api/v1/mtp/{address}/message:
-    post:
-      consumes:
-      - application/json
-      description: Receive end-to-end encrypted message
-      parameters:
-      - description: didcomm-encrypted+json
-        in: body
-        name: handshake
-        required: true
-        schema:
-          $ref: '#/definitions/types.DIDCommMessage'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/types.DIDCommMessage'
-        "400":
-          description: bad request
-          schema:
-            $ref: '#/definitions/api.ApiError'
-        "401":
-          description: invalid signature
-          schema:
-            $ref: '#/definitions/api.ApiError'
-        "429":
-          description: rate limit exceeded
-          schema:
-            $ref: '#/definitions/api.ApiError'
-      summary: Receive end-to-end encrypted message
-      tags:
-      - Mailio Transfer Protocol
   /api/v1/mtp/handshake:
     post:
       consumes:
@@ -1187,6 +1157,40 @@ paths:
           schema:
             $ref: '#/definitions/api.ApiError'
       summary: Request handshake from this server (must be digitally signed)
+      tags:
+      - Mailio Transfer Protocol
+  /api/v1/mtp/message/{address}:
+    post:
+      consumes:
+      - application/json
+      description: Receive end-to-end encrypted message
+      parameters:
+      - description: didcomm-encrypted+json
+        in: body
+        name: handshake
+        required: true
+        schema:
+          $ref: '#/definitions/types.DIDCommMessage'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.DIDCommMessage'
+        "400":
+          description: bad request
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "401":
+          description: invalid signature
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "429":
+          description: rate limit exceeded
+          schema:
+            $ref: '#/definitions/api.ApiError'
+      summary: Receive end-to-end encrypted message
       tags:
       - Mailio Transfer Protocol
   /api/v1/nonce:

@@ -38,7 +38,7 @@ func NewMessagingMTPApi(handshakeService *services.HandshakeService, mtpService 
 // @Failure 401 {object} api.ApiError "invalid signature"
 // @Failure 400 {object} api.ApiError "bad request"
 // @Failure 429 {object} api.ApiError "rate limit exceeded"
-// @Router /api/v1/mtp/{address}/message [post]
+// @Router /api/v1/mtp/message/{address} [post]
 func (ms *MessagingMTPApi) ReceiveMessage(c *gin.Context) {
 	address := c.Param("address")
 	fmt.Printf("address: %s\n", address)

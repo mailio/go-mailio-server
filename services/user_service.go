@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strconv"
 	"time"
 
 	"github.com/go-resty/resty/v2"
@@ -50,20 +51,21 @@ func (us *UserService) CreateUser(user *types.User, databasePassword string) (*t
 
 	for i := 1; i < 5; i++ {
 
-		headResponse, hErr := c.R().Get(fmt.Sprintf("%s", hexUser))
+		headResponse, hErr := c.R().Get(hexUser)
 		if hErr != nil {
-			return nil, errors.New("Failed to create user database")
+			return nil, errors.New("failed to create user database")
 		}
 		if headResponse.StatusCode() == 200 {
 			break
 		}
 
+		//TODO! is this really the best way to wait for database to be created?
 		if headResponse.StatusCode() == 404 {
 			backoff := int(100 * math.Pow(2, float64(i)))
 			time.Sleep(time.Duration(backoff) * time.Millisecond)
 			continue
 		} else {
-			return nil, errors.New("Failed to create user database")
+			return nil, errors.New("failed to create user database")
 		}
 	}
 
@@ -118,4 +120,39 @@ func (us *UserService) FindUserByScryptEmail(scryptEmail string) (*types.EmailTo
 		return nil, err
 	}
 	return getUserByScryptEmail(repo, scryptEmail)
+}
+
+// Stores mailio message to users database
+func (us *UserService) SaveMessage(userAddress string, mailioMessage *types.MailioMessage) (*types.MailioMessage, error) {
+
+	if mailioMessage.Folder == "" || mailioMessage.ID == "" || mailioMessage.Created == 0 {
+		return nil, types.ErrBadRequest
+	}
+	mailioMessage.BaseDocument.ID = mailioMessage.ID
+
+	//TODO!: sign message as a server (so it can be checked by the client if need be)
+
+	hexUser := "userdb-" + hex.EncodeToString([]byte(userAddress))
+	repoUrl := global.Conf.CouchDB.Scheme + "://" + global.Conf.CouchDB.Host + ":" + strconv.Itoa(global.Conf.CouchDB.Port)
+	url := fmt.Sprintf("%s/%s", hexUser, mailioMessage.ID)
+	client := resty.New().SetBaseURL(repoUrl).
+		SetTimeout(time.Second*10).
+		SetBasicAuth(global.Conf.CouchDB.Username, global.Conf.CouchDB.Password).
+		SetHeader("Content-Type", "application/json").
+		SetHeader("Accept", "application/json").
+		SetDebug(true)
+
+	var postResult types.CouchDBResponse
+	var postError types.CouchDBError
+	httpResp, httpErr := client.R().SetBody(mailioMessage).SetResult(&postResult).SetError(&postError).Put(url)
+	if httpErr != nil {
+		global.Logger.Log(httpErr.Error(), "failed to send message", hexUser)
+		return nil, httpErr
+	}
+	if httpResp.IsError() {
+		global.Logger.Log(httpResp.String(), "failed to send message", hexUser, postError.Error, postError.Reason)
+		return nil, fmt.Errorf("code: %s, reason: %s", postError.Error, postError.Reason)
+	}
+
+	return mailioMessage, nil
 }

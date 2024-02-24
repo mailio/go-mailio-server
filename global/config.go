@@ -28,6 +28,7 @@ type Config struct {
 	Mailio         MailioConfig     `yaml:"mailio"`
 	Prometheus     PrometheusConfig `yaml:"prometheus"`
 	Redis          RedisConfig      `yaml:"redis"`
+	Queue          Queue            `yaml:"queue"`
 }
 
 type CouchDBConfig struct {
@@ -84,4 +85,8 @@ type RedisConfig struct {
 	Port     int    `yaml:"port"`
 	Password string `yaml:"password"`
 	Username string `yaml:"username"`
+}
+
+type Queue struct {
+	Concurrency int `yaml:"concurrency"`
 }

@@ -6,7 +6,32 @@ var (
 	DIDCommIntentMessage   = "message"
 	DIDCommIntentHandshake = "handshake"
 	DIDCommIntentError     = "error"
+
+	MailioFolderInbox     = "inbox"
+	MailioFolderGoodReads = "goodreads"
+	MailioFolderOther     = "other"
+	MailioFolderSent      = "sent"
+	MailioFolderDraft     = "draft"
+	MailioFolderArchive   = "archive"
+	MaolioFolderTrash     = "trash"
+	MailioFolderSpam      = "spam"
 )
+
+// MailioMessage is a struct that is meant to be stored in the database
+type MailioMessage struct {
+	BaseDocument   `json:",inline"`
+	ID             string          `json:"id" validate:"required"`   // globally unique message identifier UUID (RFC 4122) recommended
+	DIDCommMessage *DIDCommMessage `json:"didCommMessage,omitempty"` // the DIDComm message
+	// SmtpMessage    *SMTPMessage    `json:"smtpMessage,omitempty"`       // the SMTP message
+	MTPStatusCodes []*MTPStatusCode `json:"mtpStatusCodes,omitempty"`    // MTP status messages
+	Folder         string           `json:"folder" validate:"required"`  // the folder where the message is stored
+	Created        int64            `json:"created" validate:"required"` // time of message creation in UTC milliseconds since epoch
+	Modified       int64            `json:"modified,omitempty"`          // time of message modification in UTC milliseconds since epoch
+	IsAutomated    bool             `json:"isAutomated,omitempty"`       // true if the message is automated
+	IsForwarded    bool             `json:"isForwarded,omitempty"`       // true if the message is forwarded
+	IsReplied      bool             `json:"isReplied,omitempty"`         // true if the message is replied
+	IsRead         bool             `json:"isRead,omitempty"`            // true if the message is read
+}
 
 type DIDCommMessage struct {
 	Type                 string                 `json:"type" validate:"required,eq=application/didcomm-encrypted+json"`      // a valid message type URI (MUST be: application/didcomm-encrypted+json)
@@ -21,8 +46,38 @@ type DIDCommMessage struct {
 	FromPrior            string                 `json:"fromPrior,omitempty"`                                                 // A DID is rotated by sending a message of any type to the recipient to be notified of the rotation
 	Intent               string                 `json:"intent,omitempty" validate:"omitempty,oneof=message handshake error"` // the intent of the message (if empty, ordinary message
 	EncryptedBody        *EncryptedBody         `json:"body" validate:"required"`                                            // the body attribute contains all the data and structure defined uniquely for the schema associated with the type attribute. It MUST be a JSON object conforming to RFC 7159                              // the encrypted message body
-	EncryptedAttachments []*EncryptedAttachment `json:"attachments,omitempty"`                                               // attachments to the message
+	EncryptedAttachments []*EncryptedAttachment `json:"attachments,omitempty"`                                               // attachments to the message                                                // MTP status message
 }
+
+type DIDCommRequest struct {
+	SignatureScheme string          `json:"signatureScheme" validate:"required,oneof=EdDSA_X25519"`
+	Timestamp       int64           `json:"timestamp" validate:"required"`
+	DIDCommMessage  *DIDCommMessage `json:"didCommMessage" validate:"required"`
+}
+
+// DIDCommSignedMessage is a struct that represents a signed message according to JWS standard with CBOR payload
+type DIDCommSignedRequest struct {
+	DIDCommRequest    *DIDCommRequest `json:"didCommRequest" validate:"required"`
+	CborPayloadBase64 string          `json:"cborPayloadBase64" validate:"required,base64"` // the payload that was signed, which is base64 encoded.
+	SignatureBase64   string          `json:"signatureBase64" validate:"required,base64"`   // the signature of the payload, which is base64 encoded.
+	SenderDomain      string          `json:"senderDomain" validate:"required"`             // origin of the request (where DNS is published with Mailio public key)
+}
+
+type DIDCommSignedResponse struct {
+	Response *DIDCommApiResponse `json:"response" validate:"required"`
+}
+
+// type HandshakeSignedRequest struct {
+// 	HandshakeRequest  HandshakeRequest `json:"handshakeRequest" validate:"required"`
+// 	SignatureBase64   string           `json:"signatureBase64" validate:"required,base64"`
+// 	CborPayloadBase64 string           `json:"cborPayloadBase64" validate:"required,base64"`
+// 	SenderDomain      string           `json:"senderDomain" validate:"required"` // origin of the request (where DNS is published with Mailio public key)
+// }
+
+// type HandshakeResponse struct {
+// 	HandshakeHeader HandshakeHeader     `json:"handshakeHeader" validate:"required"`
+// 	Handshakes      []*HandshakeContent `json:"handshakes" validate:"required"`
+// }
 
 // EncryptedMailioBody is a struct that represents an encrypted message according to JWE standard
 type EncryptedBody struct {

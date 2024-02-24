@@ -19,8 +19,8 @@ import (
 	"github.com/mailio/go-mailio-server/apiroutes"
 	"github.com/mailio/go-mailio-server/docs"
 	"github.com/mailio/go-mailio-server/global"
+	"github.com/mailio/go-mailio-server/queue"
 	"github.com/mailio/go-mailio-server/repository"
-	"github.com/mailio/go-mailio-server/services"
 	"github.com/mailio/go-mailio-server/types"
 	"github.com/mailio/go-mailio-server/util"
 	cfg "github.com/mailio/go-web3-kit/config"
@@ -78,22 +78,51 @@ func initRedisRateLimiter(conf global.Config) *redis.Client {
 	return redisRateLimitClient
 }
 
+// calculates the retry delay using exponential backoff
+// Here, baseDelay is the initial delay, and maxDelay caps the delay duration
+func asyncRetryDelayFunc(attempt int, err error, t *asynq.Task) time.Duration {
+	baseDelay := 1 * time.Minute // Starting from 1 minute
+	maxDelay := 60 * time.Minute // Max delay capped at 60 minutes
+
+	// in retry(3), this should be 2, 4, 8 (left shifting 0001)
+	delay := baseDelay * time.Duration(1<<attempt) // Double the delay with each retry
+	if delay > maxDelay {
+		delay = maxDelay
+	}
+
+	return delay
+}
+
 // initalizes the async queue
-func initAsyncQueue(conf global.Config, dbSelector repository.DBSelector) (*asynq.Server, *asynq.Client) {
+func initAsyncQueue(conf global.Config, dbSelector *repository.CouchDBSelector) (*asynq.Server, *asynq.Client) {
 	queueRedisClient := asynq.RedisClientOpt{
 		Addr:     global.Conf.Redis.Host + ":" + strconv.Itoa(global.Conf.Redis.Port),
 		Username: global.Conf.Redis.Username,
 		Password: global.Conf.Redis.Password,
 		DB:       2,
 	}
+
+	logLevel := asynq.InfoLevel
+	if global.Conf.Mode != "debug" {
+		logLevel = asynq.WarnLevel
+	}
+	concurrency := 50
+	if global.Conf.Queue.Concurrency > 0 {
+		concurrency = global.Conf.Queue.Concurrency
+	}
+
 	taskClient := asynq.NewClient(queueRedisClient)
 	// start a task queue server
 	taskServer := asynq.NewServer(
 		queueRedisClient,
-		asynq.Config{Concurrency: 50},
+		asynq.Config{
+			Concurrency:    concurrency,
+			LogLevel:       logLevel,
+			RetryDelayFunc: asyncRetryDelayFunc, // overriding the default retry delay function
+		},
 	)
 
-	taskService := services.NewMessageQueueService(dbSelector)
+	taskService := queue.NewMessageQueue(dbSelector)
 	// start a task processing server
 	mux := asynq.NewServeMux()
 	mux.HandleFunc(types.QueueTypeDIDCommRecv, taskService.ProcessTask)
@@ -161,7 +190,7 @@ func main() {
 	dbSelector := ConfigDBSelector()
 	ConfigDBIndexing(dbSelector.(*repository.CouchDBSelector), env)
 
-	taskServer, taskClient := initAsyncQueue(global.Conf, dbSelector)
+	taskServer, taskClient := initAsyncQueue(global.Conf, dbSelector.(*repository.CouchDBSelector))
 	defer taskClient.Close()
 	env.TaskClient = taskClient
 

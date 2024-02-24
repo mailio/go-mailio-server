@@ -13,12 +13,12 @@ type CouchDBError struct {
 type BaseDocument struct {
 
 	// Rev is the revision number returned
-	UnderscoreRev string `json:"_rev,omitempty"`
-	Rev           string `json:"rev,omitempty"`
-	ID            string `json:"id,omitempty"`
-	UnderstoreID  string `json:"_id,omitempty"`
-	OK            bool   `json:"ok,omitempty"`
-	Deleted       bool   `json:"_deleted,omitempty"`
+	// _Rev    string `json:"_rev,omitempty"`
+	Rev string `json:"_rev,omitempty"`
+	ID  string `json:"_id,omitempty"`
+	// _ID     string `json:"_id,omitempty"`
+	OK      bool `json:"ok,omitempty"`
+	Deleted bool `json:"_deleted,omitempty"`
 }
 
 // Index is a MonboDB-style index definition.
@@ -32,6 +32,12 @@ type Index struct {
 type PagingResults struct {
 	Docs     []interface{} `json:"docs"`
 	Bookmark string        `json:"bookmark,omitempty"`
+}
+
+type CouchDBResponse struct {
+	ID  string `json:"id,omitempty"`
+	Rev string `json:"rev,omitempty"`
+	OK  bool   `json:"ok,omitempty"`
 }
 
 // // Attachment represents a file attachment to a document.

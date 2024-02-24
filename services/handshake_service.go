@@ -98,7 +98,7 @@ func (hs *HandshakeService) Save(handshake *types.Handshake, userPublicKeyEd2551
 		CborPayloadBase64: handshake.CborPayloadBase64,
 	}
 	if existingHs != nil {
-		storedHandshake.UnderscoreRev = existingHs.UnderscoreRev
+		storedHandshake.Rev = existingHs.Rev
 	}
 
 	return hs.handshakeRepo.Save(ctx, handshake.Content.HandshakeID, storedHandshake)
@@ -148,7 +148,7 @@ func (hs *HandshakeService) ListHandshakes(address string, bookmark string, limi
 		Docs: handshakes,
 	}
 	if bm, ok := respObj["bookmark"]; ok {
-		if bm != nil && "nil" != bm.(string) {
+		if bm != nil && bm.(string) != "nil" {
 			results.Bookmark = bm.(string)
 		}
 	}

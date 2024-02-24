@@ -1,6 +1,8 @@
 package repository
 
-import "github.com/mailio/go-mailio-server/types"
+import (
+	"github.com/mailio/go-mailio-server/types"
+)
 
 const (
 	// CouchDB is the name of the CouchDB database

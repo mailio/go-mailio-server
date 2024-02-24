@@ -99,7 +99,7 @@ func (ns *NonceService) DeleteNonce(nonce string) error {
 func (ns *NonceService) RemoveExpiredNonces() {
 	totalRows := int64(1) // start value to enter the loop
 	for totalRows > 0 {
-		global.Logger.Log("Removing expired nonces")
+		global.Logger.Log("Removing expired nonces", totalRows)
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 		defer cancel()
 
@@ -120,9 +120,9 @@ func (ns *NonceService) RemoveExpiredNonces() {
 			bulkDelete := []types.BaseDocument{}
 			for _, nonceDoc := range expiredNonces.Rows {
 				delteDoc := types.BaseDocument{
-					UnderstoreID:  nonceDoc.ID,
-					UnderscoreRev: nonceDoc.Rev,
-					Deleted:       true,
+					ID:      nonceDoc.ID,
+					Rev:     nonceDoc.Rev,
+					Deleted: true,
 				}
 				bulkDelete = append(bulkDelete, delteDoc)
 			}
@@ -137,6 +137,4 @@ func (ns *NonceService) RemoveExpiredNonces() {
 		}
 		totalRows = int64(len(expiredNonces.Rows))
 	}
-
-	return
 }

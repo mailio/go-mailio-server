@@ -277,15 +277,15 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/types.InputDIDCommMessage"
+                            "$ref": "#/definitions/types.DIDCommMessage"
                         }
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "OK",
+                    "202": {
+                        "description": "Accepted",
                         "schema": {
-                            "$ref": "#/definitions/types.InputDIDCommMessage"
+                            "$ref": "#/definitions/types.DIDCommApiResponse"
                         }
                     },
                     "400": {
@@ -589,6 +589,11 @@ const docTemplate = `{
         },
         "/api/v1/handshakefetch": {
             "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
                 "description": "Request handshake from origin server (digitally signed)",
                 "consumes": [
                     "application/json"
@@ -786,7 +791,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/mtp/{address}/message": {
+        "/api/v1/mtp/message/{address}": {
             "post": {
                 "description": "Receive end-to-end encrypted message",
                 "consumes": [
@@ -1267,6 +1272,14 @@ const docTemplate = `{
                 }
             }
         },
+        "types.DIDCommApiResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                }
+            }
+        },
         "types.DIDCommMessage": {
             "type": "object",
             "required": [
@@ -1278,7 +1291,7 @@ const docTemplate = `{
             ],
             "properties": {
                 "attachments": {
-                    "description": "attachments to the message",
+                    "description": "attachments to the message                                                // MTP status message",
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/types.EncryptedAttachment"
@@ -1311,6 +1324,15 @@ const docTemplate = `{
                 "id": {
                     "description": "globally unique message identifier UUID (RFC 4122) recommended",
                     "type": "string"
+                },
+                "intent": {
+                    "description": "the intent of the message (if empty, ordinary message",
+                    "type": "string",
+                    "enum": [
+                        "message",
+                        "handshake",
+                        "error"
+                    ]
                 },
                 "next": {
                     "description": "in case forward message",
@@ -1711,23 +1733,6 @@ const docTemplate = `{
                 "kid": {
                     "description": "(Key ID): A hint indicating which key was used to encrypt the",
                     "type": "string"
-                }
-            }
-        },
-        "types.InputDIDCommMessage": {
-            "type": "object",
-            "required": [
-                "didCommMessage"
-            ],
-            "properties": {
-                "didCommMessage": {
-                    "$ref": "#/definitions/types.DIDCommMessage"
-                },
-                "handshakes": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/types.Handshake"
-                    }
                 }
             }
         },
