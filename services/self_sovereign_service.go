@@ -133,7 +133,7 @@ func (ssi *SelfSovereignService) SaveVC(vc *did.VerifiableCredential) (*did.Veri
 func (ssi *SelfSovereignService) StoreRegistrationSSI(mk *did.MailioKey) error {
 
 	authPath := global.Conf.Mailio.Domain + global.Conf.Mailio.AuthenticationPath
-	messagePath := global.Conf.Mailio.Domain + global.Conf.Mailio.MessagingPath + "/" + mk.MailioAddress()
+	messagePath := global.Conf.Mailio.Domain + global.Conf.Mailio.MessagingPath
 
 	userDIDDoc, didErr := did.NewMailioDIDDocument(mk, global.PublicKey, authPath, messagePath)
 	if didErr != nil {

@@ -1,5 +1,7 @@
 package types
 
+import "time"
+
 // Errors that start with a 4 are temporary failures. No action is needed, the sender will try again.
 // Errors that start with 5 are permanent failures and action is required to fix the problem.
 // The error codes are adapted and re-modeled based on RFC3463 https://www.rfc-editor.org/rfc/rfc3463
@@ -22,7 +24,7 @@ var (
 	ClassCodePermFailure = 5 // The message has been permanently failed
 
 	// Subject codes
-	SubjectCodeUndefined  = 0 // General status code (undefined)
+	SubjectCodeAccepted   = 0 // Accepted code indicates message has been accepted for delivery
 	SubjectCodeAdressing  = 1 // Addressing status code The address status reports on the originator or destination address.  It may include address syntax or validity.  These errors can generally be corrected by the sender and retried.
 	SubjectCodeMailbox    = 2 // Mailbox status code Mailbox status indicates that something having to do with the mailbox has caused this DSN.  Mailbox issues are assumed to be under the general control of the recipient.
 	SubjectCodeMailSystem = 3 // Mail system status code Mail system status indicates that something having to do with the system has caused this DSN. System issues are assumed to be under the general control of the administrator.
@@ -120,9 +122,23 @@ var (
 // Mailio Transfer Protocol (MTP) status codes
 // e.g. for succesfull delivery 2.0.0
 type MTPStatusCode struct {
-	Class       int       `json:"class" validate:"required,oneof=2 4 5"`   // Represents the class of the status code (2, 4, 5)
-	Subject     int       `json:"subject" validate:"required,min=0,max-8"` // Represents the subject category of the status code
-	Detail      int       `json:"detail" validate:"required"`              // Represents the detail of the status code
-	Description string    `json:"description,omitempty"`                   // Human-readable message or description (optional)
-	Signature   Signature `json:"signature" validate:"required"`           // JWS digital signature from the server issuing the status
+	Class       int    `json:"class" validate:"required,oneof=2 4 5"`   // Represents the class of the status code (2, 4, 5)
+	Subject     int    `json:"subject" validate:"required,min=0,max-8"` // Represents the subject category of the status code
+	Detail      int    `json:"detail" validate:"required"`              // Represents the detail of the status code
+	Description string `json:"description,omitempty"`                   // Human-readable message or description (optional)
+	Timestamp   int64  `json:"timestamp,omitempty"`                     // Unix timestamp in milliseconds
+}
+
+func NewMTPStatusCode(clazz int, subject int, detail int, description string) *MTPStatusCode {
+	return &MTPStatusCode{
+		Class:       clazz,
+		Subject:     subject,
+		Detail:      detail,
+		Description: description,
+		Timestamp:   time.Now().UnixMilli(),
+	}
+}
+
+func AppendMTPStatusCodeToMessage(message *MailioMessage, clazz int, subject int, detail int, description string) {
+	message.MTPStatusCodes = append(message.MTPStatusCodes, NewMTPStatusCode(clazz, subject, detail, description))
 }

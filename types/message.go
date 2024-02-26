@@ -3,9 +3,9 @@ package types
 var DENIED_EXTENSIONS = map[string]string{"ade": "ade", "adp": "adp", "apk": "apk", "appx": "appx", "appxbundle": "appxbundle", "bat": "bat", "cab": "cab", "chm": "chm", "cmd": "cmd", "com": "com", "cpl": "cpl", "dll": "dll", "dmg": "dmg", "ex": "ex", "ex_": "ex_", "exe": "exe", "hta": "hta", "ins": "ins", "isp": "isp", "iso": "iso", "jar": "jar", "js": "js", "jse": "jse", "lib": "lib", "lnk": "lnk", "mde": "mde", "msc": "msc", "msi": "msi", "msix": "msix", "msixbundle": "msixbundle", "msp": "msp", "mst": "mst", "nsh": "nsh", "pif": "pif", "ps1": "ps1", "scr": "scr", "sct": "sct", "shb": "shb", "sys": "sys", "vb": "vb", "vbe": "vbe", "vbs": "vbs", "vxd": "vxd", "wsc": "wsc", "wsf": "wsf", "wsh": "wsh"}
 
 var (
-	DIDCommIntentMessage   = "message"
-	DIDCommIntentHandshake = "handshake"
-	DIDCommIntentError     = "error"
+	DIDCommIntentMessage   = "message"   // ordinary message
+	DIDCommIntentHandshake = "handshake" // handshake message
+	DIDCommIntentDelivery  = "delivery"  // delivery message (acknowledgement, failure, etc.)
 
 	MailioFolderInbox     = "inbox"
 	MailioFolderGoodReads = "goodreads"
@@ -63,21 +63,20 @@ type DIDCommSignedRequest struct {
 	SenderDomain      string          `json:"senderDomain" validate:"required"`             // origin of the request (where DNS is published with Mailio public key)
 }
 
-type DIDCommSignedResponse struct {
-	Response *DIDCommApiResponse `json:"response" validate:"required"`
+// DIDCommApiResponse is a struct that represents a response to a DIDComm message (returns ID of the message with current timestamp)
+type DIDCommResponse struct {
+	Response        *DIDCommApiResponse `json:"response" validate:"required"`
+	SignatureScheme string              `json:"signatureScheme" validate:"required,oneof=EdDSA_X25519"`
+	Timestamp       int64               `json:"timestamp" validate:"required"`
 }
 
-// type HandshakeSignedRequest struct {
-// 	HandshakeRequest  HandshakeRequest `json:"handshakeRequest" validate:"required"`
-// 	SignatureBase64   string           `json:"signatureBase64" validate:"required,base64"`
-// 	CborPayloadBase64 string           `json:"cborPayloadBase64" validate:"required,base64"`
-// 	SenderDomain      string           `json:"senderDomain" validate:"required"` // origin of the request (where DNS is published with Mailio public key)
-// }
-
-// type HandshakeResponse struct {
-// 	HandshakeHeader HandshakeHeader     `json:"handshakeHeader" validate:"required"`
-// 	Handshakes      []*HandshakeContent `json:"handshakes" validate:"required"`
-// }
+// DIDCommApiResponse is a signed response to a DIDComm message
+type DIDCommSignedResponse struct {
+	DIDCommResponse   *DIDCommResponse `json:"didCommResponse" validate:"required"`
+	CborPayloadBase64 string           `json:"cborPayloadBase64" validate:"required,base64"` // the payload that was signed, which is base64 encoded.
+	SignatureBase64   string           `json:"signatureBase64" validate:"required,base64"`   // the signature of the payload, which is base64 encoded.
+	SenderDomain      string           `json:"senderDomain" validate:"required"`             // origin of the request (where DNS is published with Mailio public key)
+}
 
 // EncryptedMailioBody is a struct that represents an encrypted message according to JWE standard
 type EncryptedBody struct {

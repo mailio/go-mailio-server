@@ -49,7 +49,7 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 	nonceService := services.NewNonceService(dbSelector)
 	ssiService := services.NewSelfSovereignService(dbSelector)
 	handshakeService := services.NewHandshakeService(dbSelector, environment)
-	mtpService := services.NewMtpService(dbSelector, environment)
+	mtpService := services.NewMtpService(dbSelector)
 
 	// API definitions
 	handshakeApi := api.NewHandshakeApi(handshakeService, nonceService, mtpService)
@@ -104,7 +104,7 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 	}
 
 	// server-to-server communication (aka MTP - Mailio Transfer Protocol)
-	mtpRootApi := router.Group("/api", metrics.MetricsMiddleware(), restinterceptors.RateLimitMiddleware(), restinterceptors.SignatureMiddleware(environment))
+	mtpRootApi := router.Group("/api", metrics.MetricsMiddleware(), restinterceptors.RateLimitMiddleware(), restinterceptors.SignatureMiddleware(environment, mtpService))
 	{
 		// Handshakes MTP
 		mtpRootApi.POST("/v1/mtp/handshake", handshakeMTPApi.GetLocalHandshakes)

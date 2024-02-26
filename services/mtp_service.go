@@ -3,10 +3,13 @@ package services
 import (
 	"encoding/base64"
 	"errors"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/go-kit/log/level"
 	"github.com/go-resty/resty/v2"
+	"github.com/mailio/go-mailio-did/did"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/repository"
 	"github.com/mailio/go-mailio-server/types"
@@ -16,11 +19,10 @@ import (
 type MtpService struct {
 	domainRepo    repository.Repository
 	handshakeRepo repository.Repository
-	env           *types.Environment
 	restyClient   *resty.Client
 }
 
-func NewMtpService(dbSelector repository.DBSelector, environment *types.Environment) *MtpService {
+func NewMtpService(dbSelector repository.DBSelector) *MtpService {
 	domainRepo, err := dbSelector.ChooseDB(repository.Domain)
 	if err != nil {
 		level.Error(global.Logger).Log("msg", "error while choosing db", "err", err)
@@ -31,8 +33,8 @@ func NewMtpService(dbSelector repository.DBSelector, environment *types.Environm
 		level.Error(global.Logger).Log("msg", "error while choosing db", "err", err)
 		panic(err)
 	}
-	restyClient := resty.New()
-	return &MtpService{domainRepo: domainRepo, handshakeRepo: handshakeRepo, env: environment, restyClient: restyClient}
+	restyClient := resty.New().SetRetryCount(3).SetRetryWaitTime(5 * time.Second)
+	return &MtpService{domainRepo: domainRepo, handshakeRepo: handshakeRepo, restyClient: restyClient}
 }
 
 // Lookup handshakes locally and if not found
@@ -74,7 +76,7 @@ func (mtp *MtpService) LookupHandshakes(senderAddress string, inputLookups []typ
 func (mtp *MtpService) requestHandshakeFromRemoteServer(senderAddress string, handshakeLookups []types.HandshakeLookup, domain string) ([]types.HandshakeSignedResponse, error) {
 	output := []types.HandshakeSignedResponse{}
 
-	domainObject, resErr := resolveDomain(mtp.domainRepo, domain)
+	domainObject, resErr := resolveDomain(mtp.domainRepo, domain, false)
 	if resErr != nil {
 		return nil, resErr
 	}
@@ -181,4 +183,33 @@ func (mtp *MtpService) LocalHandshakeLookup(senderAddress string, lookups []type
 		found = append(found, &shake.Content)
 	}
 	return
+}
+
+// Resolve domain from the domain repository
+func (mtp *MtpService) ResolveDomain(domain string, forceDiscovery bool) (*types.Domain, error) {
+	resolvedDomain, err := resolveDomain(mtp.domainRepo, domain, forceDiscovery)
+	if err != nil {
+		return nil, err
+	}
+	return resolvedDomain, nil
+}
+
+// GetServerDIDDocument retrieves the server DID document from the domain
+func (mtp *MtpService) GetServerDIDDocument(domain string) (*did.Document, error) {
+
+	senderServerDIDUrl := "https://" + domain + ".well-known/did.json"
+	if strings.Contains(domain, "localhost") || strings.Contains(domain, "127.0.0.1") {
+		senderServerDIDUrl = "http://" + domain + ".well-known/did.json"
+	}
+	var serverDIDDocument did.Document
+	serverResponse, srvErr := mtp.restyClient.R().SetResult(&serverDIDDocument).Get(senderServerDIDUrl)
+	if srvErr != nil {
+		global.Logger.Log(srvErr.Error(), "failed to retrieve sender server DID", senderServerDIDUrl)
+		return nil, fmt.Errorf("failed to retrieve sender server DID: %v", srvErr)
+	}
+	if serverResponse.IsError() {
+		global.Logger.Log(serverResponse.String(), "failed to retrieve sender server DID", senderServerDIDUrl)
+		return nil, fmt.Errorf("failed to retrieve sender server DID: %v", serverResponse.Error())
+	}
+	return &serverDIDDocument, nil
 }

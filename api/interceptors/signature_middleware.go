@@ -1,16 +1,15 @@
 package interceptors
 
 import (
-	"context"
 	"encoding/base64"
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-kit/log/level"
 	"github.com/go-playground/validator/v10"
 	"github.com/mailio/go-mailio-server/global"
+	"github.com/mailio/go-mailio-server/services"
 	"github.com/mailio/go-mailio-server/types"
 	"github.com/mailio/go-mailio-server/util"
 	"golang.org/x/net/idna"
@@ -19,7 +18,7 @@ import (
 var validate = validator.New()
 
 // validating signatures of incoming requests
-func SignatureMiddleware(env *types.Environment) gin.HandlerFunc {
+func SignatureMiddleware(env *types.Environment, mtpService *services.MtpService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var commonSignature types.CommonSignature
 		if err := c.ShouldBindBodyWith(&commonSignature, binding.JSON); err != nil {
@@ -36,6 +35,7 @@ func SignatureMiddleware(env *types.Environment) gin.HandlerFunc {
 			c.Abort()
 			return
 		}
+		// IDNA encode the domain
 		domain := commonSignature.SenderDomain
 		host, err := idna.Lookup.ToASCII(domain)
 		if err != nil {
@@ -45,10 +45,8 @@ func SignatureMiddleware(env *types.Environment) gin.HandlerFunc {
 			return
 		}
 		// DNS check the host for (extracting the public key)
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		pk, pkErr := util.GetDNSMailioPublicKey(ctx, host)
-		if pkErr != nil {
+		resolvedDomain, dErr := mtpService.ResolveDomain(host, false)
+		if dErr != nil {
 			level.Error(global.Logger).Log("no Mailio DNS record", err.Error())
 			c.JSON(http.StatusBadRequest, gin.H{"error": "no Mailio DNS record found"})
 			c.Abort()
@@ -56,16 +54,32 @@ func SignatureMiddleware(env *types.Environment) gin.HandlerFunc {
 		}
 		cborPayload, _ := base64.StdEncoding.DecodeString(commonSignature.CborPayloadBase64)
 		signature, _ := base64.StdEncoding.DecodeString(commonSignature.SignatureBase64)
-		isValid, sigErr := util.Verify(cborPayload, signature, pk)
+		isValid, sigErr := util.Verify(cborPayload, signature, resolvedDomain.MailioPublicKey)
 		if sigErr != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "signature verification failed"})
 			c.Abort()
 			return
 		}
 		if !isValid {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "signature verification failed"})
-			c.Abort()
-			return
+			// re-check online for the public key (in case it changed). Force DNS discovery
+			resolvedDomain, dErr := mtpService.ResolveDomain(host, true)
+			if dErr != nil {
+				level.Error(global.Logger).Log("no Mailio DNS record", err.Error())
+				c.JSON(http.StatusBadRequest, gin.H{"error": "no Mailio DNS record found"})
+				c.Abort()
+				return
+			}
+			secondVerify, secondSigErr := util.Verify(cborPayload, signature, resolvedDomain.MailioPublicKey)
+			if secondSigErr != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "signature verification failed"})
+				c.Abort()
+				return
+			}
+			if !secondVerify {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "signature verification failed"})
+				c.Abort()
+				return
+			}
 		}
 		c.Set("data", commonSignature)
 		c.Next()
