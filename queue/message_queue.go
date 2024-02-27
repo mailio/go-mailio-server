@@ -125,9 +125,11 @@ func (msq *MessageQueue) ReceiveMessage(message *types.DIDCommMessage) error {
 	global.Logger.Log("intent", message.Intent)
 	switch message.Intent {
 	case types.DIDCommIntentMessage:
+		// handle message receive
 		msq.handleReceivedDIDCommMessage(message)
 	case types.DIDCommIntentDelivery:
-		//TODO! store message in database
+		// handle delivery receipt
+		msq.handleDIDCommDelivery(message)
 	case types.DIDCommIntentHandshake:
 		//TODO! retrieve requested handshake
 		//TODO! return Message error

@@ -17,14 +17,28 @@ import (
 
 type UserService struct {
 	repoSelector *repository.CouchDBSelector
+	restyClient  *resty.Client
 }
 
 func NewUserService(repoSelector *repository.CouchDBSelector) *UserService {
 	if repoSelector == nil {
 		panic("repoSelector cannot be nil")
 	}
+	repoUrl := global.Conf.CouchDB.Scheme + "://" + global.Conf.CouchDB.Host
+	if global.Conf.CouchDB.Port != 0 {
+		repoUrl += ":" + strconv.Itoa(global.Conf.CouchDB.Port)
+	}
+	client := resty.New().
+		SetTimeout(time.Second*10).
+		SetBasicAuth(global.Conf.CouchDB.Username, global.Conf.CouchDB.Password).
+		SetHeader("Content-Type", "application/json").
+		SetHeader("Accept", "application/json").
+		SetBaseURL(repoUrl).
+		SetDebug(false)
+
 	return &UserService{
 		repoSelector: repoSelector,
+		restyClient:  client,
 	}
 }
 
@@ -122,6 +136,32 @@ func (us *UserService) FindUserByScryptEmail(scryptEmail string) (*types.EmailTo
 	return getUserByScryptEmail(repo, scryptEmail)
 }
 
+// Retrieves mailio message from users database by ID
+func (us *UserService) GetMessage(address string, ID string) (*types.MailioMessage, error) {
+	if ID == "" {
+		return nil, types.ErrBadRequest
+	}
+	hexUser := "userdb-" + hex.EncodeToString([]byte(address))
+	url := fmt.Sprintf("%s/%s", hexUser, ID)
+
+	var mailioMessage types.MailioMessage
+	var couchError types.CouchDBError
+	response, rErr := us.restyClient.R().SetResult(&mailioMessage).SetError(&couchError).Get(url)
+	if rErr != nil {
+		global.Logger.Log(rErr.Error(), "failed to get message", hexUser)
+		return nil, rErr
+	}
+	if response.IsError() {
+		if response.StatusCode() == 404 {
+			return nil, types.ErrNotFound
+		}
+		global.Logger.Log(response.String(), "failed to get message", hexUser, couchError.Error, couchError.Reason)
+		return nil, fmt.Errorf("code: %s, reason: %s", couchError.Error, couchError.Reason)
+	}
+
+	return &mailioMessage, nil
+}
+
 // Stores mailio message to users database
 func (us *UserService) SaveMessage(userAddress string, mailioMessage *types.MailioMessage) (*types.MailioMessage, error) {
 
@@ -130,21 +170,12 @@ func (us *UserService) SaveMessage(userAddress string, mailioMessage *types.Mail
 	}
 	mailioMessage.BaseDocument.ID = mailioMessage.ID
 
-	//TODO!: sign message as a server (so it can be checked by the client if need be)
-
 	hexUser := "userdb-" + hex.EncodeToString([]byte(userAddress))
-	repoUrl := global.Conf.CouchDB.Scheme + "://" + global.Conf.CouchDB.Host + ":" + strconv.Itoa(global.Conf.CouchDB.Port)
 	url := fmt.Sprintf("%s/%s", hexUser, mailioMessage.ID)
-	client := resty.New().SetBaseURL(repoUrl).
-		SetTimeout(time.Second*10).
-		SetBasicAuth(global.Conf.CouchDB.Username, global.Conf.CouchDB.Password).
-		SetHeader("Content-Type", "application/json").
-		SetHeader("Accept", "application/json").
-		SetDebug(true)
 
 	var postResult types.CouchDBResponse
 	var postError types.CouchDBError
-	httpResp, httpErr := client.R().SetBody(mailioMessage).SetResult(&postResult).SetError(&postError).Put(url)
+	httpResp, httpErr := us.restyClient.R().SetBody(mailioMessage).SetResult(&postResult).SetError(&postError).Put(url)
 	if httpErr != nil {
 		global.Logger.Log(httpErr.Error(), "failed to send message", hexUser)
 		return nil, httpErr

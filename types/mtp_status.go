@@ -82,6 +82,8 @@ var (
 
 	// Mail delivery protocol statuses
 	// X.5.0   Other or undefined protocol status
+	// X.5.1   Duplicate message ID
+	// X.5.2  Syntax error
 	// X.5.3   Too many recipients
 	// X.5.4   Invalid command arguments
 	// X.5.5   Wrong protocol version
@@ -130,14 +132,26 @@ type MTPStatusCode struct {
 	Timestamp   int64  `json:"timestamp,omitempty"`                     // Unix timestamp in milliseconds
 }
 
-func NewMTPStatusCode(clazz int, subject int, detail int, description string) *MTPStatusCode {
-	return &MTPStatusCode{
+type MTPStatusCodeOption func(*MTPStatusCode)
+
+func WithRecAddress(address string) MTPStatusCodeOption {
+	return func(code *MTPStatusCode) {
+		code.Address = address
+	}
+}
+
+func NewMTPStatusCode(clazz int, subject int, detail int, description string, opts ...MTPStatusCodeOption) *MTPStatusCode {
+	c := &MTPStatusCode{
 		Class:       clazz,
 		Subject:     subject,
 		Detail:      detail,
 		Description: description,
 		Timestamp:   time.Now().UnixMilli(),
 	}
+	for _, opt := range opts {
+		opt(c)
+	}
+	return c
 }
 
 func AppendMTPStatusCodeToMessage(message *MailioMessage, clazz int, subject int, detail int, description string) {
