@@ -96,10 +96,11 @@ func (msq *MessageQueue) SendMessage(userAddress string, message *types.DIDCommM
 			continue
 		} else {
 			// sign and send message to remote recipient
-			sendErr := msq.httpSend(&mailioMessage, message, didDoc, endpoint)
+			sendErr, code := msq.httpSend(message, didDoc, endpoint)
 			if sendErr != nil {
 				if sendErr == types.ErrContinue {
 					// on to the next message if this one failed
+					mailioMessage.MTPStatusCodes = append(mailioMessage.MTPStatusCodes, code)
 					continue
 				}
 				return sendErr

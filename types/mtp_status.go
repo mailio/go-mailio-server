@@ -126,6 +126,7 @@ type MTPStatusCode struct {
 	Subject     int    `json:"subject" validate:"required,min=0,max-8"` // Represents the subject category of the status code
 	Detail      int    `json:"detail" validate:"required"`              // Represents the detail of the status code
 	Description string `json:"description,omitempty"`                   // Human-readable message or description (optional)
+	Address     string `json:"address,omitempty"`                       // Address of the recipient or sender
 	Timestamp   int64  `json:"timestamp,omitempty"`                     // Unix timestamp in milliseconds
 }
 

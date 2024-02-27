@@ -12,9 +12,9 @@ require (
 	github.com/go-redis/redis_rate/v10 v10.0.1
 	github.com/go-resty/resty/v2 v2.7.0
 	github.com/google/uuid v1.3.0
-	github.com/hashicorp/golang-lru/v2 v2.0.2
 	github.com/hibiken/asynq v0.24.1
 	github.com/jarcoal/httpmock v1.3.0
+	github.com/lestrrat-go/jwx v1.2.28
 	github.com/lestrrat-go/jwx/v2 v2.0.19
 	github.com/mailio/go-mailio-did v0.0.0-20240219171524-88713f84b09d
 	github.com/mailio/go-web3-kit v0.0.0-20230302165532-057a45112b37
@@ -66,6 +66,7 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/mr-tron/base58 v1.2.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.8 // indirect
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_model v0.3.0 // indirect
 	github.com/prometheus/common v0.42.0 // indirect

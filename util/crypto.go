@@ -172,6 +172,7 @@ func Verify(message []byte, signature []byte, publicKeyBase64 string) (bool, err
 }
 
 // Generated ed25519 signing key pair and returns base64 public key, private key
+// returns publicKey, privateKey, error
 func GenerateEd25519KeyPair() (*string, *string, error) {
 	pubKey, privKey, err := ed25519.GenerateKey(nil)
 	if err != nil {

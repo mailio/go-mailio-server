@@ -34,19 +34,20 @@ type MailioMessage struct {
 }
 
 type DIDCommMessage struct {
-	Type                 string                 `json:"type" validate:"required,eq=application/didcomm-encrypted+json"`      // a valid message type URI (MUST be: application/didcomm-encrypted+json)
-	ID                   string                 `json:"id" validate:"required"`                                              // globally unique message identifier UUID (RFC 4122) recommended
-	From                 string                 `json:"from" validate:"required"`                                            // sender DID required because all mailio messages are encrypted
-	To                   []string               `json:"to" validate:"required,min=1"`                                        // in format: did:web:mail.io:0xabc -> recipient DIDs
-	Thid                 string                 `json:"thid,omitempty"`                                                      // thread identifier. Uniquely identifies the thread that the message belongs to. If not included, the id property of the message MUST be treated as the value of the thid.
-	Pthid                string                 `json:"pthid,omitempty"`                                                     // parent thread identifier. Uniquely identifies the parent thread that the message belongs to. If not included, the message is the first message in the thread.
-	ExpiresTime          int64                  `json:"expiresTime,omitempty"`                                               // sender will abort the protocol if it doesn't get a response by this time (UTC milliseconds since epoch)
-	CreatedTime          int64                  `json:"createdTime,omitempty"`                                               // time of message creation in UTC milliseconds since epoch
-	Next                 string                 `json:"next,omitempty"`                                                      // in case forward message
-	FromPrior            string                 `json:"fromPrior,omitempty"`                                                 // A DID is rotated by sending a message of any type to the recipient to be notified of the rotation
-	Intent               string                 `json:"intent,omitempty" validate:"omitempty,oneof=message handshake error"` // the intent of the message (if empty, ordinary message
-	EncryptedBody        *EncryptedBody         `json:"body" validate:"required"`                                            // the body attribute contains all the data and structure defined uniquely for the schema associated with the type attribute. It MUST be a JSON object conforming to RFC 7159                              // the encrypted message body
-	EncryptedAttachments []*EncryptedAttachment `json:"attachments,omitempty"`                                               // attachments to the message                                                // MTP status message
+	Type                 string                 `json:"type" validate:"required,eq=application/didcomm-encrypted+json"`         // a valid message type URI (MUST be: application/didcomm-encrypted+json)
+	ID                   string                 `json:"id" validate:"required"`                                                 // globally unique message identifier UUID (RFC 4122) recommended
+	From                 string                 `json:"from" validate:"required"`                                               // sender DID required because all mailio messages are encrypted
+	To                   []string               `json:"to" validate:"required,min=1"`                                           // in format: did:web:mail.io:0xabc -> recipient DIDs
+	Thid                 string                 `json:"thid,omitempty"`                                                         // thread identifier. Uniquely identifies the thread that the message belongs to. If not included, the id property of the message MUST be treated as the value of the thid.
+	Pthid                string                 `json:"pthid,omitempty"`                                                        // parent thread identifier. Uniquely identifies the parent thread that the message belongs to. If not included, the message is the first message in the thread.
+	ExpiresTime          int64                  `json:"expiresTime,omitempty"`                                                  // sender will abort the protocol if it doesn't get a response by this time (UTC milliseconds since epoch)
+	CreatedTime          int64                  `json:"createdTime,omitempty"`                                                  // time of message creation in UTC milliseconds since epoch
+	Next                 string                 `json:"next,omitempty"`                                                         // in case forward message
+	FromPrior            string                 `json:"fromPrior,omitempty"`                                                    // A DID is rotated by sending a message of any type to the recipient to be notified of the rotation
+	Intent               string                 `json:"intent,omitempty" validate:"omitempty,oneof=message handshake delivery"` // the intent of the message (if empty, ordinary message
+	EncryptedBody        *EncryptedBody         `json:"body,omitempty"`                                                         // the body attribute contains all the data and structure defined uniquely for the schema associated with the type attribute. It MUST be a JSON object conforming to RFC 7159                              // the encrypted message body
+	PlainBodyBase64      string                 `json:"plainBodyBase64,omitempty" validate:"omitempty,base64"`                  // the plain text message body, base64 encoded (optional)
+	EncryptedAttachments []*EncryptedAttachment `json:"attachments,omitempty"`                                                  // attachments to the message                                                // MTP status message
 }
 
 type DIDCommRequest struct {
@@ -63,21 +64,6 @@ type DIDCommSignedRequest struct {
 	SenderDomain      string          `json:"senderDomain" validate:"required"`             // origin of the request (where DNS is published with Mailio public key)
 }
 
-// DIDCommApiResponse is a struct that represents a response to a DIDComm message (returns ID of the message with current timestamp)
-type DIDCommResponse struct {
-	Response        *DIDCommApiResponse `json:"response" validate:"required"`
-	SignatureScheme string              `json:"signatureScheme" validate:"required,oneof=EdDSA_X25519"`
-	Timestamp       int64               `json:"timestamp" validate:"required"`
-}
-
-// DIDCommApiResponse is a signed response to a DIDComm message
-type DIDCommSignedResponse struct {
-	DIDCommResponse   *DIDCommResponse `json:"didCommResponse" validate:"required"`
-	CborPayloadBase64 string           `json:"cborPayloadBase64" validate:"required,base64"` // the payload that was signed, which is base64 encoded.
-	SignatureBase64   string           `json:"signatureBase64" validate:"required,base64"`   // the signature of the payload, which is base64 encoded.
-	SenderDomain      string           `json:"senderDomain" validate:"required"`             // origin of the request (where DNS is published with Mailio public key)
-}
-
 // EncryptedMailioBody is a struct that represents an encrypted message according to JWE standard
 type EncryptedBody struct {
 	Ciphertext string      `json:"ciphertext" validate:"required"`       // the encrypted message
@@ -86,6 +72,11 @@ type EncryptedBody struct {
 	Tag        string      `json:"tag" validate:"required"`              // integrity check on the encrypted message
 	Protected  string      `json:"protected" validate:"required"`        // the protected header
 	Signature  Signature   `json:"signature" validate:"required"`        // JWS digital signature
+}
+
+// Delivery message (successfull or failed)
+type PlainBodyDelivery struct {
+	StatusCodes []*MTPStatusCode `json:"statusCodes" validate:"required,min=1"` // MTP status messages
 }
 
 // EncryptedMailioAttachment is a struct that represents an encrypted attachment according to JWE standard

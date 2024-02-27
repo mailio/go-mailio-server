@@ -61,19 +61,17 @@ func (ms *MessagingMTPApi) ReceiveMessage(c *gin.Context) {
 	}
 
 	// digitially sign response and send confirmation receipt
-	resp := &types.DIDCommSignedResponse{
-		DIDCommResponse: &types.DIDCommResponse{
-			Response: &types.DIDCommApiResponse{
+	resp := &types.DIDCommSignedRequest{
+		DIDCommRequest: &types.DIDCommRequest{
+			DIDCommMessage: &types.DIDCommMessage{
 				ID: input.DIDCommRequest.DIDCommMessage.ID,
 			},
 			SignatureScheme: types.Signature_Scheme_EdDSA_X25519,
 			Timestamp:       time.Now().UnixMilli(),
 		},
-		CborPayloadBase64: "",
-		SignatureBase64:   "",
-		SenderDomain:      global.Conf.Host,
+		SenderDomain: global.Conf.Host,
 	}
-	cbBytes, cbErr := util.CborEncode(resp.DIDCommResponse)
+	cbBytes, cbErr := util.CborEncode(resp.DIDCommRequest)
 	if cbErr != nil {
 		global.Logger.Log(cbErr.Error(), "failed to cbor encode response")
 		ApiErrorf(c, http.StatusInternalServerError, "failed to cbor encode response")
