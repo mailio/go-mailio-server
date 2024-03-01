@@ -34,7 +34,9 @@ func CreateDesign_DeleteExpiredRecordsByCreatedDate(dbRepo Repository, olderThan
 		panic(eErr)
 	}
 	if existing.IsError() {
-		panic(existing.Error())
+		if existing.StatusCode() != 404 {
+			panic(existing.Error())
+		}
 	}
 	if existing.StatusCode() == 200 {
 		return // view already exists

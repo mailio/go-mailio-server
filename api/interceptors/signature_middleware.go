@@ -47,7 +47,7 @@ func SignatureMiddleware(env *types.Environment, mtpService *services.MtpService
 		// DNS check the host for (extracting the public key)
 		resolvedDomain, dErr := mtpService.ResolveDomain(host, false)
 		if dErr != nil {
-			level.Error(global.Logger).Log("no Mailio DNS record", err.Error())
+			level.Error(global.Logger).Log("no Mailio DNS record", dErr.Error())
 			c.JSON(http.StatusBadRequest, gin.H{"error": "no Mailio DNS record found"})
 			c.Abort()
 			return

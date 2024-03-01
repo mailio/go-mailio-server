@@ -7,6 +7,7 @@ import (
 	"net"
 	"strings"
 
+	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/types"
 )
 
@@ -97,6 +98,18 @@ var (
 // - Ips: IP addresses of the domain
 func MailioDNSDiscover(ctx context.Context, domain string) (*types.Discovery, error) {
 	var r net.Resolver
+
+	if strings.Contains(domain, "localhost") {
+		// if development server take the local public key
+		pk := base64.StdEncoding.EncodeToString(global.PublicKey)
+		return &types.Discovery{
+			Domain:        "localhost",
+			IsMailio:      true,
+			Ips:           []string{"127.0.0.1"},
+			PublicKeyType: "ed25519",
+			PublicKey:     pk,
+		}, nil
+	}
 
 	txts, err := r.LookupTXT(ctx, "mailio._mailiokey."+domain)
 	if err != nil {

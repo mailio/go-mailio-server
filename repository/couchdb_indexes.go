@@ -75,3 +75,26 @@ func CreateHandshakeIndex(handshakeRepo Repository) error {
 	}
 	return nil
 }
+
+// func CreateHandshakeAddressIndex(handshakeRepo Repository) error {
+// 	dbName := Handshake
+// 	// create index on database
+// 	addressIndex := map[string]interface{}{
+// 		"index": map[string]interface{}{
+// 			"fields": []map[string]interface{}{{"ownerAddress": "desc"}, {"created": "desc"}},
+// 		},
+// 		"name": "address-index",
+// 		"type": "json",
+// 		"ddoc": "address-design",
+// 	}
+// 	c := handshakeRepo.GetClient().(*resty.Client)
+// 	resp, rErr := c.R().SetBody(addressIndex).Post(fmt.Sprintf("%s/%s", dbName, "_index"))
+// 	if rErr != nil {
+// 		return rErr
+// 	}
+// 	if resp.IsError() {
+// 		outErr := handleError(resp)
+// 		return outErr
+// 	}
+// 	return nil
+// }

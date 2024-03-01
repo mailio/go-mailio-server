@@ -234,13 +234,16 @@ func (ha *HandshakeApi) PersonalHandshakeLink(c *gin.Context) {
 	// create a personal handshake link
 	domain := global.Conf.Mailio.Domain
 	// nonces are typically deleted within 5 minutes. That should be enough time to use the link
-	nonce, nErr := ha.nonceService.CreateCustomNonce(32)
+	nonce, nErr := ha.nonceService.CreateCustomNonce(16)
 	if nErr != nil {
 		ApiErrorf(c, http.StatusInternalServerError, "error while creating nonce")
 		return
 	}
+
+	// create a link with the nonce
+	// format: nonce:web:domain:address
 	link := types.HandshakeLink{
-		Link: nonce.Nonce + address.(string) + domain,
+		Link: nonce.Nonce + ":web:" + domain + ":" + address.(string),
 	}
 	c.JSON(http.StatusOK, link)
 }

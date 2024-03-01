@@ -15,14 +15,16 @@ var (
 	MailioFolderArchive   = "archive"
 	MaolioFolderTrash     = "trash"
 	MailioFolderSpam      = "spam"
+	MailioFolderHandshake = "handshake"
 )
 
 // MailioMessage is a struct that is meant to be stored in the database
 type MailioMessage struct {
 	BaseDocument   `json:",inline"`
 	ID             string          `json:"id" validate:"required"`   // globally unique message identifier UUID (RFC 4122) recommended
+	From           string          `json:"from" validate:"required"` // either the sender's DID or the sender's email address
 	DIDCommMessage *DIDCommMessage `json:"didCommMessage,omitempty"` // the DIDComm message
-	// SmtpMessage    *SMTPMessage    `json:"smtpMessage,omitempty"`       // the SMTP message
+	// SmtpMessage    *SMTPMessage     `json:"smtpMessage,omitempty"`       // the SMTP message
 	MTPStatusCodes []*MTPStatusCode `json:"mtpStatusCodes,omitempty"`    // MTP status messages
 	Folder         string           `json:"folder" validate:"required"`  // the folder where the message is stored
 	Created        int64            `json:"created" validate:"required"` // time of message creation in UTC milliseconds since epoch
@@ -34,20 +36,20 @@ type MailioMessage struct {
 }
 
 type DIDCommMessage struct {
-	Type                 string                 `json:"type" validate:"required,eq=application/didcomm-encrypted+json"`         // a valid message type URI (MUST be: application/didcomm-encrypted+json)
-	ID                   string                 `json:"id" validate:"required"`                                                 // globally unique message identifier UUID (RFC 4122) recommended
-	From                 string                 `json:"from" validate:"required"`                                               // sender DID required because all mailio messages are encrypted
-	To                   []string               `json:"to" validate:"required,min=1"`                                           // in format: did:web:mail.io:0xabc -> recipient DIDs
-	Thid                 string                 `json:"thid,omitempty"`                                                         // thread identifier. Uniquely identifies the thread that the message belongs to. If not included, the id property of the message MUST be treated as the value of the thid.
-	Pthid                string                 `json:"pthid,omitempty"`                                                        // parent thread identifier. Uniquely identifies the parent thread that the message belongs to. If not included, the message is the first message in the thread.
-	ExpiresTime          int64                  `json:"expiresTime,omitempty"`                                                  // sender will abort the protocol if it doesn't get a response by this time (UTC milliseconds since epoch)
-	CreatedTime          int64                  `json:"createdTime,omitempty"`                                                  // time of message creation in UTC milliseconds since epoch
-	Next                 string                 `json:"next,omitempty"`                                                         // in case forward message
-	FromPrior            string                 `json:"fromPrior,omitempty"`                                                    // A DID is rotated by sending a message of any type to the recipient to be notified of the rotation
-	Intent               string                 `json:"intent,omitempty" validate:"omitempty,oneof=message handshake delivery"` // the intent of the message (if empty, ordinary message
-	EncryptedBody        *EncryptedBody         `json:"body,omitempty"`                                                         // the body attribute contains all the data and structure defined uniquely for the schema associated with the type attribute. It MUST be a JSON object conforming to RFC 7159                              // the encrypted message body
-	PlainBodyBase64      string                 `json:"plainBodyBase64,omitempty" validate:"omitempty,base64"`                  // the plain text message body, base64 encoded (optional)
-	EncryptedAttachments []*EncryptedAttachment `json:"attachments,omitempty"`                                                  // attachments to the message                                                // MTP status message
+	Type                 string                 `json:"type" validate:"required,oneof=application/didcomm-encrypted+json application/didcomm-signed+json"` // a valid message type URI (MUST be: application/didcomm-encrypted+json or application/didcomm-signed+json)
+	ID                   string                 `json:"id" validate:"required"`                                                                            // globally unique message identifier UUID (RFC 4122) recommended
+	From                 string                 `json:"from" validate:"required"`                                                                          // sender DID required because all mailio messages are encrypted
+	To                   []string               `json:"to" validate:"required,min=1"`                                                                      // in format: did:web:mail.io:0xabc -> recipient DIDs
+	Thid                 string                 `json:"thid,omitempty"`                                                                                    // thread identifier. Uniquely identifies the thread that the message belongs to. If not included, the id property of the message MUST be treated as the value of the thid.
+	Pthid                string                 `json:"pthid,omitempty"`                                                                                   // parent thread identifier. Uniquely identifies the parent thread that the message belongs to. If not included, the message is the first message in the thread.
+	ExpiresTime          int64                  `json:"expiresTime,omitempty"`                                                                             // sender will abort the protocol if it doesn't get a response by this time (UTC milliseconds since epoch)
+	CreatedTime          int64                  `json:"createdTime,omitempty"`                                                                             // time of message creation in UTC milliseconds since epoch
+	Next                 string                 `json:"next,omitempty"`                                                                                    // in case forward message
+	FromPrior            string                 `json:"fromPrior,omitempty"`                                                                               // A DID is rotated by sending a message of any type to the recipient to be notified of the rotation
+	Intent               string                 `json:"intent,omitempty" validate:"omitempty,oneof=message handshake delivery"`                            // the intent of the message (if empty, ordinary message
+	EncryptedBody        *EncryptedBody         `json:"body,omitempty"`                                                                                    // the body attribute contains all the data and structure defined uniquely for the schema associated with the type attribute. It MUST be a JSON object conforming to RFC 7159                              // the encrypted message body
+	PlainBodyBase64      string                 `json:"plainBodyBase64,omitempty" validate:"omitempty,base64"`                                             // the plain text message body, base64 encoded (optional)
+	EncryptedAttachments []*EncryptedAttachment `json:"attachments,omitempty"`                                                                             // attachments to the message                                                // MTP status message
 }
 
 type DIDCommRequest struct {

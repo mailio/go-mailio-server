@@ -782,9 +782,9 @@
                 }
             }
         },
-        "/api/v1/mtp/message/{address}": {
+        "/api/v1/mtp/message": {
             "post": {
-                "description": "Receive end-to-end encrypted message",
+                "description": "Receive end-to-end encrypted message (signed by senders Mailio server)",
                 "consumes": [
                     "application/json"
                 ],
@@ -794,15 +794,15 @@
                 "tags": [
                     "Mailio Transfer Protocol"
                 ],
-                "summary": "Receive end-to-end encrypted message",
+                "summary": "Receive end-to-end encrypted message (signed by senders Mailio server)",
                 "parameters": [
                     {
-                        "description": "didcomm-encrypted+json",
+                        "description": "didcomm signed request",
                         "name": "handshake",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/types.DIDCommMessage"
+                            "$ref": "#/definitions/types.DIDCommSignedRequest"
                         }
                     }
                 ],
@@ -810,7 +810,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/types.DIDCommMessage"
+                            "$ref": "#/definitions/types.DIDCommApiResponse"
                         }
                     },
                     "400": {
@@ -852,6 +852,56 @@
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/types.NonceResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/nonce/{id}": {
+            "delete": {
+                "description": "Deletes nonce if it exists",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "User Account"
+                ],
+                "summary": "Deletes nonce if it exists",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "nonce id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.NonceResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "not found",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
                         }
                     },
                     "429": {
@@ -1268,13 +1318,21 @@
             "properties": {
                 "id": {
                     "type": "string"
+                },
+                "mtpStatusCodes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.MTPStatusCode"
+                    }
+                },
+                "type": {
+                    "type": "string"
                 }
             }
         },
         "types.DIDCommMessage": {
             "type": "object",
             "required": [
-                "body",
                 "from",
                 "id",
                 "to",
@@ -1322,11 +1380,15 @@
                     "enum": [
                         "message",
                         "handshake",
-                        "error"
+                        "delivery"
                     ]
                 },
                 "next": {
                     "description": "in case forward message",
+                    "type": "string"
+                },
+                "plainBodyBase64": {
+                    "description": "the plain text message body, base64 encoded (optional)",
                     "type": "string"
                 },
                 "pthid": {
@@ -1347,6 +1409,54 @@
                 },
                 "type": {
                     "description": "a valid message type URI (MUST be: application/didcomm-encrypted+json)",
+                    "type": "string"
+                }
+            }
+        },
+        "types.DIDCommRequest": {
+            "type": "object",
+            "required": [
+                "didCommMessage",
+                "signatureScheme",
+                "timestamp"
+            ],
+            "properties": {
+                "didCommMessage": {
+                    "$ref": "#/definitions/types.DIDCommMessage"
+                },
+                "signatureScheme": {
+                    "type": "string",
+                    "enum": [
+                        "EdDSA_X25519"
+                    ]
+                },
+                "timestamp": {
+                    "type": "integer"
+                }
+            }
+        },
+        "types.DIDCommSignedRequest": {
+            "type": "object",
+            "required": [
+                "cborPayloadBase64",
+                "didCommRequest",
+                "senderDomain",
+                "signatureBase64"
+            ],
+            "properties": {
+                "cborPayloadBase64": {
+                    "description": "the payload that was signed, which is base64 encoded.",
+                    "type": "string"
+                },
+                "didCommRequest": {
+                    "$ref": "#/definitions/types.DIDCommRequest"
+                },
+                "senderDomain": {
+                    "description": "origin of the request (where DNS is published with Mailio public key)",
+                    "type": "string"
+                },
+                "signatureBase64": {
+                    "description": "the signature of the payload, which is base64 encoded.",
                     "type": "string"
                 }
             }
@@ -1812,6 +1922,46 @@
             "properties": {
                 "token": {
                     "type": "string"
+                }
+            }
+        },
+        "types.MTPStatusCode": {
+            "type": "object",
+            "required": [
+                "class",
+                "detail",
+                "subject"
+            ],
+            "properties": {
+                "address": {
+                    "description": "Address of the recipient or sender",
+                    "type": "string"
+                },
+                "class": {
+                    "description": "Represents the class of the status code (2, 4, 5)",
+                    "type": "integer",
+                    "enum": [
+                        2,
+                        4,
+                        5
+                    ]
+                },
+                "description": {
+                    "description": "Human-readable message or description (optional)",
+                    "type": "string"
+                },
+                "detail": {
+                    "description": "Represents the detail of the status code",
+                    "type": "integer"
+                },
+                "subject": {
+                    "description": "Represents the subject category of the status code",
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "timestamp": {
+                    "description": "Unix timestamp in milliseconds",
+                    "type": "integer"
                 }
             }
         },

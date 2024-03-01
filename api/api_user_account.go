@@ -85,6 +85,42 @@ func (ua *UserAccountApi) ChallengeNonce(c *gin.Context) {
 	c.JSON(http.StatusOK, nonce)
 }
 
+// Deletes nonce if it exists
+// @Summary Deletes nonce if it exists
+// @Description Deletes nonce if it exists
+// @Tags User Account
+// @Param id path string true "nonce id"
+// @Success 200 {object} types.NonceResponse
+// @Failure 404 {object} api.ApiError "not found"
+// @Failure 429 {object} api.ApiError "rate limit exceeded"
+// @Failure 500 {object} api.ApiError "Internal server error"
+// @Accept json
+// @Produce json
+// @Router /api/v1/nonce/{id} [delete]
+func (ua *UserAccountApi) DeleteNonce(c *gin.Context) {
+	nonceId := c.Param("id")
+	if nonceId == "" {
+		ApiErrorf(c, http.StatusBadRequest, "nonce id is required")
+		return
+	}
+	nonce, err := ua.nonceService.GetNonce(nonceId)
+	if err != nil {
+		if err == types.ErrNotFound {
+			ApiErrorf(c, http.StatusNotFound, "nonce not found")
+		} else {
+			ApiErrorf(c, http.StatusInternalServerError, "Failed to retrieve nonce")
+		}
+		return
+	}
+	delErr := ua.nonceService.DeleteNonce(nonceId)
+	if delErr != nil {
+		ApiErrorf(c, http.StatusInternalServerError, "Failed to delete nonce")
+		return
+	}
+
+	c.JSON(http.StatusOK, nonce)
+}
+
 // Login method
 // @Summary Login with username and password
 // @Description Returns a JWS token
@@ -93,6 +129,7 @@ func (ua *UserAccountApi) ChallengeNonce(c *gin.Context) {
 // @Success 200 {object} types.JwsToken
 // @Failure 401 {object} api.ApiError "Invalid signature"
 // @Failure 403 {object} api.ApiError "Failed to login (valid signature, no valid VC)"
+// @Failure 404 {object} api.ApiError "Failed to login (user not registered)"
 // @Failure 400 {object} api.ApiError "Invalid or missing input parameters"
 // @Failure 429 {object} api.ApiError "rate limit exceeded"
 // @Accept json
@@ -142,23 +179,23 @@ func (ua *UserAccountApi) Login(c *gin.Context) {
 		return
 	}
 
-	// validate also VC for the user (is user was registered at mail.io)
+	// validate also VC for the user (proof that user was registered at host)
 	vc, vcErr := ua.ssiService.GetAuthorizedAppVCByAddress(inputLogin.MailioAddress, global.MailioDID.String())
 	if vcErr != nil {
 		if vcErr == types.ErrNotFound {
-			ApiErrorf(c, http.StatusForbidden, "failed to login (valid signature, no valid VC)")
+			ApiErrorf(c, http.StatusNotFound, "user not found")
 			return
 		}
-		ApiErrorf(c, http.StatusInternalServerError, "failed to retrieve a VC")
+		ApiErrorf(c, http.StatusInternalServerError, "failed to retrieve a Verifiable Cred.")
 		return
 	}
 	isVCValid, vcValidateErr := vc.VerifyProof(global.PublicKey)
 	if vcValidateErr != nil {
-		ApiErrorf(c, http.StatusForbidden, "failed to validate VC")
+		ApiErrorf(c, http.StatusForbidden, "user not registered at this host (failed proof validation)")
 		return
 	}
 	if !isVCValid {
-		ApiErrorf(c, http.StatusForbidden, "failed to login (valid signature, no valid VC)")
+		ApiErrorf(c, http.StatusForbidden, "user not registered at this host (proof signature invalid)")
 		return
 	}
 

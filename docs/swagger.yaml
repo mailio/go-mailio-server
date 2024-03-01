@@ -166,6 +166,12 @@ definitions:
     properties:
       id:
         type: string
+      mtpStatusCodes:
+        items:
+          $ref: '#/definitions/types.MTPStatusCode'
+        type: array
+      type:
+        type: string
     type: object
   types.DIDCommMessage:
     properties:
@@ -204,10 +210,13 @@ definitions:
         enum:
         - message
         - handshake
-        - error
+        - delivery
         type: string
       next:
         description: in case forward message
+        type: string
+      plainBodyBase64:
+        description: the plain text message body, base64 encoded (optional)
         type: string
       pthid:
         description: parent thread identifier. Uniquely identifies the parent thread
@@ -229,11 +238,45 @@ definitions:
         description: 'a valid message type URI (MUST be: application/didcomm-encrypted+json)'
         type: string
     required:
-    - body
     - from
     - id
     - to
     - type
+    type: object
+  types.DIDCommRequest:
+    properties:
+      didCommMessage:
+        $ref: '#/definitions/types.DIDCommMessage'
+      signatureScheme:
+        enum:
+        - EdDSA_X25519
+        type: string
+      timestamp:
+        type: integer
+    required:
+    - didCommMessage
+    - signatureScheme
+    - timestamp
+    type: object
+  types.DIDCommSignedRequest:
+    properties:
+      cborPayloadBase64:
+        description: the payload that was signed, which is base64 encoded.
+        type: string
+      didCommRequest:
+        $ref: '#/definitions/types.DIDCommRequest'
+      senderDomain:
+        description: origin of the request (where DNS is published with Mailio public
+          key)
+        type: string
+      signatureBase64:
+        description: the signature of the payload, which is base64 encoded.
+        type: string
+    required:
+    - cborPayloadBase64
+    - didCommRequest
+    - senderDomain
+    - signatureBase64
     type: object
   types.EncryptedAttachment:
     properties:
@@ -555,6 +598,36 @@ definitions:
     properties:
       token:
         type: string
+    type: object
+  types.MTPStatusCode:
+    properties:
+      address:
+        description: Address of the recipient or sender
+        type: string
+      class:
+        description: Represents the class of the status code (2, 4, 5)
+        enum:
+        - 2
+        - 4
+        - 5
+        type: integer
+      description:
+        description: Human-readable message or description (optional)
+        type: string
+      detail:
+        description: Represents the detail of the status code
+        type: integer
+      subject:
+        description: Represents the subject category of the status code
+        minimum: 0
+        type: integer
+      timestamp:
+        description: Unix timestamp in milliseconds
+        type: integer
+    required:
+    - class
+    - detail
+    - subject
     type: object
   types.NonceResponse:
     properties:
@@ -1159,25 +1232,26 @@ paths:
       summary: Request handshake from this server (must be digitally signed)
       tags:
       - Mailio Transfer Protocol
-  /api/v1/mtp/message/{address}:
+  /api/v1/mtp/message:
     post:
       consumes:
       - application/json
-      description: Receive end-to-end encrypted message
+      description: Receive end-to-end encrypted message (signed by senders Mailio
+        server)
       parameters:
-      - description: didcomm-encrypted+json
+      - description: didcomm signed request
         in: body
         name: handshake
         required: true
         schema:
-          $ref: '#/definitions/types.DIDCommMessage'
+          $ref: '#/definitions/types.DIDCommSignedRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/types.DIDCommMessage'
+            $ref: '#/definitions/types.DIDCommApiResponse'
         "400":
           description: bad request
           schema:
@@ -1190,7 +1264,7 @@ paths:
           description: rate limit exceeded
           schema:
             $ref: '#/definitions/api.ApiError'
-      summary: Receive end-to-end encrypted message
+      summary: Receive end-to-end encrypted message (signed by senders Mailio server)
       tags:
       - Mailio Transfer Protocol
   /api/v1/nonce:
@@ -1214,6 +1288,39 @@ paths:
           schema:
             $ref: '#/definitions/api.ApiError'
       summary: Login and Registration challenge nonce
+      tags:
+      - User Account
+  /api/v1/nonce/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Deletes nonce if it exists
+      parameters:
+      - description: nonce id
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.NonceResponse'
+        "404":
+          description: not found
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "429":
+          description: rate limit exceeded
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/api.ApiError'
+      summary: Deletes nonce if it exists
       tags:
       - User Account
   /api/v1/register:

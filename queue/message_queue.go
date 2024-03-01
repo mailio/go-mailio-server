@@ -59,9 +59,13 @@ func (mqs *MessageQueue) ProcessTask(ctx context.Context, t *asynq.Task) error {
 func (msq *MessageQueue) SendMessage(userAddress string, message *types.DIDCommMessage) error {
 	global.Logger.Log("sending from", userAddress, "intent", message.Intent)
 
+	if message.Thid == "" {
+		message.Thid = message.ID // if there is no thid, use message id
+	}
 	// struct to store in local database
 	mailioMessage := types.MailioMessage{
 		ID:             message.ID,
+		From:           message.From,
 		DIDCommMessage: message,
 		Created:        time.Now().UnixMilli(),
 		Folder:         types.MailioFolderSent,
@@ -69,25 +73,12 @@ func (msq *MessageQueue) SendMessage(userAddress string, message *types.DIDCommM
 		MTPStatusCodes: []*types.MTPStatusCode{},
 	}
 
-	// validate sender DID
-	fromDID, sndrErr := msq.validateSenderDID(message, userAddress)
-	if sndrErr != nil {
-		// if sender cannot be validated, no retryies are allowed. Message fails permanently
-		return sndrErr
-	}
-
 	//validate recipients (checks if they are valid DIDs and if they are reachable via HTTP/HTTPS)
 	recipientDidMap := msq.validateRecipientDIDs(&mailioMessage, message)
 
-	// skip sender (but only once, since sending to one-self is allowed)
-	senderSkipped := false
+	// iterating over recipient map and sending messages
 	for _, didDoc := range recipientDidMap {
 		// didDoc ID has format e.g. did:mailio:0xabc, while from has web format (e.g. did:web:mail.io#0xabc)
-		if didDoc.ID.Value() == fromDID.Fragment() && !senderSkipped {
-			// sender skipping is allowed only once due to the original sender being able to decrypt their own message in the sent folder
-			senderSkipped = true
-			continue
-		}
 		// find a service endpoint for a recipient from DID Document
 		endpoint := msq.extractDIDMessageEndpoint(&didDoc)
 		if endpoint == "" {
@@ -122,21 +113,16 @@ func (msq *MessageQueue) SendMessage(userAddress string, message *types.DIDCommM
 
 // SendMessage sends encrypted DIDComm message to recipient
 func (msq *MessageQueue) ReceiveMessage(message *types.DIDCommMessage) error {
-	global.Logger.Log("intent", message.Intent)
+	global.Logger.Log("received msg intent", message.Intent, "id", message.ID, "from", message.From)
 	switch message.Intent {
-	case types.DIDCommIntentMessage:
+	case types.DIDCommIntentMessage, types.DIDCommIntentHandshake:
 		// handle message receive
 		msq.handleReceivedDIDCommMessage(message)
 	case types.DIDCommIntentDelivery:
 		// handle delivery receipt
 		msq.handleDIDCommDelivery(message)
-	case types.DIDCommIntentHandshake:
-		//TODO! retrieve requested handshake
-		//TODO! return Message error
 	default:
-		//TODO! return Message error
-		return fmt.Errorf("unexpected intent: %s", message.Intent)
-
+		return fmt.Errorf("unrecognized intent: %s, %w", message.Intent, asynq.SkipRetry)
 	}
 	return nil
 }

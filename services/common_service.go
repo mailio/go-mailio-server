@@ -41,6 +41,7 @@ func resolveDomain(domainRepo repository.Repository, domain string, forceDiscove
 	defer cancel()
 
 	host := domain
+	// schema added so that it can be parsed
 	if !strings.Contains(domain, "http") {
 		host = "http://" + host
 	}
@@ -49,13 +50,18 @@ func resolveDomain(domainRepo repository.Repository, domain string, forceDiscove
 		global.Logger.Log(pErr.Error(), "error while parsing host")
 		return nil, pErr
 	}
-	lookupHost, lErr := idna.Lookup.ToASCII(parsedHost.Host)
+	// in case of ports attached to host
+	idnaLookupHost := parsedHost.Host
+	if strings.Contains(idnaLookupHost, ":") {
+		idnaLookupHost = strings.Split(idnaLookupHost, ":")[0]
+	}
+	lookupHost, lErr := idna.Lookup.ToASCII(idnaLookupHost)
 	if lErr != nil {
 		global.Logger.Log(lErr.Error(), "error converting host to IDNA")
 		return nil, lErr
 	}
 
-	var domainObj *types.Domain
+	var domainObj types.Domain
 
 	if !forceDiscovery { // check local database
 
@@ -67,17 +73,18 @@ func resolveDomain(domainRepo repository.Repository, domain string, forceDiscove
 			}
 		} else {
 			// domain found in database
-			mErr := repository.MapToObject(response, domainObj)
+			mErr := repository.MapToObject(response, &domainObj)
 			if mErr != nil {
 				return nil, mErr
 			}
+
 			ageInMillis := time.Now().UnixMilli() - domainObj.Timestamp
 			if !domainObj.IsMailioServer && ageInMillis < AGE_OF_NON_MAILIO_DOMAINS_BEFORE_REFRESH {
-				return domainObj, nil
+				return &domainObj, nil
 			}
 			if ageInMillis < AGE_OF_MAILIO_DOMAINS_BEFORE_REFRESH {
 				// return only if the domain record is not older than AGE_OF_MAILIO_DOMAINS_BEFORE_REFRESH
-				return domainObj, nil
+				return &domainObj, nil
 			}
 		}
 	}
@@ -94,15 +101,15 @@ func resolveDomain(domainRepo repository.Repository, domain string, forceDiscove
 		MailioPublicKey: discovery.PublicKey,
 		Timestamp:       time.Now().UnixMilli(),
 	}
-	if domainObj != nil {
+	if domainObj.ID != "" {
 		updatedDomainObj.Rev = domainObj.Rev
 	}
 	// save to domains
-	sErr := domainRepo.Save(ctx, domain, domainObj)
+	sErr := domainRepo.Save(ctx, domain, updatedDomainObj)
 	if sErr != nil {
 		// ignore error (we'll get it next time)
 		level.Error(global.Logger).Log("msg", "error while saving domain", "err", sErr)
 	}
 
-	return domainObj, nil
+	return updatedDomainObj, nil
 }

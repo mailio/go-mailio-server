@@ -1,7 +1,9 @@
 package api
 
 import (
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"net/http"
 	"time"
 
@@ -33,9 +35,9 @@ func NewMessagingMTPApi(handshakeService *services.HandshakeService, mtpService 
 	}
 }
 
-// Receive end-to-end encrypted message
-// @Summary Receive end-to-end encrypted message
-// @Description Receive end-to-end encrypted message
+// Receive end-to-end encrypted message (signed by senders Mailio server)
+// @Summary Receive end-to-end encrypted message (signed by senders Mailio server)
+// @Description Receive end-to-end encrypted message (signed by senders Mailio server)
 // @Tags Mailio Transfer Protocol
 // @Accept json
 // @Produce json
@@ -98,11 +100,21 @@ func (ms *MessagingMTPApi) ReceiveMessage(c *gin.Context) {
 		return
 	}
 
+	// we sha256 the task ID from message ID in case of sending message to thy-self
+	// if sending to self, Unique check would fail in the queue
+	messageReceived, mrErr := util.CborEncode(input.DIDCommRequest)
+	if mrErr != nil {
+		global.Logger.Log(mrErr.Error(), "failed to cbor encode message")
+		ApiErrorf(c, http.StatusInternalServerError, "failed to create unique task id")
+		return
+	}
+	s := sha256.Sum256(messageReceived)
+	uniqueTaskId := hex.EncodeToString(s[:])
 	taskInfo, tqErr := ms.env.TaskClient.Enqueue(receiveTask,
-		asynq.MaxRetry(3),                                    // max number of times to retry the task
-		asynq.Timeout(60*time.Second),                        // max time to process the task
-		asynq.TaskID(input.DIDCommRequest.DIDCommMessage.ID), // unique task id
-		asynq.Unique(time.Second*10))                         // unique for 10 seconds (preventing multiple equal messages in the queue)
+		asynq.MaxRetry(3),             // max number of times to retry the task
+		asynq.Timeout(60*time.Second), // max time to process the task
+		asynq.TaskID(uniqueTaskId),    // unique task id
+		asynq.Unique(time.Second*10))  // unique for 10 seconds (preventing multiple equal messages in the queue)
 	if tqErr != nil {
 		global.Logger.Log(tqErr.Error(), "failed to send message")
 		ApiErrorf(c, http.StatusInternalServerError, "failed to send message")

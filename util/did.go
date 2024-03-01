@@ -5,6 +5,7 @@ import (
 	"github.com/mailio/go-mailio-server/global"
 )
 
+// TODO! rename the CreateMailioDIDDocument (although it's functionality is ok, but the name is a bit misleading)
 // CreateMailioDIDDocument creates a new mailio DID document (server DID)
 func CreateMailioDIDDocument() (*mailiodid.Document, error) {
 	mkMailio := &mailiodid.MailioKey{

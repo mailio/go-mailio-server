@@ -53,6 +53,7 @@ func ConfigDBIndexing(dbSelector *repository.CouchDBSelector, environment *types
 
 	icVcsErr := repository.CreateVcsCredentialSubjectIDIndex(vcsRepo)
 	hiErr := repository.CreateHandshakeIndex(handshakeRepo)
+	// aErr := repository.CreateHandshakeAddressIndex(handshakeRepo)
 	iErr := errors.Join(icVcsErr, hiErr)
 	if iErr != nil {
 		panic(iErr)

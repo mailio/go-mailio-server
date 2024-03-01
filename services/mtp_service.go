@@ -197,9 +197,9 @@ func (mtp *MtpService) ResolveDomain(domain string, forceDiscovery bool) (*types
 // GetServerDIDDocument retrieves the server DID document from the domain
 func (mtp *MtpService) GetServerDIDDocument(domain string) (*did.Document, error) {
 
-	senderServerDIDUrl := "https://" + domain + ".well-known/did.json"
+	senderServerDIDUrl := "https://" + domain + "/.well-known/did.json"
 	if strings.Contains(domain, "localhost") || strings.Contains(domain, "127.0.0.1") {
-		senderServerDIDUrl = "http://" + domain + ".well-known/did.json"
+		senderServerDIDUrl = "http://" + domain + "/.well-known/did.json"
 	}
 	var serverDIDDocument did.Document
 	serverResponse, srvErr := mtp.restyClient.R().SetResult(&serverDIDDocument).Get(senderServerDIDUrl)

@@ -6,12 +6,23 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/hibiken/asynq"
 	"github.com/mailio/go-mailio-did/did"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/types"
 	"github.com/mailio/go-mailio-server/util"
 )
+
+func (msq *MessageQueue) selectMailFolder(fromDID did.DID, recipientAddress string) (string, error) {
+	// if message to self, then it goes to inbox
+	if fromDID.Fragment() == recipientAddress {
+		return types.MailioFolderInbox, nil
+	}
+	//TODO: GET handshake by fromDID address or scrypt email address
+	// TODO! implement this
+	return types.MailioFolderOther, nil
+}
 
 // handleReceivedDIDCommMessage handles received DIDComm messages
 func (msq *MessageQueue) handleReceivedDIDCommMessage(message *types.DIDCommMessage) error {
@@ -25,18 +36,13 @@ func (msq *MessageQueue) handleReceivedDIDCommMessage(message *types.DIDCommMess
 	// get the senders DID and get the service endpoint where message was sent from
 	fromDID, fdErr := did.ParseDID(message.From)
 	if fdErr != nil {
-		//TODO: the sender cannot be validated, no retryies are allowed. Message fails permanently
+		//the sender cannot be validated, no retryies are allowed. Message fails permanently
 		global.Logger.Log(fdErr.Error(), "failed to parse sender DID", message.From)
 		return fmt.Errorf("failed to parse sender DID: %v: %w", fdErr, asynq.SkipRetry)
 	}
 
 	domain := fromDID.Value()
-	resolvedDomain, rdErr := msq.mtpService.ResolveDomain(domain, false)
-	if rdErr != nil {
-		global.Logger.Log(rdErr.Error(), "failed retrieving Mailio DNS record", domain)
-		return fmt.Errorf("failed retrieving Mailio DNS record: %v: %w", rdErr, asynq.SkipRetry)
-	}
-	serverDID, didErr := msq.mtpService.GetServerDIDDocument(resolvedDomain.Name)
+	serverDID, didErr := msq.mtpService.GetServerDIDDocument(domain)
 	if didErr != nil {
 		global.Logger.Log(didErr.Error(), "failed retrieving Mailio DID document", domain)
 		return fmt.Errorf("failed retrieving Mailio DID document: %v: %w", didErr, asynq.SkipRetry)
@@ -46,14 +52,10 @@ func (msq *MessageQueue) handleReceivedDIDCommMessage(message *types.DIDCommMess
 		// Bad destination address syntax
 		return fmt.Errorf("unable to route message to %s for %s: %w", endpoint, serverDID.ID.String(), asynq.SkipRetry)
 	}
-	thisServerDIDDoc, err := util.CreateMailioDIDDocument()
-	if err != nil {
-		global.Logger.Log(err.Error(), "failed to create Mailio DID document")
-		return fmt.Errorf("failed to create Mailio DID document: %v: %w", err, asynq.SkipRetry)
-	}
 
 	// collect local recipients of the message
 	localRecipientsAddresses := []string{}
+	addedMap := map[string]string{} // keeping track of added recipients
 	for _, recipient := range message.EncryptedBody.Recipients {
 		recAddress := recipient.Header.Kid
 		parsedDid, pErr := did.ParseDID(recAddress)
@@ -63,7 +65,10 @@ func (msq *MessageQueue) handleReceivedDIDCommMessage(message *types.DIDCommMess
 			continue
 		}
 		if parsedDid.Value() == global.Conf.Mailio.Domain {
-			localRecipientsAddresses = append(localRecipientsAddresses, parsedDid.Fragment())
+			if _, ok := addedMap[parsedDid.Fragment()]; !ok { // if not yet added
+				localRecipientsAddresses = append(localRecipientsAddresses, parsedDid.Fragment())
+				addedMap[parsedDid.Fragment()] = parsedDid.Fragment()
+			}
 		}
 	}
 
@@ -75,33 +80,56 @@ func (msq *MessageQueue) handleReceivedDIDCommMessage(message *types.DIDCommMess
 
 	for _, recAddress := range localRecipientsAddresses {
 		// store message in database (received folder of the recipient)
-		mailioMessage, err := msq.userService.GetMessage(recAddress, message.ID)
-		if err != nil && err != types.ErrNotFound {
-			global.Logger.Log(err.Error(), "failed to get message", recAddress)
-			// send error message to sender
-			deliveryStatuses = append(deliveryStatuses, types.NewMTPStatusCode(4, 5, 1, fmt.Sprintf("duplicate message ID %s", message.ID), types.WithRecAddress(recAddress)))
-			continue
-		}
-		if mailioMessage == nil {
-			mailioMessage = &types.MailioMessage{
-				BaseDocument: types.BaseDocument{
-					ID: message.ID,
-				},
-				ID:             message.ID,
-				DIDCommMessage: message,
-				Folder:         types.MailioFolderInbox, // TODO!: based on the recipient's handshakes
-				Created:        time.Now().UnixMilli(),
+		// GetMessage to avoid collisions in IDs
+		// _, err := msq.userService.GetMessage(recAddress, message.ID)
+		// if (err != nil && err != types.ErrNotFound) || err == nil {
+		// 	// message must be not found
+		// 	if err != nil {
+		// 		global.Logger.Log(err.Error(), "failed to get message", recAddress)
+		// 	} else {
+		// 		global.Logger.Log("duplicate message ID", message.ID, "for", recAddress)
+		// 	}
+		// 	// send error message to sender
+		// 	deliveryStatuses = append(deliveryStatuses, types.NewMTPStatusCode(4, 5, 1, fmt.Sprintf("duplicate message ID %s", message.ID), types.WithRecAddress(recAddress)))
+		// 	continue
+		// }
+		// TODO!: based on the recipient's handshakes and statistics
+		folder, fErr := msq.selectMailFolder(fromDID, recAddress)
+		if fErr != nil {
+			if fErr == types.ErrHandshakeRevoked {
+				deliveryStatuses = append(deliveryStatuses, types.NewMTPStatusCode(5, 8, 2, fmt.Sprintf("handshake revoked for %s", recAddress), types.WithRecAddress(recAddress)))
+				continue
 			}
 		}
-		mailioMessage.MTPStatusCodes = append(mailioMessage.MTPStatusCodes, types.NewMTPStatusCode(2, 0, 0, "successfully received message"))
+		// in case request is a handshake request
+		if message.Intent == types.DIDCommIntentHandshake {
+			folder = types.MailioFolderHandshake
+		}
+
+		isReplied := false
+		if message.Pthid != "" {
+			isReplied = true
+		}
+		uniqueID := uuid.NewString()
+		mailioMessage := &types.MailioMessage{
+			ID:             uniqueID,
+			DIDCommMessage: message,
+			Folder:         folder,
+			IsRead:         false,
+			IsReplied:      isReplied,
+			From:           message.From,
+			Created:        time.Now().UnixMilli(),
+		}
+
+		mailioMessage.MTPStatusCodes = append(mailioMessage.MTPStatusCodes, types.NewMTPStatusCode(2, 0, 0, "successfully received message", types.WithRecAddress(recAddress)))
 
 		_, sErr := msq.userService.SaveMessage(recAddress, mailioMessage)
 		if sErr != nil {
 			global.Logger.Log(sErr.Error(), "failed to save message", recAddress)
 			// send error message to sender
-			deliveryStatuses = append(deliveryStatuses, types.NewMTPStatusCode(5, 4, 4, fmt.Sprintf("failed to save message for %s", recAddress), types.WithRecAddress(recAddress)))
+			deliveryStatuses = append(deliveryStatuses, types.NewMTPStatusCode(5, 4, 4, fmt.Sprintf("failed to save message for %s", recAddress), types.WithRecAddress(fromDID.String())))
 		} else {
-			deliveryStatuses = append(deliveryStatuses, types.NewMTPStatusCode(2, 0, 0, fmt.Sprintf("message received by %s", recAddress), types.WithRecAddress(recAddress)))
+			deliveryStatuses = append(deliveryStatuses, types.NewMTPStatusCode(2, 0, 0, fmt.Sprintf("message to %s", recAddress), types.WithRecAddress(fromDID.String())))
 		}
 	}
 	//send delivery message to sender
@@ -112,6 +140,11 @@ func (msq *MessageQueue) handleReceivedDIDCommMessage(message *types.DIDCommMess
 	if delErr != nil {
 		global.Logger.Log(delErr.Error(), "failed to marshal delivery message")
 		return fmt.Errorf("failed to marshal delivery message: %v: %w", delErr, asynq.SkipRetry)
+	}
+	thisServerDIDDoc, err := util.CreateMailioDIDDocument()
+	if err != nil {
+		global.Logger.Log(err.Error(), "failed to create Mailio DID document")
+		return fmt.Errorf("failed to create Mailio DID document: %v: %w", err, asynq.SkipRetry)
 	}
 	didMessage := &types.DIDCommMessage{
 		ID:              message.ID,
@@ -158,10 +191,10 @@ func (msq *MessageQueue) handleDIDCommDelivery(message *types.DIDCommMessage) er
 			continue
 		}
 		address := parsedDid.Fragment()
-		// find previously sent message ID
+		// must find previously sent message ID (if not, delivery status is ignored)
 		mailioMessage, err := msq.userService.GetMessage(address, message.ID)
 		if err != nil {
-			global.Logger.Log(err.Error(), "failed to get message", address)
+			global.Logger.Log(err.Error(), "delivery has no matching message id", message.ID, "mailio address", address)
 			continue
 		}
 		mailioMessage.MTPStatusCodes = append(mailioMessage.MTPStatusCodes, plainBody.StatusCodes...)
