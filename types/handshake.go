@@ -62,7 +62,7 @@ type HandshakeContent struct {
 	SignatureBase64      string                `json:"signatureBase64,omitempty"` // owners signature of the handshake
 	Type                 string                `json:"type,omitempty"`            // handshake type
 	SignatureScheme      string                `json:"signatureScheme"`           // handshake signature scheme
-	Created              int64                 `json:"timestamp"`                 // timestamp of the handshake
+	Created              float64               `json:"created"`                   // timestamp of the handshake
 }
 
 // One of the emailHash or address MUST be present
@@ -78,6 +78,7 @@ type StoredHandshake struct {
 	OwnerAddress      string           `json:"ownerAddress"` // Mailio address of the owner of the handshake
 	SignatureBase64   string           `json:"signatureBase64"`
 	CborPayloadBase64 string           `json:"cborPayloadBase64"`
+	Timestamp         int64            `json:"timestamp"` // timestamp of the handshake (created or updated)
 }
 
 type HandshakeLink struct {

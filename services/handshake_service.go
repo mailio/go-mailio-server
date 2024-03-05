@@ -20,10 +20,9 @@ import (
 type HandshakeService struct {
 	handshakeRepo repository.Repository
 	userRepo      repository.Repository
-	env           *types.Environment
 }
 
-func NewHandshakeService(dbSelector repository.DBSelector, environment *types.Environment) *HandshakeService {
+func NewHandshakeService(dbSelector repository.DBSelector) *HandshakeService {
 	handshakeRepo, err := dbSelector.ChooseDB(repository.Handshake)
 	if err != nil {
 		level.Error(global.Logger).Log("msg", "error while choosing db", "err", err)
@@ -34,7 +33,7 @@ func NewHandshakeService(dbSelector repository.DBSelector, environment *types.En
 		level.Error(global.Logger).Log("msg", "error while choosing db", "err", err)
 		panic(err)
 	}
-	return &HandshakeService{handshakeRepo: handshakeRepo, userRepo: userRepo, env: environment}
+	return &HandshakeService{handshakeRepo: handshakeRepo, userRepo: userRepo}
 }
 
 // Save a handshake into a database
@@ -76,7 +75,8 @@ func (hs *HandshakeService) Save(handshake *types.Handshake, userPublicKeyEd2551
 	// verify handshakes digital signature
 	isValid, vErr := util.VerifyHandshake(handshake, userPublicKeyEd25519Base64)
 	if vErr != nil {
-		return vErr
+		global.Logger.Log(vErr.Error(), "failed to verify handshake", "owner", ownerMailioAddr, "sender", senderAddress)
+		return types.ErrSignatureInvalid
 	}
 
 	if !isValid {
@@ -96,6 +96,7 @@ func (hs *HandshakeService) Save(handshake *types.Handshake, userPublicKeyEd2551
 		OwnerAddress:      ownerMailioAddr,
 		SignatureBase64:   handshake.SignatureBase64,
 		CborPayloadBase64: handshake.CborPayloadBase64,
+		Timestamp:         time.Now().UTC().UnixMilli(),
 	}
 	if existingHs != nil {
 		storedHandshake.Rev = existingHs.Rev
@@ -114,9 +115,9 @@ func (hs *HandshakeService) ListHandshakes(address string, bookmark string, limi
 		"selector": map[string]interface{}{
 			"ownerAddress": address,
 		},
-		"use_index": []string{"ownerAddressDesign", "ownerAddress-index"},
+		"use_index": []string{"ownerAddress-index"},
 		"limit":     limit,
-		"sort":      []map[string]string{{"created": "desc"}},
+		"sort":      []map[string]string{{"timestamp": "desc"}},
 	}
 	if bookmark != "" {
 		query["bookmark"] = bookmark
@@ -136,13 +137,8 @@ func (hs *HandshakeService) ListHandshakes(address string, bookmark string, limi
 	}
 
 	handshakes := []interface{}{}
-	if rows, ok := respObj["docs"]; ok {
-		for _, row := range rows.([]interface{}) {
-			r := row.(map[string]interface{})
-			if value, ok := r["value"]; ok {
-				handshakes = append(handshakes, value)
-			}
-		}
+	if docs, ok := respObj["docs"]; ok {
+		handshakes = docs.([]interface{})
 	}
 	results := &types.PagingResults{
 		Docs: handshakes,

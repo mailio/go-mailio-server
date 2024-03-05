@@ -48,7 +48,7 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 	userService := services.NewUserService(dbSelector)
 	nonceService := services.NewNonceService(dbSelector)
 	ssiService := services.NewSelfSovereignService(dbSelector)
-	handshakeService := services.NewHandshakeService(dbSelector, environment)
+	handshakeService := services.NewHandshakeService(dbSelector)
 	mtpService := services.NewMtpService(dbSelector)
 
 	// API definitions

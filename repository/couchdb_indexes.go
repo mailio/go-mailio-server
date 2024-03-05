@@ -58,7 +58,7 @@ func CreateHandshakeIndex(handshakeRepo Repository) error {
 	// create index on database
 	addressIndex := map[string]interface{}{
 		"index": map[string]interface{}{
-			"fields": []map[string]interface{}{{"ownerAddress": "desc"}, {"created": "desc"}},
+			"fields": []map[string]interface{}{{"ownerAddress": "desc"}, {"timestamp": "desc"}},
 		},
 		"name": "ownerAddress-index",
 		"type": "json",

@@ -40,6 +40,15 @@ type CouchDBResponse struct {
 	OK  bool   `json:"ok,omitempty"`
 }
 
+type CouchDBCountDistinctFromResponse struct {
+	Rows []*CouchDBCountDistinctFromRow `json:"rows"`
+}
+
+type CouchDBCountDistinctFromRow struct {
+	Key   []string `json:"key"`
+	Value int      `json:"value"`
+}
+
 // // Attachment represents a file attachment to a document.
 // type Attachment struct {
 // 	Filename        string        `json:"-"`

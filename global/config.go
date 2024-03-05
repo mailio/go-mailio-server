@@ -51,6 +51,7 @@ type MailioConfig struct {
 	ServerHanshake     ServerHandshakeConfig `yaml:"serverHandshake"`
 	AuthenticationPath string                `yaml:"authenticationPath"`
 	MessagingPath      string                `yaml:"messagingPath"`
+	ReadVsReceived     int                   `yaml:"readVsReceived"`
 }
 
 type PrometheusConfig struct {

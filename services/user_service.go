@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"net/url"
 	"strconv"
 	"time"
 
@@ -186,4 +187,67 @@ func (us *UserService) SaveMessage(userAddress string, mailioMessage *types.Mail
 	}
 
 	return mailioMessage, nil
+}
+
+// counts the number of sent messages by user between two timestamps
+func (us *UserService) CountNumberOfSentMessages(address string, from int64, to int64) (*types.CouchDBCountDistinctFromResponse, error) {
+	viewPath := "_design/count-from/_view/count-from-address"
+	hexUser := "userdb-" + hex.EncodeToString([]byte(address))
+	query := fmt.Sprintf("startkey=['sent', '%s', %d]&endkey=['sent', '%s', %d]&group_level=1", address, from, address, to)
+	urlEncodedQuery := url.QueryEscape(query)
+
+	url := fmt.Sprintf("%s/%s/%s", hexUser, viewPath, urlEncodedQuery)
+
+	var couchError types.CouchDBError
+	var response types.CouchDBCountDistinctFromResponse
+
+	httpResp, httpErr := us.restyClient.R().SetResult(&response).SetError(&couchError).Get(url)
+	if httpErr != nil {
+		global.Logger.Log(httpErr.Error(), "failed to send message", hexUser)
+		return nil, httpErr
+	}
+	if httpResp.IsError() {
+		global.Logger.Log(httpResp.String(), "failed to send message", hexUser, couchError.Error, couchError.Reason)
+		return nil, fmt.Errorf("code: %s, reason: %s", couchError.Error, couchError.Reason)
+	}
+	return &response, nil
+}
+
+// address is the user's mailio address, from is a message sender (it can be Mailio address or ordinary email address)
+func (us *UserService) CountNumberOfReceivedMessages(address string, from string, isRead bool) (*types.CouchDBCountDistinctFromResponse, error) {
+	// query for couchdb statistics
+
+	//_design/count-from/_view/count-from-address (how many messages are received from user)
+	//_design/count-from/_view/count-from-address-read (how many messages are read)
+	// startkey=["inbox", "0x1869cc058092317800727afa25981bfd2a3d0969", 0]&endkey=["inbox", "0x1869cc058092317800727afa25981bfd2a3d0969", \u0000]&group_level=1
+
+	//expected response (for both views):
+	/**
+	{"rows":[
+		{"key":["inbox"],"value":4},
+		{"key":["sent"],"value":4}
+	]}
+	**/
+	viewPath := "_design/count-from/_view/count-from-address"
+	if isRead {
+		viewPath = "_design/count-from/_view/count-from-address-read"
+	}
+	hexUser := "userdb-" + hex.EncodeToString([]byte(address))
+	query := fmt.Sprintf("startkey=['a', '%s', 0]&endkey=['\u0000', '%s', \u0000]&group_level=1", from, from)
+	urlEncodedQuery := url.QueryEscape(query)
+	url := fmt.Sprintf("%s/%s/%s", hexUser, viewPath, urlEncodedQuery)
+
+	var couchError types.CouchDBError
+	var response types.CouchDBCountDistinctFromResponse
+
+	httpResp, httpErr := us.restyClient.R().SetResult(&response).SetError(&couchError).Get(url)
+	if httpErr != nil {
+		global.Logger.Log(httpErr.Error(), "failed to send message", hexUser)
+		return nil, httpErr
+	}
+	if httpResp.IsError() {
+		global.Logger.Log(httpResp.String(), "failed to send message", hexUser, couchError.Error, couchError.Reason)
+		return nil, fmt.Errorf("code: %s, reason: %s", couchError.Error, couchError.Reason)
+	}
+	return &response, nil
 }

@@ -15,20 +15,22 @@ import (
 )
 
 type MessageQueue struct {
-	ssiService  *services.SelfSovereignService
-	userService *services.UserService
-	mtpService  *services.MtpService
-	restyClient *resty.Client
+	ssiService       *services.SelfSovereignService
+	userService      *services.UserService
+	mtpService       *services.MtpService
+	handshakeService *services.HandshakeService
+	restyClient      *resty.Client
 }
 
-func NewMessageQueue(dbSelector *repository.CouchDBSelector) *MessageQueue {
+func NewMessageQueue(dbSelector *repository.CouchDBSelector, env *types.Environment) *MessageQueue {
 
 	rcClient := resty.New()
 	ssiService := services.NewSelfSovereignService(dbSelector)
 	userService := services.NewUserService(dbSelector)
 	mtpService := services.NewMtpService(dbSelector)
+	handshakeService := services.NewHandshakeService(dbSelector)
 
-	return &MessageQueue{ssiService: ssiService, userService: userService, mtpService: mtpService, restyClient: rcClient}
+	return &MessageQueue{ssiService: ssiService, userService: userService, mtpService: mtpService, handshakeService: handshakeService, restyClient: rcClient}
 }
 
 func (mqs *MessageQueue) ProcessTask(ctx context.Context, t *asynq.Task) error {

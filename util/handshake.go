@@ -86,7 +86,7 @@ func ServerSideHandshake(publicServerKey ed25519.PublicKey, privateServerKey ed2
 			Level:                types.HANDSHAKE_LEVEL_NONE,
 			OwnerPublicKeyBase64: base64.StdEncoding.EncodeToString(publicServerKey),
 			OwnerAddressHex:      addr,
-			Created:              time.Now().UTC().UnixMilli(),
+			Created:              float64(time.Now().UTC().UnixMilli()),
 			SignatureScheme:      types.HANDSHAKE_SIGNATURE_SCHEME_EdDSA_X25519,
 		},
 	}
