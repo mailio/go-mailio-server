@@ -2,9 +2,11 @@ package repository
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/go-resty/resty/v2"
+	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/types"
 )
 
@@ -26,42 +28,95 @@ func GetDesignDocumentByID(id string, dbRepo Repository) (*types.DesignDocument,
 	return &existingDoc, nil
 }
 
-// Map-Reduce methods for couchdb (called designs)
-func CreateDesign_DeleteExpiredRecordsByCreatedDate(dbRepo Repository, olderThanMinutes int64) {
-	c := dbRepo.GetClient().(*resty.Client)
-	existing, eErr := c.R().Head(dbRepo.GetDBName() + "/_design/nonce/_view/NonceByCreated")
+func createDesignAndView(databaseName string, designName string, viewName string, mapFunction string, reduceFunction string) error {
+	client := resty.New().SetTimeout(time.Second*10).SetBasicAuth(global.Conf.CouchDB.Username, global.Conf.CouchDB.Password)
+
+	// check if design document already exists
+	host := ""
+	scheme := global.Conf.CouchDB.Scheme
+	if scheme == "" {
+		scheme = "http"
+	}
+	if global.Conf.CouchDB.Port != 0 {
+		host = fmt.Sprintf("%s://%s:%d", scheme, global.Conf.CouchDB.Host, global.Conf.CouchDB.Port)
+	} else {
+		host = fmt.Sprintf("%s://%s", scheme, global.Conf.CouchDB.Host)
+	}
+	url := fmt.Sprintf("%s/%s/_design/%s/_view/%s", host, databaseName, designName, viewName)
+	existingResponse, eErr := client.R().Head(url)
 	if eErr != nil {
 		panic(eErr)
 	}
-	if existing.IsError() {
-		if existing.StatusCode() != 404 {
-			panic(existing.Error())
+	if existingResponse.IsError() {
+		if existingResponse.StatusCode() != 404 {
+			panic(fmt.Sprintf("filed to create design %s with view %s, error: %s", designName, viewName, existingResponse.Error()))
 		}
 	}
-	if existing.StatusCode() == 200 {
-		return // view already exists
+	if existingResponse.StatusCode() == 200 {
+		return nil // view already exists
 	}
+
 	// create a design document and a view
 	ddoc := &types.DesignDocument{
 		Language: "javascript",
 		Views: map[string]types.MapFunction{
-			"NonceByCreated": {
-				Map: `function(doc) 
-					{ 
-						if (doc.created) {
-							emit(doc.created, doc._rev); 
-						}
-					}`,
+			viewName: {
+				Map: mapFunction,
 			},
 		},
 	}
-
-	client := dbRepo.GetClient().(*resty.Client)
-	resp, err := client.R().SetBody(ddoc).Put(dbRepo.GetDBName() + "/_design/nonce")
+	if reduceFunction != "" {
+		temp := ddoc.Views[viewName]
+		temp.Reduce = reduceFunction
+		ddoc.Views[viewName] = temp
+	}
+	url = fmt.Sprintf("%s/%s/_design/%s", host, databaseName, designName)
+	resp, err := client.R().SetBody(ddoc).Put(url)
 	if err != nil {
 		panic(err)
 	}
 	if resp.IsError() {
 		panic(resp.Error())
 	}
+
+	return nil
+}
+
+// created for nonces to be deleted after a certain time (indexed by time)
+func CreateDesign_DeleteExpiredRecordsByCreatedDate(databaseName string, designName string, viewName string) error {
+	mapFunction := `function(doc)
+						{
+							if (doc.created) {
+								emit(doc.created, doc._rev);
+							}
+						}`
+	return createDesignAndView(databaseName, designName, viewName, mapFunction, "")
+}
+
+// created for each user database
+func CreateDesign_CountFromAddress(databaseName string, designName string, viewName string) error {
+	mapFunction := `function(doc)
+						{
+							if (doc.folder && doc.from && doc.created) {
+								var splitted = doc.from.split("#");
+								var address = splitted[splitted.length-1];
+								emit([address,doc.folder,doc.created], 1);
+							}
+						}`
+	return createDesignAndView(databaseName, designName, viewName, mapFunction, "_approx_count_distinct")
+}
+
+// created for each user database
+func CreateDesign_CountFromAddressRead(databaseName string, designName string, viewName string) error {
+	mapFunction := `function(doc)
+						{
+							if (doc.folder && doc.from && doc.created) {
+								if (doc.isRead) {
+									var splitted = doc.from.split("#");
+									var address = splitted[splitted.length-1];
+									emit([address,doc.folder,doc.created], 1);
+								}
+							}
+						}`
+	return createDesignAndView(databaseName, designName, viewName, mapFunction, "_approx_count_distinct")
 }

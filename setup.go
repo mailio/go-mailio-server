@@ -46,9 +46,8 @@ func ConfigDBIndexing(dbSelector *repository.CouchDBSelector, environment *types
 	// Create INDEXES
 	vcsRepo, vscErr := dbSelector.ChooseDB(repository.VCS)
 	handshakeRepo, hshErr := dbSelector.ChooseDB(repository.Handshake)
-	nonceRepo, nErr := dbSelector.ChooseDB(repository.Nonce)
-	if errors.Join(vscErr, hshErr, nErr) != nil {
-		panic(errors.Join(vscErr, hshErr, nErr))
+	if errors.Join(vscErr, hshErr) != nil {
+		panic(errors.Join(vscErr, hshErr))
 	}
 
 	icVcsErr := repository.CreateVcsCredentialSubjectIDIndex(vcsRepo)
@@ -61,9 +60,10 @@ func ConfigDBIndexing(dbSelector *repository.CouchDBSelector, environment *types
 
 	// Create DESIGN DOCUMENTS
 	// create a design document to return all documents older than N minutes
-	repository.CreateDesign_DeleteExpiredRecordsByCreatedDate(nonceRepo, 5)
+	repository.CreateDesign_DeleteExpiredRecordsByCreatedDate(repository.Nonce, "nonce", "old")
 
 	// cron jobs
 	environment.Cron.AddFunc("@every 5m", nonceService.RemoveExpiredNonces) // remove expired tokens every 5 minutes
 	environment.Cron.Start()
+	go nonceService.RemoveExpiredNonces() // run once on startup
 }

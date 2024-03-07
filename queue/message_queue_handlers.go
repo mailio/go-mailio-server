@@ -77,12 +77,14 @@ func (msq *MessageQueue) selectMailFolder(fromDID did.DID, recipientAddress stri
 	}
 
 	// 4. check the read vs received ratio
-	totalMessagesReceived, err := msq.userService.CountNumberOfReceivedMessages(recipientAddress, fromDID.Fragment(), false)
+	fromTimestamp := int64(0)
+	toTimestamp := time.Now().UnixMilli()
+	totalMessagesReceived, err := msq.userService.CountNumberOfReceivedMessages(recipientAddress, fromDID.Fragment(), false, fromTimestamp, toTimestamp)
 	if err != nil {
 		global.Logger.Log(err.Error(), "failed to count number of received messages", recipientAddress, fromDID.Fragment())
 		return types.MailioFolderInbox, err
 	}
-	totalMessagesRead, err := msq.userService.CountNumberOfReceivedMessages(recipientAddress, fromDID.Fragment(), true)
+	totalMessagesRead, err := msq.userService.CountNumberOfReceivedMessages(recipientAddress, fromDID.Fragment(), true, fromTimestamp, toTimestamp)
 	if err != nil {
 		global.Logger.Log(err.Error(), "failed to count number of read messages", recipientAddress, fromDID.Fragment())
 		return types.MailioFolderInbox, err

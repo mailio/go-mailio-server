@@ -84,9 +84,12 @@ func (us *UserService) CreateUser(user *types.User, databasePassword string) (*t
 		}
 	}
 
+	// create required indexes
 	iErr := repository.CreateUserDatabaseFolderCreatedIndex(userRepo, hexUser)
-	if iErr != nil {
-		return nil, iErr
+	aErr := repository.CreateDesign_CountFromAddress(hexUser, "count", "from-address")
+	arErr := repository.CreateDesign_CountFromAddressRead(hexUser, "count-read", "from-address-read")
+	if errors.Join(iErr, aErr, arErr) != nil {
+		return nil, errors.Join(iErr, aErr, arErr)
 	}
 
 	return user, nil
@@ -191,12 +194,16 @@ func (us *UserService) SaveMessage(userAddress string, mailioMessage *types.Mail
 
 // counts the number of sent messages by user between two timestamps
 func (us *UserService) CountNumberOfSentMessages(address string, from int64, to int64) (*types.CouchDBCountDistinctFromResponse, error) {
-	viewPath := "_design/count-from/_view/count-from-address"
+	viewPath := "_design/count/_view/from-address"
 	hexUser := "userdb-" + hex.EncodeToString([]byte(address))
-	query := fmt.Sprintf("startkey=['sent', '%s', %d]&endkey=['sent', '%s', %d]&group_level=1", address, from, address, to)
-	urlEncodedQuery := url.QueryEscape(query)
 
-	url := fmt.Sprintf("%s/%s/%s", hexUser, viewPath, urlEncodedQuery)
+	// format: address, folder, timestamp
+	params := url.Values{}
+	params.Add("startkey", fmt.Sprintf("[\"%s\",\"%s\",%d]", address, "sent", from))
+	params.Add("endkey", fmt.Sprintf("[\"%s\",\"%s\",%d]", address, "sent", to))
+	params.Add("group_level", "2")
+
+	url := fmt.Sprintf("%s/%s?%s", hexUser, viewPath, params.Encode())
 
 	var couchError types.CouchDBError
 	var response types.CouchDBCountDistinctFromResponse
@@ -214,7 +221,7 @@ func (us *UserService) CountNumberOfSentMessages(address string, from int64, to 
 }
 
 // address is the user's mailio address, from is a message sender (it can be Mailio address or ordinary email address)
-func (us *UserService) CountNumberOfReceivedMessages(address string, from string, isRead bool) (*types.CouchDBCountDistinctFromResponse, error) {
+func (us *UserService) CountNumberOfReceivedMessages(address string, from string, isRead bool, fromTimestamp int64, toTimestamp int64) (*types.CouchDBCountDistinctFromResponse, error) {
 	// query for couchdb statistics
 
 	//_design/count-from/_view/count-from-address (how many messages are received from user)
@@ -228,14 +235,18 @@ func (us *UserService) CountNumberOfReceivedMessages(address string, from string
 		{"key":["sent"],"value":4}
 	]}
 	**/
-	viewPath := "_design/count-from/_view/count-from-address"
+	viewPath := "_design/count/_view/from-address"
 	if isRead {
-		viewPath = "_design/count-from/_view/count-from-address-read"
+		viewPath = "_design/count-read/_view/from-address-read"
 	}
 	hexUser := "userdb-" + hex.EncodeToString([]byte(address))
-	query := fmt.Sprintf("startkey=['a', '%s', 0]&endkey=['\u0000', '%s', \u0000]&group_level=1", from, from)
-	urlEncodedQuery := url.QueryEscape(query)
-	url := fmt.Sprintf("%s/%s/%s", hexUser, viewPath, urlEncodedQuery)
+
+	params := url.Values{}
+	params.Add("startkey", fmt.Sprintf("[\"%s\",\"%s\",%d]", address, "", fromTimestamp))
+	params.Add("endkey", fmt.Sprintf("[\"%s\",\"%s\", %d]", address, "\uffff", toTimestamp))
+	params.Add("group_level", "2")
+
+	url := fmt.Sprintf("%s/%s?%s", hexUser, viewPath, params.Encode())
 
 	var couchError types.CouchDBError
 	var response types.CouchDBCountDistinctFromResponse
