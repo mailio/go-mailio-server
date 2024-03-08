@@ -199,6 +199,8 @@ func (ua *UserAccountApi) Login(c *gin.Context) {
 		return
 	}
 
+	//TODO!: check if user is disabled!
+
 	// Sign the payload with servers private key.
 	token, err := interceptors.GenerateJWSToken(global.PrivateKey, mk.DID(), inputLogin.Nonce, inputLogin.Ed25519SigningPublicKeyBase64)
 	if err != nil {

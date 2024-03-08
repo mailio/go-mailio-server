@@ -17,20 +17,18 @@ import (
 )
 
 type MessagingApi struct {
-	handshakeService *services.HandshakeService
-	mtpService       *services.MtpService
-	validate         *validator.Validate
-	env              *types.Environment
+	ssiService *services.SelfSovereignService
+	validate   *validator.Validate
+	env        *types.Environment
 }
 
-func NewMessagingApi(handshakeService *services.HandshakeService, mtpService *services.MtpService, env *types.Environment) *MessagingApi {
+func NewMessagingApi(ssiService *services.SelfSovereignService, env *types.Environment) *MessagingApi {
 	validate := validator.New()
 
 	return &MessagingApi{
-		handshakeService: handshakeService,
-		mtpService:       mtpService,
-		validate:         validate,
-		env:              env,
+		validate:   validate,
+		ssiService: ssiService,
+		env:        env,
 	}
 }
 
@@ -44,7 +42,7 @@ func NewMessagingApi(handshakeService *services.HandshakeService, mtpService *se
 // @Param handshake body types.DIDCommMessage true "didcomm-encrypted+json"
 // @Success 202 {object} types.DIDCommApiResponse
 // @Failure 400 {object} api.ApiError "bad request"
-// @Failure 401 {object} api.ApiError "invalid signature"
+// @Failure 401 {object} api.ApiError "invalid signature or unauthorized to send messages"
 // @Failure 429 {object} api.ApiError "rate limit exceeded"
 // @Router /api/v1/didmessage [post]
 func (ma *MessagingApi) SendDIDMessage(c *gin.Context) {
@@ -70,6 +68,13 @@ func (ma *MessagingApi) SendDIDMessage(c *gin.Context) {
 	if err != nil {
 		msg := util.ValidationErrorToMessage(err)
 		ApiErrorf(c, http.StatusBadRequest, msg)
+		return
+	}
+
+	// force the from field to be the subject address
+	from := fmt.Sprintf("did:web:%s#%s", global.Conf.Mailio.Domain, subjectAddress.(string))
+	if input.From != from {
+		ApiErrorf(c, http.StatusUnauthorized, "unathorized")
 		return
 	}
 	input.ID = uuid.New().String()

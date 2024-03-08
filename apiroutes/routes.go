@@ -56,7 +56,7 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 	accountApi := api.NewUserAccountApi(userService, nonceService, ssiService)
 	didApi := api.NewDIDApi(ssiService)
 	vcApi := api.NewVCApi(ssiService)
-	messageApi := api.NewMessagingApi(handshakeService, mtpService, environment)
+	messageApi := api.NewMessagingApi(ssiService, environment)
 
 	// MTP API definitions
 	handshakeMTPApi := api.NewHandshakeMTPApi(handshakeService, mtpService, environment)

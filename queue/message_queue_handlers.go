@@ -187,15 +187,13 @@ func (msq *MessageQueue) handleReceivedDIDCommMessage(message *types.DIDCommMess
 			Created:        time.Now().UnixMilli(),
 		}
 
-		mailioMessage.MTPStatusCodes = append(mailioMessage.MTPStatusCodes, types.NewMTPStatusCode(2, 0, 0, "successfully received message", types.WithRecAddress(recAddress)))
-
 		_, sErr := msq.userService.SaveMessage(recAddress, mailioMessage)
 		if sErr != nil {
 			global.Logger.Log(sErr.Error(), "failed to save message", recAddress)
 			// send error message to sender
 			deliveryStatuses = append(deliveryStatuses, types.NewMTPStatusCode(5, 4, 4, fmt.Sprintf("failed to save message for %s", recAddress), types.WithRecAddress(fromDID.String())))
 		} else {
-			deliveryStatuses = append(deliveryStatuses, types.NewMTPStatusCode(2, 0, 0, fmt.Sprintf("message to %s", recAddress), types.WithRecAddress(fromDID.String())))
+			deliveryStatuses = append(deliveryStatuses, types.NewMTPStatusCode(2, 0, 0, "delivery confirmation", types.WithRecAddress(fromDID.String())))
 		}
 	}
 	//send delivery message to sender

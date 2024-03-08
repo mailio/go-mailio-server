@@ -102,7 +102,7 @@ func (msq *MessageQueue) SendMessage(userAddress string, message *types.DIDCommM
 	}
 
 	if len(mailioMessage.MTPStatusCodes) == 0 {
-		types.AppendMTPStatusCodeToMessage(&mailioMessage, 2, 0, 0, "message sent successfully")
+		types.AppendMTPStatusCodeToMessage(&mailioMessage, 2, 0, 0, "message sent")
 	}
 	// store mailioMessage in database (sent folder of the sender)
 	_, sErr := msq.userService.SaveMessage(userAddress, &mailioMessage)
