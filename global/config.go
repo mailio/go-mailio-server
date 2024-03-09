@@ -47,6 +47,7 @@ type MailioConfig struct {
 	Domain             string                `yaml:"domain"`
 	ServerKeysPath     string                `yaml:"serverKeysPath"`
 	EmailSaltHex       string                `yaml:"emailSaltHex"`
+	DiskSpace          int64                 `yaml:"diskSpace"`
 	RecaptchaV3SiteKey string                `yaml:"recaptchaV3SiteKey"`
 	ServerHanshake     ServerHandshakeConfig `yaml:"serverHandshake"`
 	AuthenticationPath string                `yaml:"authenticationPath"`

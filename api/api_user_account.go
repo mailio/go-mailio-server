@@ -19,18 +19,20 @@ import (
 )
 
 type UserAccountApi struct {
-	userService  *services.UserService
-	nonceService *services.NonceService
-	ssiService   *services.SelfSovereignService
-	validate     *validator.Validate
+	userService        *services.UserService
+	nonceService       *services.NonceService
+	ssiService         *services.SelfSovereignService
+	userProfileService *services.UserProfileService
+	validate           *validator.Validate
 }
 
-func NewUserAccountApi(userService *services.UserService, nonceService *services.NonceService, ssiService *services.SelfSovereignService) *UserAccountApi {
+func NewUserAccountApi(userService *services.UserService, userProfileService *services.UserProfileService, nonceService *services.NonceService, ssiService *services.SelfSovereignService) *UserAccountApi {
 	return &UserAccountApi{
-		userService:  userService,
-		nonceService: nonceService,
-		ssiService:   ssiService,
-		validate:     validator.New(),
+		userService:        userService,
+		nonceService:       nonceService,
+		ssiService:         ssiService,
+		userProfileService: userProfileService,
+		validate:           validator.New(),
 	}
 }
 

@@ -50,10 +50,11 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 	ssiService := services.NewSelfSovereignService(dbSelector)
 	handshakeService := services.NewHandshakeService(dbSelector)
 	mtpService := services.NewMtpService(dbSelector)
+	userProfileService := services.NewUserProfileService(dbSelector, environment)
 
 	// API definitions
 	handshakeApi := api.NewHandshakeApi(handshakeService, nonceService, mtpService)
-	accountApi := api.NewUserAccountApi(userService, nonceService, ssiService)
+	accountApi := api.NewUserAccountApi(userService, userProfileService, nonceService, ssiService)
 	didApi := api.NewDIDApi(ssiService)
 	vcApi := api.NewVCApi(ssiService)
 	messageApi := api.NewMessagingApi(ssiService, environment)
@@ -81,7 +82,7 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 		// publicApi.GET("/v1/handshake/lookup/:ownerAddress/:senderAddress", handshakeApi.LookupHandshake)
 	}
 
-	rootApi := router.Group("/api", metrics.MetricsMiddleware(), restinterceptors.RateLimitMiddleware(), restinterceptors.JWSMiddleware())
+	rootApi := router.Group("/api", metrics.MetricsMiddleware(), restinterceptors.RateLimitMiddleware(), restinterceptors.JWSMiddleware(userProfileService))
 	{
 		// Handshakes
 		rootApi.GET("/v1/handshake/:id", handshakeApi.GetHandshake)

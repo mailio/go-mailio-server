@@ -14,6 +14,7 @@ const (
 	DID             = "did"              // decentralized identifiers
 	VCS             = "vcs"              // verifiable credentials
 	MessageDelivery = "message_delivery" // message delivery statuses
+	UserProfile     = "user_profile"     // user profile (for system use only)
 )
 
 type CouchDBSelector struct {
