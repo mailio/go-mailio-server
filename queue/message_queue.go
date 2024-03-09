@@ -19,6 +19,7 @@ type MessageQueue struct {
 	userService      *services.UserService
 	mtpService       *services.MtpService
 	handshakeService *services.HandshakeService
+	deliveryService  *services.MessageDeliveryService
 	restyClient      *resty.Client
 }
 
@@ -29,8 +30,9 @@ func NewMessageQueue(dbSelector *repository.CouchDBSelector, env *types.Environm
 	userService := services.NewUserService(dbSelector)
 	mtpService := services.NewMtpService(dbSelector)
 	handshakeService := services.NewHandshakeService(dbSelector)
+	deliveryService := services.NewMessageDeliveryService(dbSelector)
 
-	return &MessageQueue{ssiService: ssiService, userService: userService, mtpService: mtpService, handshakeService: handshakeService, restyClient: rcClient}
+	return &MessageQueue{ssiService: ssiService, userService: userService, mtpService: mtpService, handshakeService: handshakeService, deliveryService: deliveryService, restyClient: rcClient}
 }
 
 func (mqs *MessageQueue) ProcessTask(ctx context.Context, t *asynq.Task) error {
@@ -64,6 +66,7 @@ func (msq *MessageQueue) SendMessage(userAddress string, message *types.DIDCommM
 	if message.Thid == "" {
 		message.Thid = message.ID // if there is no thid, use message id
 	}
+
 	// struct to store in local database
 	mailioMessage := types.MailioMessage{
 		ID:             message.ID,
@@ -72,11 +75,13 @@ func (msq *MessageQueue) SendMessage(userAddress string, message *types.DIDCommM
 		Created:        time.Now().UnixMilli(),
 		Folder:         types.MailioFolderSent,
 		IsRead:         true, // sent messages are by default read
-		MTPStatusCodes: []*types.MTPStatusCode{},
 	}
 
 	//validate recipients (checks if they are valid DIDs and if they are reachable via HTTP/HTTPS)
-	recipientDidMap := msq.validateRecipientDIDs(&mailioMessage, message)
+	recipientDidMap, mtpStatusErrors := msq.validateRecipientDIDs(message)
+
+	// collect endpoints
+	endpointMap := make(map[string]string)
 
 	// iterating over recipient map and sending messages
 	for _, didDoc := range recipientDidMap {
@@ -85,37 +90,41 @@ func (msq *MessageQueue) SendMessage(userAddress string, message *types.DIDCommM
 		endpoint := msq.extractDIDMessageEndpoint(&didDoc)
 		if endpoint == "" {
 			// Bad destination address syntax
-			types.AppendMTPStatusCodeToMessage(&mailioMessage, 5, 1, 3, fmt.Sprintf("unable to route message to %s for %s", endpoint, didDoc.ID.String()))
+			mtpStatusErrors = append(mtpStatusErrors, types.NewMTPStatusCode(5, 1, 3, fmt.Sprintf("unable to route message to %s for %s", endpoint, didDoc.ID.String())))
 			continue
-		} else {
-			// sign and send message to remote recipient
-			sendErr, code := msq.httpSend(message, didDoc, endpoint)
-			if sendErr != nil {
-				if sendErr == types.ErrContinue {
-					// on to the next message if this one failed
-					mailioMessage.MTPStatusCodes = append(mailioMessage.MTPStatusCodes, code)
-					continue
-				}
-				return sendErr
+		}
+		endpointMap[endpoint] = endpoint
+	}
+	// send message to each endpoint extracted from DID documents
+	for _, ep := range endpointMap {
+		code, sendErr := msq.httpSend(message, ep)
+		if sendErr != nil {
+			if sendErr == types.ErrContinue {
+				// on to the next message if this one failed
+				mtpStatusErrors = append(mtpStatusErrors, code)
+				continue
 			}
+			return sendErr
 		}
 	}
-
-	if len(mailioMessage.MTPStatusCodes) == 0 {
-		types.AppendMTPStatusCodeToMessage(&mailioMessage, 2, 0, 0, "message sent")
+	// if no errors, append success message
+	if len(mtpStatusErrors) == 0 {
+		mtpStatusErrors = append(mtpStatusErrors, types.NewMTPStatusCode(2, 0, 0, "message sent"))
 	}
 	// store mailioMessage in database (sent folder of the sender)
 	_, sErr := msq.userService.SaveMessage(userAddress, &mailioMessage)
 	if sErr != nil {
-		global.Logger.Log(sErr.Error(), "failed to save message", userAddress)
+		global.Logger.Log(sErr.Error(), "(sendMessage) failed to save message", userAddress)
 		return sErr
 	}
+	msq.deliveryService.SaveBulkMtpStatusCodes(message.ID, mtpStatusErrors)
 	return nil
 }
 
 // SendMessage sends encrypted DIDComm message to recipient
 func (msq *MessageQueue) ReceiveMessage(message *types.DIDCommMessage) error {
 	global.Logger.Log("received msg intent", message.Intent, "id", message.ID, "from", message.From)
+	fmt.Printf("received msg intent %s id %s from %s\n", message.Intent, message.ID, message.From)
 	switch message.Intent {
 	case types.DIDCommIntentMessage, types.DIDCommIntentHandshake:
 		// handle message receive

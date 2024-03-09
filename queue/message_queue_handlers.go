@@ -7,7 +7,6 @@ import (
 	"math"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/hibiken/asynq"
 	"github.com/mailio/go-mailio-did/did"
 	"github.com/mailio/go-mailio-server/global"
@@ -107,6 +106,7 @@ func (msq *MessageQueue) selectMailFolder(fromDID did.DID, recipientAddress stri
 // handleReceivedDIDCommMessage handles received DIDComm messages
 func (msq *MessageQueue) handleReceivedDIDCommMessage(message *types.DIDCommMessage) error {
 	/**
+	0. Check if message with same ID already exists for the recipient
 	1. Get the senders DID document to extract the service endpoint
 	2. Check if the message already exists in the local database (it shouldn't exist but if it does, add MTP codes to it)
 	3. Check if at least one recipient exists on this server and if it matches the recipient in the message
@@ -136,16 +136,29 @@ func (msq *MessageQueue) handleReceivedDIDCommMessage(message *types.DIDCommMess
 	// collect local recipients of the message
 	localRecipientsAddresses := []string{}
 	addedMap := map[string]string{} // keeping track of added recipients
+	hasExcludedSelf := false
 	for _, recipient := range message.EncryptedBody.Recipients {
+		// skip sender address if exists in the message itself
+		// but only once (since it might be sending to one self)
+		if recipient.Header.Kid == message.From && !hasExcludedSelf {
+			hasExcludedSelf = true
+			continue
+		}
 		recAddress := recipient.Header.Kid
+
 		parsedDid, pErr := did.ParseDID(recAddress)
 		if pErr != nil {
 			// skip if parsing fails
 			global.Logger.Log(pErr.Error(), "failed to parse recipient DID", recAddress)
 			continue
 		}
+
 		if parsedDid.Value() == global.Conf.Mailio.Domain {
 			if _, ok := addedMap[parsedDid.Fragment()]; !ok { // if not yet added
+				// avoiding duplicates
+				// if msq.hasAlreadyReceivedMessage(uniqueID, parsedDid) {
+				// 	continue
+				// }
 				localRecipientsAddresses = append(localRecipientsAddresses, parsedDid.Fragment())
 				addedMap[parsedDid.Fragment()] = parsedDid.Fragment()
 			}
@@ -176,7 +189,7 @@ func (msq *MessageQueue) handleReceivedDIDCommMessage(message *types.DIDCommMess
 		if message.Pthid != "" {
 			isReplied = true
 		}
-		uniqueID := uuid.NewString()
+		uniqueID, _ := util.DIDDocumentToUniqueID(message, folder)
 		mailioMessage := &types.MailioMessage{
 			ID:             uniqueID,
 			DIDCommMessage: message,
@@ -187,13 +200,14 @@ func (msq *MessageQueue) handleReceivedDIDCommMessage(message *types.DIDCommMess
 			Created:        time.Now().UnixMilli(),
 		}
 
+		fmt.Printf("Saving message for user %s, mailio id: %s, didcommid: %s\n", recAddress, mailioMessage.ID, mailioMessage.DIDCommMessage.ID)
 		_, sErr := msq.userService.SaveMessage(recAddress, mailioMessage)
 		if sErr != nil {
-			global.Logger.Log(sErr.Error(), "failed to save message", recAddress)
+			global.Logger.Log(sErr.Error(), "(receive message) failed to save message", recAddress)
 			// send error message to sender
-			deliveryStatuses = append(deliveryStatuses, types.NewMTPStatusCode(5, 4, 4, fmt.Sprintf("failed to save message for %s", recAddress), types.WithRecAddress(fromDID.String())))
+			deliveryStatuses = append(deliveryStatuses, types.NewMTPStatusCode(5, 4, 4, fmt.Sprintf("failed to save message for %s", recAddress), types.WithRecAddress(recAddress)))
 		} else {
-			deliveryStatuses = append(deliveryStatuses, types.NewMTPStatusCode(2, 0, 0, "delivery confirmation", types.WithRecAddress(fromDID.String())))
+			deliveryStatuses = append(deliveryStatuses, types.NewMTPStatusCode(2, 0, 0, "delivery confirmation", types.WithRecAddress(recAddress)))
 		}
 	}
 	//send delivery message to sender
@@ -218,7 +232,7 @@ func (msq *MessageQueue) handleReceivedDIDCommMessage(message *types.DIDCommMess
 		To:              []string{message.From},
 		PlainBodyBase64: base64.StdEncoding.EncodeToString(deliveryMsgStr),
 	}
-	sndErr, sndCode := msq.httpSend(didMessage, *serverDID, endpoint)
+	sndCode, sndErr := msq.httpSend(didMessage, endpoint)
 	if sndErr != nil {
 		global.Logger.Log(sndErr.Error(), "failed to send message to sender", sndCode.Class, sndCode.Subject, sndCode.Detail, sndCode.Description, sndCode.Address)
 		return fmt.Errorf("failed to send message to sender: %v: %w", sndErr, asynq.SkipRetry)
@@ -248,25 +262,9 @@ func (msq *MessageQueue) handleDIDCommDelivery(message *types.DIDCommMessage) er
 		global.Logger.Log(pErr.Error(), "failed to unmarshal delivery message")
 		return fmt.Errorf("failed to unmarshal delivery message: %v: %w", pErr, asynq.SkipRetry)
 	}
-	for _, to := range message.To {
-		parsedDid, pErr := did.ParseDID(to)
-		if pErr != nil {
-			global.Logger.Log(pErr.Error(), "failed to parse recipient DID", to)
-			continue
-		}
-		address := parsedDid.Fragment()
-		// must find previously sent message ID (if not, delivery status is ignored)
-		mailioMessage, err := msq.userService.GetMessage(address, message.ID)
-		if err != nil {
-			global.Logger.Log(err.Error(), "delivery has no matching message id", message.ID, "mailio address", address)
-			continue
-		}
-		mailioMessage.MTPStatusCodes = append(mailioMessage.MTPStatusCodes, plainBody.StatusCodes...)
-		_, sErr := msq.userService.SaveMessage(address, mailioMessage)
-		if sErr != nil {
-			global.Logger.Log(sErr.Error(), "failed to save message", address)
-			return fmt.Errorf("failed to save message: %v: %w", sErr, asynq.SkipRetry)
-		}
+	if len(plainBody.StatusCodes) > 0 {
+		msq.deliveryService.SaveBulkMtpStatusCodes(message.ID, plainBody.StatusCodes)
 	}
+
 	return nil
 }

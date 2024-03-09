@@ -59,24 +59,31 @@ func (msq *MessageQueue) validateSenderDID(message *types.DIDCommMessage, userAd
 
 // validateRecipientDid validates the recipient DIDs and collect valid DIDs in a recipientDidMap
 // invalid recipients are added to MailioMessage as MTPStatusCodes
-func (msq *MessageQueue) validateRecipientDIDs(mailioMessage *types.MailioMessage, message *types.DIDCommMessage) map[string]did.Document {
+func (msq *MessageQueue) validateRecipientDIDs(message *types.DIDCommMessage) (map[string]did.Document, []*types.MTPStatusCode) {
 	//validate recipients (checks if they are valid DIDs and if they are reachable via HTTP/HTTPS)
 	recipientDidMap := map[string]did.Document{}
+
+	mtpStatusErrors := []*types.MTPStatusCode{}
+
 	for _, recipient := range message.To {
 		rec, didErr := did.ParseDID(recipient)
 		if didErr != nil {
 			global.Logger.Log(didErr.Error(), "recipient verification failed", rec.Fragment())
-			types.AppendMTPStatusCodeToMessage(mailioMessage, 5, 1, 1, fmt.Sprintf("failed to validate recipient %s", rec.Fragment()))
+			mtpStatusErrors = append(mtpStatusErrors, types.NewMTPStatusCode(5, 1, 1, fmt.Sprintf("failed to validate recipient", types.WithRecAddress(rec.Fragment()))))
 			continue
 		}
 
 		var result did.Document
 		// check if local server (don't query it over network due to "rate limits")
-		if rec.Value() == global.Conf.Host {
+		host := global.Conf.Host
+		if global.Conf.Port != 0 {
+			host += ":" + fmt.Sprintf("%d", global.Conf.Port)
+		}
+		if rec.Value() == host {
 			r, rErr := msq.ssiService.GetDIDDocument(rec.Fragment())
 			if rErr != nil {
 				global.Logger.Log(rErr.Error(), "failed to validate recipient", rec.Fragment())
-				types.AppendMTPStatusCodeToMessage(mailioMessage, 5, 1, 1, fmt.Sprintf("failed to validate recipient %s", rec.Fragment()))
+				mtpStatusErrors = append(mtpStatusErrors, types.NewMTPStatusCode(5, 1, 1, fmt.Sprintf("failed to validate recipient", types.WithRecAddress(rec.Fragment()))))
 				continue
 			} else {
 				result = *r
@@ -110,7 +117,7 @@ func (msq *MessageQueue) validateRecipientDIDs(mailioMessage *types.MailioMessag
 					mtpCode.Detail = 0  // unknown
 					mtpCode.Description = fmt.Sprintf("unknown error for destination server: %s", rec.Fragment())
 				}
-				mailioMessage.MTPStatusCodes = append(mailioMessage.MTPStatusCodes, &mtpCode)
+				mtpStatusErrors = append(mtpStatusErrors, &mtpCode)
 				// next recipient validation
 				continue
 			} else {
@@ -119,13 +126,12 @@ func (msq *MessageQueue) validateRecipientDIDs(mailioMessage *types.MailioMessag
 		}
 		recipientDidMap[rec.String()] = result
 	}
-	return recipientDidMap
+	return recipientDidMap, mtpStatusErrors
 }
 
 // sign and httpSend DIDComm message
 func (msq *MessageQueue) httpSend(message *types.DIDCommMessage,
-	didDoc did.Document,
-	endpoint string) (error, *types.MTPStatusCode) {
+	endpoint string) (*types.MTPStatusCode, error) {
 	// sign a DIDCommRequest
 	request := &types.DIDCommRequest{
 		DIDCommMessage:  message,
@@ -135,12 +141,12 @@ func (msq *MessageQueue) httpSend(message *types.DIDCommMessage,
 	cborPayload, cErr := util.CborEncode(request)
 	if cErr != nil {
 		level.Error(global.Logger).Log("msg", "failed to cbor encode request", "err", cErr)
-		return fmt.Errorf("failed to cbor encode request: %v, %w", cErr, asynq.SkipRetry), nil
+		return nil, fmt.Errorf("failed to cbor encode request: %v, %w", cErr, asynq.SkipRetry)
 	}
 	signature, sErr := util.Sign(cborPayload, global.PrivateKey)
 	if sErr != nil {
 		level.Error(global.Logger).Log("msg", "failed to sign request", "err", sErr)
-		return fmt.Errorf("failed to sign request: %v, %w", sErr, asynq.SkipRetry), nil
+		return nil, fmt.Errorf("failed to sign request: %v, %w", sErr, asynq.SkipRetry)
 	}
 
 	signedRequest := &types.DIDCommSignedRequest{
@@ -155,7 +161,7 @@ func (msq *MessageQueue) httpSend(message *types.DIDCommMessage,
 	response, rErr := msq.restyClient.R().SetBody(signedRequest).SetResult(&responseResult).Post(endpoint)
 	if rErr != nil {
 		global.Logger.Log(rErr.Error(), "failed to send message", endpoint)
-		return types.ErrContinue, types.NewMTPStatusCode(5, 4, 4, fmt.Sprintf("failed to send message to %s", didDoc.ID.String()))
+		return types.NewMTPStatusCode(5, 4, 4, fmt.Sprintf("failed to send message")), types.ErrContinue
 	}
 	if response.IsError() {
 		// if response.StatusCode() >= 405 && response.StatusCode() < 500 {
@@ -163,37 +169,63 @@ func (msq *MessageQueue) httpSend(message *types.DIDCommMessage,
 		// } else {
 
 		// }
-		global.Logger.Log(response.String(), "failed to send message", endpoint)
-		return types.ErrContinue, types.NewMTPStatusCode(4, 4, 4, fmt.Sprintf("failed to send message to %s", didDoc.ID.String()))
+		global.Logger.Log(response.String(), "failed to send message", endpoint, "code", response.StatusCode(), "body", string(response.Body()))
+		return types.NewMTPStatusCode(4, 4, 4, fmt.Sprintf("failed to send message")), types.ErrContinue
 	}
 	// validate response receipt
 	responseId := responseResult.DIDCommRequest.DIDCommMessage.ID
 	if responseId != message.ID {
 		global.Logger.Log("response ID", responseId, "message ID", message.ID, "message ids don't match", endpoint)
-		return types.ErrContinue, types.NewMTPStatusCode(5, 4, 4, fmt.Sprintf("failed to send message to %s", didDoc.ID.String()))
+		return types.NewMTPStatusCode(5, 4, 4, fmt.Sprintf("failed to send message")), types.ErrContinue
 	}
 	cbor, rcErr := base64.StdEncoding.DecodeString(responseResult.CborPayloadBase64)
 	signature, rsErr := base64.StdEncoding.DecodeString(responseResult.SignatureBase64)
 	if errors.Join(rcErr, rsErr) != nil {
 		global.Logger.Log(errors.Join(cErr, sErr).Error(), "failed to decode cbor payload or signature")
-		return types.ErrContinue, types.NewMTPStatusCode(5, 4, 4, fmt.Sprintf("failed to decode cbor or signature response from %s", didDoc.ID.String()))
+		return types.NewMTPStatusCode(5, 4, 4, fmt.Sprintf("failed to decode cbor or signature response from %s", endpoint)), types.ErrContinue
 	}
 
 	// get public key from the recipients serv er
 	discovery, dErr := msq.mtpService.ResolveDomain(endpoint, false)
 	if dErr != nil {
-		global.Logger.Log(dErr.Error(), "failed to get public key for", didDoc.ID.String())
-		return types.ErrContinue, types.NewMTPStatusCode(5, 4, 4, fmt.Sprintf("failed to get public key for %s endpoint %s", didDoc.ID.String(), endpoint))
+		global.Logger.Log(dErr.Error(), "failed to get public key for", endpoint)
+		return types.NewMTPStatusCode(5, 4, 4, fmt.Sprintf("failed to get public key for endpoint %s", endpoint)), types.ErrContinue
 	}
 	isValid, vErr := util.Verify(cbor, signature, discovery.MailioPublicKey)
 	if vErr != nil {
 		global.Logger.Log(vErr.Error(), "failed to verify response")
-		return types.ErrContinue, types.NewMTPStatusCode(5, 4, 4, fmt.Sprintf("failed to verify response from %s", didDoc.ID.String()))
+		return types.NewMTPStatusCode(5, 4, 4, fmt.Sprintf("failed to verify response from %s", endpoint)), types.ErrContinue
 	}
 	if !isValid {
 		global.Logger.Log("response signature is invalid", "failed to verify response")
-		// types.AppendMTPStatusCodeToMessage(mailioMessage, 5, 4, 4, fmt.Sprintf("failed to verify response from %s", didDoc.ID.String()))
-		return types.ErrContinue, types.NewMTPStatusCode(5, 4, 4, fmt.Sprintf("failed to verify response from %s", didDoc.ID.String()))
+		return types.NewMTPStatusCode(5, 4, 4, fmt.Sprintf("failed to verify response from %s", endpoint)), types.ErrContinue
 	}
 	return nil, nil
+}
+
+// checks if user already recieved a message with given messageID
+func (msq *MessageQueue) hasAlreadyReceivedMessage(messageID string, did did.DID) bool {
+	userAddress := did.Fragment()
+	if userAddress == "" {
+		userAddress = did.Value()
+	}
+	if userAddress == "" {
+		global.Logger.Log("user address is empty", "failed to check if message exists", did.String())
+		return true
+	}
+
+	// msg, exErr := msq.userService.GetMessage(userAddress, messageID)
+	// if exErr != nil {
+	// 	if exErr != types.ErrNotFound {
+	// 		global.Logger.Log(exErr.Error(), "failed to check if message exists", userAddress)
+	// 		return false
+	// 	} else if exErr == types.ErrNotFound {
+	// 		return false
+	// 	}
+	// }
+	// // received messages must not be in sent folder
+	// if msg != nil && msg.Folder == types.MailioFolderSent {
+	// 	return false
+	// }
+	return true
 }

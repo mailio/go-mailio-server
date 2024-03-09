@@ -1,15 +1,14 @@
 package api
 
 import (
-	"crypto/sha256"
 	"encoding/base64"
-	"encoding/hex"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
+	"github.com/google/uuid"
 	"github.com/hibiken/asynq"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/services"
@@ -100,21 +99,11 @@ func (ms *MessagingMTPApi) ReceiveMessage(c *gin.Context) {
 		return
 	}
 
-	// we sha256 the task ID from message ID in case of sending message to thy-self
-	// if sending to self, Unique check would fail in the queue
-	messageReceived, mrErr := util.CborEncode(input.DIDCommRequest)
-	if mrErr != nil {
-		global.Logger.Log(mrErr.Error(), "failed to cbor encode message")
-		ApiErrorf(c, http.StatusInternalServerError, "failed to create unique task id")
-		return
-	}
-	s := sha256.Sum256(messageReceived)
-	uniqueTaskId := hex.EncodeToString(s[:])
+	uniqueTaskId := uuid.NewString()
 	taskInfo, tqErr := ms.env.TaskClient.Enqueue(receiveTask,
 		asynq.MaxRetry(3),             // max number of times to retry the task
 		asynq.Timeout(60*time.Second), // max time to process the task
-		asynq.TaskID(uniqueTaskId),    // unique task id
-		asynq.Unique(time.Second*10))  // unique for 10 seconds (preventing multiple equal messages in the queue)
+		asynq.TaskID(uniqueTaskId))    // unique task id
 	if tqErr != nil {
 		global.Logger.Log(tqErr.Error(), "failed to send message")
 		ApiErrorf(c, http.StatusInternalServerError, "failed to send message")

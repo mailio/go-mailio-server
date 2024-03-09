@@ -153,7 +153,3 @@ func NewMTPStatusCode(clazz int, subject int, detail int, description string, op
 	}
 	return c
 }
-
-func AppendMTPStatusCodeToMessage(message *MailioMessage, clazz int, subject int, detail int, description string) {
-	message.MTPStatusCodes = append(message.MTPStatusCodes, NewMTPStatusCode(clazz, subject, detail, description))
-}

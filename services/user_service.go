@@ -141,30 +141,30 @@ func (us *UserService) FindUserByScryptEmail(scryptEmail string) (*types.EmailTo
 }
 
 // Retrieves mailio message from users database by ID
-func (us *UserService) GetMessage(address string, ID string) (*types.MailioMessage, error) {
-	if ID == "" {
-		return nil, types.ErrBadRequest
-	}
-	hexUser := "userdb-" + hex.EncodeToString([]byte(address))
-	url := fmt.Sprintf("%s/%s", hexUser, ID)
+// func (us *UserService) GetMessage(address string, ID string) (*types.MailioMessage, error) {
+// 	if ID == "" {
+// 		return nil, types.ErrBadRequest
+// 	}
+// 	hexUser := "userdb-" + hex.EncodeToString([]byte(address))
+// 	url := fmt.Sprintf("%s/%s", hexUser, ID)
 
-	var mailioMessage types.MailioMessage
-	var couchError types.CouchDBError
-	response, rErr := us.restyClient.R().SetResult(&mailioMessage).SetError(&couchError).Get(url)
-	if rErr != nil {
-		global.Logger.Log(rErr.Error(), "failed to get message", hexUser)
-		return nil, rErr
-	}
-	if response.IsError() {
-		if response.StatusCode() == 404 {
-			return nil, types.ErrNotFound
-		}
-		global.Logger.Log(response.String(), "failed to get message", hexUser, couchError.Error, couchError.Reason)
-		return nil, fmt.Errorf("code: %s, reason: %s", couchError.Error, couchError.Reason)
-	}
+// 	var mailioMessage types.MailioMessage
+// 	var couchError types.CouchDBError
+// 	response, rErr := us.restyClient.R().SetResult(&mailioMessage).SetError(&couchError).Get(url)
+// 	if rErr != nil {
+// 		global.Logger.Log(rErr.Error(), "failed to get message", hexUser)
+// 		return nil, rErr
+// 	}
+// 	if response.IsError() {
+// 		if response.StatusCode() == 404 {
+// 			return nil, types.ErrNotFound
+// 		}
+// 		global.Logger.Log(response.String(), "failed to get message", hexUser, couchError.Error, couchError.Reason)
+// 		return nil, fmt.Errorf("code: %s, reason: %s", couchError.Error, couchError.Reason)
+// 	}
 
-	return &mailioMessage, nil
-}
+// 	return &mailioMessage, nil
+// }
 
 // Stores mailio message to users database
 func (us *UserService) SaveMessage(userAddress string, mailioMessage *types.MailioMessage) (*types.MailioMessage, error) {

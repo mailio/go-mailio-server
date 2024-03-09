@@ -102,7 +102,7 @@ func PublicKeyToMailioAddress(pubKeyBase64 string) (string, error) {
 	// sh256Bytes := hash.Sum(nil)
 	// ma := BytesToAddress(sh256Bytes)
 	// return hex.EncodeToString(ma[:]), nil
-	pubKey, err := base64.StdEncoding.DecodeString(pubKeyBase64)
+	pubKey, err := base64.RawURLEncoding.DecodeString(pubKeyBase64)
 	if err != nil {
 		return "", err
 	}
