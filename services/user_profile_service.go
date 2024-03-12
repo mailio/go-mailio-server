@@ -2,9 +2,12 @@ package services
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"time"
 
+	"github.com/go-resty/resty/v2"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/repository"
 	"github.com/mailio/go-mailio-server/types"
@@ -134,4 +137,70 @@ func (s *UserProfileService) Save(address string, profile *types.UserProfile) (*
 	s.DeleteFromCache(address)
 
 	return profile, nil
+}
+
+// get users database stats (used when checking if user has disk space available)
+func (s *UserProfileService) Stats(address string) (*types.UserProfileStats, error) {
+	// implement get the users db
+	hexUser := "userdb-" + hex.EncodeToString([]byte(address))
+	host := fmt.Sprintf("%s://%s", global.Conf.CouchDB.Scheme, global.Conf.CouchDB.Host)
+	if global.Conf.CouchDB.Port != 0 {
+		host = fmt.Sprintf("%s:%d", host, global.Conf.CouchDB.Port)
+	}
+	client := resty.New().SetBaseURL(host).SetHeader("Content-Type", "application/json").SetBasicAuth(global.Conf.CouchDB.Username, global.Conf.CouchDB.Password).SetTimeout(time.Second * 10)
+
+	response, rErr := client.R().Get(hexUser)
+	if rErr != nil {
+		return nil, rErr
+	}
+	if response.IsError() {
+		return nil, fmt.Errorf("failed to get user db")
+	}
+	var statsMap map[string]interface{}
+	uErr := json.Unmarshal(response.Body(), &statsMap)
+	if uErr != nil {
+		global.Logger.Log("UserProfileService.Stats", "failed to unmarshal", uErr.Error())
+		return nil, uErr
+	}
+	upStats := types.UserProfileStats{}
+	if docCount, ok := statsMap["doc_count"].(int64); ok {
+		upStats.DocCount = docCount
+	}
+	if docDelCount, ok := statsMap["doc_del_count"].(int64); ok {
+		upStats.DocDelCount = docDelCount
+	}
+	if activeSize, ok := statsMap["sizes"].(map[string]interface{})["active"].(int64); ok {
+		upStats.ActiveSize = activeSize
+	}
+	if externalSize, ok := statsMap["sizes"].(map[string]interface{})["external"].(int64); ok {
+		upStats.ExternalSize = externalSize
+	}
+	if fileSize, ok := statsMap["sizes"].(map[string]interface{})["file"].(int64); ok {
+		upStats.FileSize = fileSize
+	}
+	return &upStats, nil
+}
+
+func (s *UserProfileService) Delete(address string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	//TODO! delete users database too and all related data
+	//TODO! schedule specific deletes in the queue for:
+	// 1. users db (_users database should delete it's own database)
+	// 2. all users handshakes
+	// 3. delete from mailio_mapping
+	// 4. did
+	// 5. vcs
+	// 6: user profile
+
+	err := s.userProfileRepo.Delete(ctx, address)
+	if err != nil {
+		global.Logger.Log("UserProfileService.Delete", "failed to delete", err.Error())
+		return err
+	}
+	// delete from cache user profile
+	s.DeleteFromCache(address)
+
+	return nil
 }
