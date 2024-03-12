@@ -48,15 +48,16 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 	userService := services.NewUserService(dbSelector)
 	nonceService := services.NewNonceService(dbSelector)
 	ssiService := services.NewSelfSovereignService(dbSelector)
-	handshakeService := services.NewHandshakeService(dbSelector, environment)
-	mtpService := services.NewMtpService(dbSelector, environment)
+	handshakeService := services.NewHandshakeService(dbSelector)
+	mtpService := services.NewMtpService(dbSelector)
+	userProfileService := services.NewUserProfileService(dbSelector, environment)
 
 	// API definitions
 	handshakeApi := api.NewHandshakeApi(handshakeService, nonceService, mtpService)
-	accountApi := api.NewUserAccountApi(userService, nonceService, ssiService)
+	accountApi := api.NewUserAccountApi(userService, userProfileService, nonceService, ssiService)
 	didApi := api.NewDIDApi(ssiService)
 	vcApi := api.NewVCApi(ssiService)
-	messageApi := api.NewMessagingApi(handshakeService, mtpService, environment)
+	messageApi := api.NewMessagingApi(ssiService, environment)
 
 	// MTP API definitions
 	handshakeMTPApi := api.NewHandshakeMTPApi(handshakeService, mtpService, environment)
@@ -81,7 +82,7 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 		// publicApi.GET("/v1/handshake/lookup/:ownerAddress/:senderAddress", handshakeApi.LookupHandshake)
 	}
 
-	rootApi := router.Group("/api", metrics.MetricsMiddleware(), restinterceptors.RateLimitMiddleware(), restinterceptors.JWSMiddleware())
+	rootApi := router.Group("/api", metrics.MetricsMiddleware(), restinterceptors.RateLimitMiddleware(), restinterceptors.JWSMiddleware(userProfileService))
 	{
 		// Handshakes
 		rootApi.GET("/v1/handshake/:id", handshakeApi.GetHandshake)
@@ -101,14 +102,15 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 
 		// user account
 		rootApi.GET("/v1/user/me", accountApi.GetUserAddress)
+		rootApi.DELETE("/v1/nonce/:id", accountApi.DeleteNonce)
 	}
 
 	// server-to-server communication (aka MTP - Mailio Transfer Protocol)
-	mtpRootApi := router.Group("/api", metrics.MetricsMiddleware(), restinterceptors.RateLimitMiddleware(), restinterceptors.SignatureMiddleware(environment))
+	mtpRootApi := router.Group("/api", metrics.MetricsMiddleware(), restinterceptors.RateLimitMiddleware(), restinterceptors.SignatureMiddleware(environment, mtpService))
 	{
 		// Handshakes MTP
 		mtpRootApi.POST("/v1/mtp/handshake", handshakeMTPApi.GetLocalHandshakes)
-		mtpRootApi.POST("/v1/mtp/message/:address", messageMTPApi.ReceiveMessage)
+		mtpRootApi.POST("/v1/mtp/message", messageMTPApi.ReceiveMessage)
 	}
 
 	router.StaticFile("./well-known/did.json", "./well-known/did.json")

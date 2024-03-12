@@ -37,4 +37,10 @@ var (
 	ErrSignatureInvalid = errors.New("signature invalid")
 	// ErrInvalidPrivateKey - invalid private key
 	ErrInvalidPrivateKey = errors.New("invalid private key")
+	// ErrContinue defines something went wrong but code exection should continue
+	ErrContinue = errors.New("continue")
+
+	// HANDSHAKE ERRORS
+	// If handshake has been revoked
+	ErrHandshakeRevoked = errors.New("handshake revoked")
 )

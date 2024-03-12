@@ -1,5 +1,8 @@
 package handler
 
+import "github.com/mailio/go-mailio-server/types"
+
 type SmtpHandler interface {
-	HandleSmtp([]byte) (*MailReceived, error)
+	ReceiveMail([]byte) (*types.MailReceived, error)
+	SendMail([]byte) (string, error)
 }

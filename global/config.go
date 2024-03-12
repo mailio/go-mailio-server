@@ -24,7 +24,6 @@ type Config struct {
 	cfg.YamlConfig `yaml:",inline"`
 	CouchDB        CouchDBConfig    `yaml:"couchdb"`
 	AwsSmtp        AwsSmtpConfig    `yaml:"awssmtp"`
-	Grpc           GrpcConfig       `yaml:"grpc"`
 	Mailio         MailioConfig     `yaml:"mailio"`
 	Prometheus     PrometheusConfig `yaml:"prometheus"`
 	Redis          RedisConfig      `yaml:"redis"`
@@ -48,14 +47,12 @@ type MailioConfig struct {
 	Domain             string                `yaml:"domain"`
 	ServerKeysPath     string                `yaml:"serverKeysPath"`
 	EmailSaltHex       string                `yaml:"emailSaltHex"`
+	DiskSpace          int64                 `yaml:"diskSpace"`
 	RecaptchaV3SiteKey string                `yaml:"recaptchaV3SiteKey"`
 	ServerHanshake     ServerHandshakeConfig `yaml:"serverHandshake"`
 	AuthenticationPath string                `yaml:"authenticationPath"`
 	MessagingPath      string                `yaml:"messagingPath"`
-}
-
-type GrpcConfig struct {
-	Port int `yaml:"port"`
+	ReadVsReceived     int                   `yaml:"readVsReceived"`
 }
 
 type PrometheusConfig struct {

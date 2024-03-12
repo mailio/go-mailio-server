@@ -10,13 +10,15 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/go-jose/go-jose/v3"
 	"github.com/mailio/go-mailio-server/global"
+	"github.com/mailio/go-mailio-server/services"
+	"github.com/mailio/go-mailio-server/types"
 )
 
 const (
 	tokenExpiryHours = 30 * 24 // 30 days
 )
 
-func JWSMiddleware() gin.HandlerFunc {
+func JWSMiddleware(userProfileService *services.UserProfileService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		auth := c.GetHeader("Authorization")
 		if auth == "" {
@@ -37,6 +39,7 @@ func JWSMiddleware() gin.HandlerFunc {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Failed to verify JWS message"})
 			return
 		}
+
 		payload := object.UnsafePayloadWithoutVerification()
 		var plMap map[string]interface{}
 		uErr := json.Unmarshal(payload, &plMap)
@@ -71,6 +74,24 @@ func JWSMiddleware() gin.HandlerFunc {
 		} else {
 			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Failed to parse JWS payload (usrPubKey missing)"})
 		}
+		// get user profile
+		userProfile, upErr := userProfileService.Get(subjectAddress)
+		if upErr != nil && upErr != types.ErrNotFound {
+			global.Logger.Log("JWSMiddleware", "failed to get user profile", upErr.Error())
+		}
+		// user profile doesn't need to exist, unless user is disabled or has a subscription
+		if userProfile != nil {
+			if !userProfile.Enabled {
+				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "User account is disabled"})
+				return
+			}
+		} else {
+			// add user profile into DB and into cache (for subsequent requests)
+			userProfile = &types.UserProfile{Enabled: true, DiskSpace: global.Conf.Mailio.DiskSpace}
+			userProfileService.Save(subjectAddress, userProfile)
+		}
+		c.Set("userProfile", userProfile)
+		// TODO! subjectAddress is probably not necessary anymore since we have _id from userProfile
 		c.Set("subjectAddress", subjectAddress)
 		c.Next()
 	}

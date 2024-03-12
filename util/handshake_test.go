@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"testing"
+	"time"
 
 	"github.com/mailio/go-mailio-server/types"
 )
@@ -43,6 +44,36 @@ func TestServerHandshake(t *testing.T) {
 	}
 	prettyJson, _ := json.MarshalIndent(srvKey, "", "  ")
 	fmt.Printf("Server handshake: %v\n", string(prettyJson))
+}
+
+func TestCBORExample(t *testing.T) {
+	example := &types.Handshake{
+		Content: types.HandshakeContent{
+			HandshakeID: "1234567890",
+			OriginServer: types.HandshakeOriginServer{
+				Domain: "test.mail.io",
+			},
+			Created: float64(time.Now().UnixMilli()),
+		},
+		SignatureBase64:   "123",
+		CborPayloadBase64: "123",
+	}
+	encoded, err := base64.StdEncoding.DecodeString("uQAKa2hhbmRzaGFrZUlkeEBhNzA3YmJlN2VkMjJmOTExYjA1YmQwMTFlOTQ3NjAwYzI4ZmZkMjQ4ZjU1OWVkZDFhYTE4MDFjMmJmMjM4MDIzbG9yaWdpblNlcnZlcrkAAWZkb21haW5ubG9jYWxob3N0OjgwODBkdHlwZWR1c2VyZnN0YXR1c2hhY2NlcHRlZGVsZXZlbGRub25lbm93bmVyUHVibGljS2V5eCxKWmdGZWpOalZhMlc3c09DcXN0RUk3TWNiREVld3cvdHFZd3B5clpxUmtZPWxvd25lckFkZHJlc3N4KjB4MTg2OWNjMDU4MDkyMzE3ODAwNzI3YWZhMjU5ODFiZmQyYTNkMDk2OWdjcmVhdGVk+0J44GTh2PAAbnNlbmRlck1ldGFkYXRhuQABaWVtYWlsSGFzaHgsbVArYkxwY2x0Mk5iQ1dUVkdmZU1zclpnZUhwcklranZqbWo4cjVaNGdRQT1vc2lnbmF0dXJlU2NoZW1lbEVkRFNBX1gyNTUxOQ==")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// encoded, err := CborEncode(example)
+	// if err != nil {
+	// 	t.Fatal(err)
+	// }
+	decoded := &types.Handshake{}
+	err = CborDecode(encoded, decoded)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if example.Content.Created != decoded.Content.Created {
+		t.Fatal("created not equal")
+	}
 }
 
 func TestVerifyServerSideHandshake(t *testing.T) {

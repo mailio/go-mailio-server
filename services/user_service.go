@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"net/url"
 	"strconv"
 	"time"
 
@@ -17,14 +18,28 @@ import (
 
 type UserService struct {
 	repoSelector *repository.CouchDBSelector
+	restyClient  *resty.Client
 }
 
 func NewUserService(repoSelector *repository.CouchDBSelector) *UserService {
 	if repoSelector == nil {
 		panic("repoSelector cannot be nil")
 	}
+	repoUrl := global.Conf.CouchDB.Scheme + "://" + global.Conf.CouchDB.Host
+	if global.Conf.CouchDB.Port != 0 {
+		repoUrl += ":" + strconv.Itoa(global.Conf.CouchDB.Port)
+	}
+	client := resty.New().
+		SetTimeout(time.Second*10).
+		SetBasicAuth(global.Conf.CouchDB.Username, global.Conf.CouchDB.Password).
+		SetHeader("Content-Type", "application/json").
+		SetHeader("Accept", "application/json").
+		SetBaseURL(repoUrl).
+		SetDebug(false)
+
 	return &UserService{
 		repoSelector: repoSelector,
+		restyClient:  client,
 	}
 }
 
@@ -69,9 +84,12 @@ func (us *UserService) CreateUser(user *types.User, databasePassword string) (*t
 		}
 	}
 
+	// create required indexes
 	iErr := repository.CreateUserDatabaseFolderCreatedIndex(userRepo, hexUser)
-	if iErr != nil {
-		return nil, iErr
+	aErr := repository.CreateDesign_CountFromAddress(hexUser, "count", "from-address")
+	arErr := repository.CreateDesign_CountFromAddressRead(hexUser, "count-read", "from-address-read")
+	if errors.Join(iErr, aErr, arErr) != nil {
+		return nil, errors.Join(iErr, aErr, arErr)
 	}
 
 	return user, nil
@@ -122,6 +140,32 @@ func (us *UserService) FindUserByScryptEmail(scryptEmail string) (*types.EmailTo
 	return getUserByScryptEmail(repo, scryptEmail)
 }
 
+// Retrieves mailio message from users database by ID
+// func (us *UserService) GetMessage(address string, ID string) (*types.MailioMessage, error) {
+// 	if ID == "" {
+// 		return nil, types.ErrBadRequest
+// 	}
+// 	hexUser := "userdb-" + hex.EncodeToString([]byte(address))
+// 	url := fmt.Sprintf("%s/%s", hexUser, ID)
+
+// 	var mailioMessage types.MailioMessage
+// 	var couchError types.CouchDBError
+// 	response, rErr := us.restyClient.R().SetResult(&mailioMessage).SetError(&couchError).Get(url)
+// 	if rErr != nil {
+// 		global.Logger.Log(rErr.Error(), "failed to get message", hexUser)
+// 		return nil, rErr
+// 	}
+// 	if response.IsError() {
+// 		if response.StatusCode() == 404 {
+// 			return nil, types.ErrNotFound
+// 		}
+// 		global.Logger.Log(response.String(), "failed to get message", hexUser, couchError.Error, couchError.Reason)
+// 		return nil, fmt.Errorf("code: %s, reason: %s", couchError.Error, couchError.Reason)
+// 	}
+
+// 	return &mailioMessage, nil
+// }
+
 // Stores mailio message to users database
 func (us *UserService) SaveMessage(userAddress string, mailioMessage *types.MailioMessage) (*types.MailioMessage, error) {
 
@@ -130,21 +174,12 @@ func (us *UserService) SaveMessage(userAddress string, mailioMessage *types.Mail
 	}
 	mailioMessage.BaseDocument.ID = mailioMessage.ID
 
-	//TODO!: sign message as a server (so it can be checked by the client if need be)
-
 	hexUser := "userdb-" + hex.EncodeToString([]byte(userAddress))
-	repoUrl := global.Conf.CouchDB.Scheme + "://" + global.Conf.CouchDB.Host + ":" + strconv.Itoa(global.Conf.CouchDB.Port)
 	url := fmt.Sprintf("%s/%s", hexUser, mailioMessage.ID)
-	client := resty.New().SetBaseURL(repoUrl).
-		SetTimeout(time.Second*10).
-		SetBasicAuth(global.Conf.CouchDB.Username, global.Conf.CouchDB.Password).
-		SetHeader("Content-Type", "application/json").
-		SetHeader("Accept", "application/json").
-		SetDebug(true)
 
 	var postResult types.CouchDBResponse
 	var postError types.CouchDBError
-	httpResp, httpErr := client.R().SetBody(mailioMessage).SetResult(&postResult).SetError(&postError).Put(url)
+	httpResp, httpErr := us.restyClient.R().SetBody(mailioMessage).SetResult(&postResult).SetError(&postError).Put(url)
 	if httpErr != nil {
 		global.Logger.Log(httpErr.Error(), "failed to send message", hexUser)
 		return nil, httpErr
@@ -155,4 +190,75 @@ func (us *UserService) SaveMessage(userAddress string, mailioMessage *types.Mail
 	}
 
 	return mailioMessage, nil
+}
+
+// counts the number of sent messages by user between two timestamps
+func (us *UserService) CountNumberOfSentMessages(address string, from int64, to int64) (*types.CouchDBCountDistinctFromResponse, error) {
+	viewPath := "_design/count/_view/from-address"
+	hexUser := "userdb-" + hex.EncodeToString([]byte(address))
+
+	// format: address, folder, timestamp
+	params := url.Values{}
+	params.Add("startkey", fmt.Sprintf("[\"%s\",\"%s\",%d]", address, "sent", from))
+	params.Add("endkey", fmt.Sprintf("[\"%s\",\"%s\",%d]", address, "sent", to))
+	params.Add("group_level", "2")
+
+	url := fmt.Sprintf("%s/%s?%s", hexUser, viewPath, params.Encode())
+
+	var couchError types.CouchDBError
+	var response types.CouchDBCountDistinctFromResponse
+
+	httpResp, httpErr := us.restyClient.R().SetResult(&response).SetError(&couchError).Get(url)
+	if httpErr != nil {
+		global.Logger.Log(httpErr.Error(), "failed to send message", hexUser)
+		return nil, httpErr
+	}
+	if httpResp.IsError() {
+		global.Logger.Log(httpResp.String(), "failed to send message", hexUser, couchError.Error, couchError.Reason)
+		return nil, fmt.Errorf("code: %s, reason: %s", couchError.Error, couchError.Reason)
+	}
+	return &response, nil
+}
+
+// address is the user's mailio address, from is a message sender (it can be Mailio address or ordinary email address)
+func (us *UserService) CountNumberOfReceivedMessages(address string, from string, isRead bool, fromTimestamp int64, toTimestamp int64) (*types.CouchDBCountDistinctFromResponse, error) {
+	// query for couchdb statistics
+
+	//_design/count-from/_view/count-from-address (how many messages are received from user)
+	//_design/count-from/_view/count-from-address-read (how many messages are read)
+	// startkey=["inbox", "0x1869cc058092317800727afa25981bfd2a3d0969", 0]&endkey=["inbox", "0x1869cc058092317800727afa25981bfd2a3d0969", \u0000]&group_level=1
+
+	//expected response (for both views):
+	/**
+	{"rows":[
+		{"key":["inbox"],"value":4},
+		{"key":["sent"],"value":4}
+	]}
+	**/
+	viewPath := "_design/count/_view/from-address"
+	if isRead {
+		viewPath = "_design/count-read/_view/from-address-read"
+	}
+	hexUser := "userdb-" + hex.EncodeToString([]byte(address))
+
+	params := url.Values{}
+	params.Add("startkey", fmt.Sprintf("[\"%s\",\"%s\",%d]", address, "", fromTimestamp))
+	params.Add("endkey", fmt.Sprintf("[\"%s\",\"%s\", %d]", address, "\uffff", toTimestamp))
+	params.Add("group_level", "2")
+
+	url := fmt.Sprintf("%s/%s?%s", hexUser, viewPath, params.Encode())
+
+	var couchError types.CouchDBError
+	var response types.CouchDBCountDistinctFromResponse
+
+	httpResp, httpErr := us.restyClient.R().SetResult(&response).SetError(&couchError).Get(url)
+	if httpErr != nil {
+		global.Logger.Log(httpErr.Error(), "failed to send message", hexUser)
+		return nil, httpErr
+	}
+	if httpResp.IsError() {
+		global.Logger.Log(httpResp.String(), "failed to send message", hexUser, couchError.Error, couchError.Reason)
+		return nil, fmt.Errorf("code: %s, reason: %s", couchError.Error, couchError.Reason)
+	}
+	return &response, nil
 }

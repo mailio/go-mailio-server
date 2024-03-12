@@ -3,94 +3,91 @@ package util
 import (
 	"context"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"net"
-	"os"
 	"strings"
 
-	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/types"
 )
 
 var (
-	// LRU Cache for storing server public keys based on the request domain
-	// {key:value} = {domain:public key}
-	l *lru.Cache[string, string]
-	// discovery
-	// dnsDiscovery = discovery.NewDiscoverer()
-	// I/O thread-safe file
-	cacheFile *SafeFile
+// LRU Cache for storing server public keys based on the request domain
+// {key:value} = {domain:public key}
+// l *lru.Cache[string, string]
+// discovery
+// dnsDiscovery = discovery.NewDiscoverer()
+// I/O thread-safe file
+// cacheFile *SafeFile
 )
 
-func init() {
-	// init domain cache file
-	cf, cfErr := NewSafeFile(os.TempDir() + "/mailio_domain_cache.gob")
-	if cfErr != nil {
-		panic(cfErr)
-	}
+// func init() {
+// 	// init domain cache file
+// 	cf, cfErr := NewSafeFile(os.TempDir() + "/mailio_domain_cache.gob")
+// 	if cfErr != nil {
+// 		panic(cfErr)
+// 	}
 
-	lr, lrErr := lru.New[string, string](5000)
-	if lrErr != nil {
-		panic(lrErr)
-	}
+// 	lr, lrErr := lru.New[string, string](5000)
+// 	if lrErr != nil {
+// 		panic(lrErr)
+// 	}
 
-	data, rErr := cf.Read()
-	if rErr != nil {
-		if rErr == types.ErrNotFound {
-			l = lr
-		} else {
-			panic(rErr)
-		}
-	} else {
-		for _, kv := range data.Value {
-			lr.Add(kv.Key, kv.Value)
-		}
-		l = lr
-	}
-	cacheFile = cf
+// 	data, rErr := cf.Read()
+// 	if rErr != nil {
+// 		if rErr == types.ErrNotFound {
+// 			l = lr
+// 		} else {
+// 			panic(rErr)
+// 		}
+// 	} else {
+// 		for _, kv := range data.Value {
+// 			lr.Add(kv.Key, kv.Value)
+// 		}
+// 		l = lr
+// 	}
+// 	cacheFile = cf
 
-}
+// }
 
-func GetDNSMailioPublicKey(ctx context.Context, domain string) (string, error) {
-	var pk string
-	if publicKey, ok := l.Get(domain); !ok {
-		discovery, err := MailioDNSDiscover(ctx, domain)
-		if err != nil {
-			return "", errors.New(fmt.Sprintf("no public key in DNS for authority %s found", domain))
-		}
-		keyType := discovery.PublicKeyType
-		if keyType != "ed25519" {
-			return "", errors.New(fmt.Sprintf("public key type %s not supported", keyType))
-		}
-		pk = discovery.PublicKey
+// func GetDNSMailioPublicKey(redisClient *redis.Client, domainRepo *repository.CouchDBRepository, domain string) (string, error) {
+// 	var pk string
+// 	// if publicKey, ok := l.Get(domain); !ok {
+// 		discovery, err := MailioDNSDiscover(ctx, domain)
+// 		if err != nil {
+// 			return "", fmt.Errorf("no public key in DNS for authority %s found", domain)
+// 		}
+// 		keyType := discovery.PublicKeyType
+// 		if keyType != "ed25519" {
+// 			return "", fmt.Errorf("public key type %s not supported", keyType)
+// 		}
+// 		pk = discovery.PublicKey
 
-		l.Add(domain, pk)
+// 		// l.Add(domain, pk)
 
-		// write new domain to cache file (first convert to orginary map so it's gob-serializable)
-		var kvPairs []types.KeyValue
-		for _, key := range l.Keys() {
-			if val, ok := l.Get(key); ok {
-				kvPairs = append(kvPairs, types.KeyValue{
-					Key:   key,
-					Value: val,
-				})
-			}
-		}
-		data := &Data{
-			Value: kvPairs,
-		}
-		wErr := cacheFile.Write(data)
-		if wErr != nil {
-			global.Logger.Log(wErr)
-		}
-	} else {
-		pk = publicKey
-	}
+// 		// write new domain to cache file (first convert to orginary map so it's gob-serializable)
+// 		var kvPairs []types.KeyValue
+// 		for _, key := range l.Keys() {
+// 			if val, ok := l.Get(key); ok {
+// 				kvPairs = append(kvPairs, types.KeyValue{
+// 					Key:   key,
+// 					Value: val,
+// 				})
+// 			}
+// 		}
+// 		data := &Data{
+// 			Value: kvPairs,
+// 		}
+// 		wErr := cacheFile.Write(data)
+// 		if wErr != nil {
+// 			global.Logger.Log(wErr)
+// 		}
+// 	// } else {
+// 		pk = publicKey
+// 	}
 
-	return pk, nil
-}
+// 	return pk, nil
+// }
 
 // DNS discovery of the domain.
 // Returns Discovery object with the following fields:
@@ -102,6 +99,18 @@ func GetDNSMailioPublicKey(ctx context.Context, domain string) (string, error) {
 func MailioDNSDiscover(ctx context.Context, domain string) (*types.Discovery, error) {
 	var r net.Resolver
 
+	if strings.Contains(domain, "localhost") {
+		// if development server take the local public key
+		pk := base64.StdEncoding.EncodeToString(global.PublicKey)
+		return &types.Discovery{
+			Domain:        "localhost",
+			IsMailio:      true,
+			Ips:           []string{"127.0.0.1"},
+			PublicKeyType: "ed25519",
+			PublicKey:     pk,
+		}, nil
+	}
+
 	txts, err := r.LookupTXT(ctx, "mailio._mailiokey."+domain)
 	if err != nil {
 		return nil, err
@@ -112,14 +121,14 @@ func MailioDNSDiscover(ctx context.Context, domain string) (*types.Discovery, er
 	ips, _ := r.LookupIPAddr(ctx, domain)
 	// read IP address
 	ipAddresses := []string{}
-	if ips != nil {
-		for _, ip := range ips {
-			if ipv4 := ip.IP.To4(); ipv4 != nil {
-				ipAddress := ipv4.String()
-				ipAddresses = append(ipAddresses, ipAddress)
-			}
+
+	for _, ip := range ips {
+		if ipv4 := ip.IP.To4(); ipv4 != nil {
+			ipAddress := ipv4.String()
+			ipAddresses = append(ipAddresses, ipAddress)
 		}
 	}
+
 	// parse TXT record
 	for _, txt := range txts {
 		if strings.Contains(txt, "v=MAILIO1") {

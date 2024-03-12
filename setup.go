@@ -20,8 +20,10 @@ func ConfigDBSelector() repository.DBSelector {
 	didRepo, didRErr := repository.NewCouchDBRepository(repoUrl, repository.DID, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
 	vcsRepo, vscrErr := repository.NewCouchDBRepository(repoUrl, repository.VCS, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
 	domainRepo, dErr := repository.NewCouchDBRepository(repoUrl, repository.Domain, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
+	messageDeliveryRepo, mdErr := repository.NewCouchDBRepository(repoUrl, repository.MessageDelivery, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
+	userProfileRepo, upErr := repository.NewCouchDBRepository(repoUrl, repository.UserProfile, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
 
-	repoErr := errors.Join(handshakeRepoErr, nonceRepoErr, userRepoErr, mappingRepoErr, didRErr, vscrErr, dErr)
+	repoErr := errors.Join(handshakeRepoErr, nonceRepoErr, userRepoErr, mappingRepoErr, didRErr, vscrErr, dErr, mdErr, upErr)
 	if repoErr != nil {
 		panic(repoErr)
 	}
@@ -35,6 +37,8 @@ func ConfigDBSelector() repository.DBSelector {
 	dbSelector.AddDB(didRepo)
 	dbSelector.AddDB(vcsRepo)
 	dbSelector.AddDB(domainRepo)
+	dbSelector.AddDB(messageDeliveryRepo)
+	dbSelector.AddDB(userProfileRepo)
 
 	return dbSelector
 }
@@ -46,13 +50,13 @@ func ConfigDBIndexing(dbSelector *repository.CouchDBSelector, environment *types
 	// Create INDEXES
 	vcsRepo, vscErr := dbSelector.ChooseDB(repository.VCS)
 	handshakeRepo, hshErr := dbSelector.ChooseDB(repository.Handshake)
-	nonceRepo, nErr := dbSelector.ChooseDB(repository.Nonce)
-	if errors.Join(vscErr, hshErr, nErr) != nil {
-		panic(errors.Join(vscErr, hshErr, nErr))
+	if errors.Join(vscErr, hshErr) != nil {
+		panic(errors.Join(vscErr, hshErr))
 	}
 
 	icVcsErr := repository.CreateVcsCredentialSubjectIDIndex(vcsRepo)
 	hiErr := repository.CreateHandshakeIndex(handshakeRepo)
+	// aErr := repository.CreateHandshakeAddressIndex(handshakeRepo)
 	iErr := errors.Join(icVcsErr, hiErr)
 	if iErr != nil {
 		panic(iErr)
@@ -60,9 +64,10 @@ func ConfigDBIndexing(dbSelector *repository.CouchDBSelector, environment *types
 
 	// Create DESIGN DOCUMENTS
 	// create a design document to return all documents older than N minutes
-	repository.CreateDesign_DeleteExpiredRecordsByCreatedDate(nonceRepo, 5)
+	repository.CreateDesign_DeleteExpiredRecordsByCreatedDate(repository.Nonce, "nonce", "old")
 
 	// cron jobs
 	environment.Cron.AddFunc("@every 5m", nonceService.RemoveExpiredNonces) // remove expired tokens every 5 minutes
 	environment.Cron.Start()
+	go nonceService.RemoveExpiredNonces() // run once on startup
 }

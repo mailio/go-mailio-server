@@ -102,7 +102,7 @@ func PublicKeyToMailioAddress(pubKeyBase64 string) (string, error) {
 	// sh256Bytes := hash.Sum(nil)
 	// ma := BytesToAddress(sh256Bytes)
 	// return hex.EncodeToString(ma[:]), nil
-	pubKey, err := base64.StdEncoding.DecodeString(pubKeyBase64)
+	pubKey, err := base64.RawURLEncoding.DecodeString(pubKeyBase64)
 	if err != nil {
 		return "", err
 	}
@@ -172,6 +172,7 @@ func Verify(message []byte, signature []byte, publicKeyBase64 string) (bool, err
 }
 
 // Generated ed25519 signing key pair and returns base64 public key, private key
+// returns publicKey, privateKey, error
 func GenerateEd25519KeyPair() (*string, *string, error) {
 	pubKey, privKey, err := ed25519.GenerateKey(nil)
 	if err != nil {

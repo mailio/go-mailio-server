@@ -94,7 +94,7 @@ func asyncRetryDelayFunc(attempt int, err error, t *asynq.Task) time.Duration {
 }
 
 // initalizes the async queue
-func initAsyncQueue(conf global.Config, dbSelector *repository.CouchDBSelector) (*asynq.Server, *asynq.Client) {
+func initAsyncQueue(dbSelector *repository.CouchDBSelector, env *types.Environment) (*asynq.Server, *asynq.Client) {
 	queueRedisClient := asynq.RedisClientOpt{
 		Addr:     global.Conf.Redis.Host + ":" + strconv.Itoa(global.Conf.Redis.Port),
 		Username: global.Conf.Redis.Username,
@@ -122,7 +122,7 @@ func initAsyncQueue(conf global.Config, dbSelector *repository.CouchDBSelector) 
 		},
 	)
 
-	taskService := queue.NewMessageQueue(dbSelector)
+	taskService := queue.NewMessageQueue(dbSelector, env)
 	// start a task processing server
 	mux := asynq.NewServeMux()
 	mux.HandleFunc(types.QueueTypeDIDCommRecv, taskService.ProcessTask)
@@ -190,7 +190,7 @@ func main() {
 	dbSelector := ConfigDBSelector()
 	ConfigDBIndexing(dbSelector.(*repository.CouchDBSelector), env)
 
-	taskServer, taskClient := initAsyncQueue(global.Conf, dbSelector.(*repository.CouchDBSelector))
+	taskServer, taskClient := initAsyncQueue(dbSelector.(*repository.CouchDBSelector), env)
 	defer taskClient.Close()
 	env.TaskClient = taskClient
 

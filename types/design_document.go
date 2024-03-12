@@ -1,7 +1,8 @@
 package types
 
 type MapFunction struct {
-	Map string `json:"map"`
+	Map    string `json:"map"`
+	Reduce string `json:"reduce,omitempty"`
 }
 
 type DesignDocument struct {

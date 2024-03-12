@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"time"
 
@@ -44,7 +43,7 @@ var keysCmd = &cobra.Command{
 				os.Exit(1)
 			}
 			check(err)
-			err = ioutil.WriteFile(outputFile, fileBytes, 0644)
+			err = os.WriteFile(outputFile, fileBytes, 0644)
 			check(err)
 			fmt.Printf("Output file: %s\n", outputFile)
 		} else {

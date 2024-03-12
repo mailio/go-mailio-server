@@ -104,15 +104,17 @@ func (ns *NonceService) RemoveExpiredNonces() {
 		defer cancel()
 
 		time_ago := time.Now().UnixMilli() - (5 * 60 * 1000) // 5 seconds ago and older
-		query := fmt.Sprintf("_design/nonce/_view/older_than?descending=true&startkey=%d&limit=100", time_ago)
+		query := fmt.Sprintf("_design/nonce/_view/old?descending=true&startkey=%d&limit=100", time_ago)
 		response, err := ns.nonceRepo.GetByID(ctx, query)
 		if err != nil {
+			global.Logger.Log("Error getting expired nonces", err.Error())
 			return
 		}
 
 		var expiredNonces nonceExpiredView
 		mErr := repository.MapToObject(response, &expiredNonces)
 		if mErr != nil {
+			global.Logger.Log("Error mapping expired nonces", mErr.Error())
 			return
 		}
 		if len(expiredNonces.Rows) > 0 {

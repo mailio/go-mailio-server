@@ -6,13 +6,15 @@ import (
 
 const (
 	// CouchDB is the name of the CouchDB database
-	Handshake     = "handshake"
-	Nonce         = "nonce"
-	User          = "_users"
-	Domain        = "domains"
-	MailioMapping = "mailio_mapping"
-	DID           = "did" // decentralized identifiers
-	VCS           = "vcs" // verifiable credentials
+	Handshake       = "handshake"
+	Nonce           = "nonce"
+	User            = "_users"
+	Domain          = "domains"
+	MailioMapping   = "mailio_mapping"
+	DID             = "did"              // decentralized identifiers
+	VCS             = "vcs"              // verifiable credentials
+	MessageDelivery = "message_delivery" // message delivery statuses
+	UserProfile     = "user_profile"     // user profile (for system use only)
 )
 
 type CouchDBSelector struct {

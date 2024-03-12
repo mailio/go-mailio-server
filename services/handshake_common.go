@@ -4,9 +4,12 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/go-kit/log/level"
+	"github.com/go-resty/resty/v2"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/repository"
 	"github.com/mailio/go-mailio-server/types"
@@ -31,8 +34,18 @@ func GetByID(handshakeRepo repository.Repository, handshakeID string) (*types.St
 	if err != nil {
 		return nil, err
 	}
+	response := handshakeResponse.(*resty.Response)
 
-	return handshakeResponse.(*types.StoredHandshake), nil
+	if response.IsError() {
+		global.Logger.Log(response.Error(), "failed to retrieve handshake id", handshakeID, "response", string(response.Body()))
+		return nil, fmt.Errorf("failed to retrieve handshake id %s", handshakeID)
+	}
+	var handshake types.StoredHandshake
+	if err := json.Unmarshal(response.Body(), &handshake); err != nil {
+		return nil, err
+	}
+
+	return &handshake, nil
 }
 
 // get handshake by mailio address (where ID of the handshake is constructed from userOwnerAddress and senderAddress)
