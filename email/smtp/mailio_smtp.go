@@ -23,10 +23,9 @@ import (
 )
 
 var (
-	handlersMu       sync.RWMutex
-	handlers         = make(map[string]SmtpHandler)
-	maxBigInt        = big.NewInt(math.MaxInt64)
-	bounceMailioInfo = "Mailio"
+	handlersMu sync.RWMutex
+	handlers   = make(map[string]SmtpHandler)
+	maxBigInt  = big.NewInt(math.MaxInt64)
 )
 
 type SmtpHandler interface {
@@ -135,6 +134,14 @@ func ToMime(msg *types.Mail) ([]byte, error) {
 	// add headers
 	outgoingMime = outgoingMime.Header("X-Mailer", "Mailio")
 
+	// add attachments
+	if msg.Attachments != nil {
+		for _, attachment := range msg.Attachments {
+			outgoingMime = outgoingMime.AddAttachment(attachment.Content, attachment.ContentType, attachment.Filename)
+		}
+
+	}
+
 	// add message id
 	host := "localhost"
 	if global.Conf.Host != "" {
@@ -174,7 +181,7 @@ Temporary Failure — SMTP Reply Code = 450, SMTP Status Code = 4.0.0
 
 where 4.x.x codes are soft bounces, and 5.x..x codes are hard bounces
 */
-func ToBounce(recipient mail.Address, msg types.MailSmtpReceived, bounceCode string, bounceReason string) ([]byte, error) {
+func ToBounce(recipient mail.Address, msg types.Mail, bounceCode string, bounceReason string) ([]byte, error) {
 	// Create the bounce message builder
 	host := "localhost"
 	if global.Conf.Host != "" {
@@ -248,13 +255,25 @@ func ToBounce(recipient mail.Address, msg types.MailSmtpReceived, bounceCode str
 	return finalBuf.Bytes(), nil
 }
 
-func ToComplaint(recipient mail.Address, complaintReason string) ([]byte, error) {
+// ToComplaint creates a complaint message
+/*
+Complaints are generated when a recipient reports an email as spam or junk.
+The recipient's email provider sends a complaint to the custom ESP.
+The complaint includes the original email that was reported as spam or junk.
+The complaint also includes information about the recipient who reported the email as spam or junk.
+*/
+func ToComplaint(recipient mail.Address, reporter mail.Address, msg types.Mail, complaintReason string) ([]byte, error) {
 	// Set host dynamically or use "localhost" as default
 	host := "localhost"
 	if global.Conf.Host != "" {
 		host = global.Conf.Host
 	}
-	from := mail.Address{Name: "Complaint Department", Address: fmt.Sprintf("complaints@%s", host)}
+
+	// Convert the original message to MIME
+	originalMsgMime, err := ToMime(&msg)
+	if err != nil {
+		return nil, err
+	}
 
 	// Buffers for headers and MIME message
 	var headerBuf bytes.Buffer
@@ -266,7 +285,7 @@ func ToComplaint(recipient mail.Address, complaintReason string) ([]byte, error)
 
 	// Set the top-level headers for the message
 	header := make(textproto.MIMEHeader)
-	header.Set("From", from.String())
+	header.Set("From", reporter.String())
 	header.Set("To", recipient.String())
 	header.Set("Subject", "Complaint Notification")
 	header.Set("Date", time.Now().Format(time.RFC1123Z))
@@ -278,27 +297,64 @@ func ToComplaint(recipient mail.Address, complaintReason string) ([]byte, error)
 		fmt.Fprintf(&headerBuf, "%s: %s\r\n", k, strings.Join(v, ","))
 	}
 
+	allTos := ""
+	for i, to := range msg.To {
+		allTos += to.String()
+		if i < len(msg.To)-1 {
+			allTos += ", "
+		}
+	}
+	for i, cc := range msg.Cc {
+		allTos += cc.String()
+		if i < len(msg.Cc)-1 {
+			allTos += ", "
+		}
+	}
+	for i, bcc := range msg.Bcc {
+		allTos += bcc.String()
+		if i < len(msg.Bcc)-1 {
+			allTos += ", "
+		}
+
+	}
 	// First part: Human-readable explanation of the complaint
 	textPartHeader := make(textproto.MIMEHeader)
 	textPartHeader.Set("Content-Type", "text/plain; charset=\"utf-8\"")
 	textPart, _ := writer.CreatePart(textPartHeader)
 	fmt.Fprintln(textPart, fmt.Sprintf("This message is to inform you that a complaint was received for an email sent to %s.\n\n"+
 		"Reason for complaint:\n"+
-		"%s\n", recipient.String(), complaintReason))
+		"%s\n", allTos, complaintReason))
 
 	// Second part: Machine-readable complaint feedback report
 	feedbackPartHeader := make(textproto.MIMEHeader)
 	feedbackPartHeader.Set("Content-Type", "message/feedback-report")
 	feedbackPart, _ := writer.CreatePart(feedbackPartHeader)
-	fmt.Fprintln(feedbackPart, fmt.Sprintf("Feedback-Type: complaint\n"+
-		"User-Agent: %s\n"+
-		"Version: 1\n"+
-		"Original-Recipient: rfc822; %s\n"+
-		"Final-Recipient: rfc822; %s\n"+
-		"Original-Mail-From: %s\n"+
-		"Arrival-Date: %s\n"+
-		"Reported-Domain: %s\n"+
-		"Reason: %s", host, recipient.String(), recipient.String(), from.String(), time.Now().UTC().Format(time.RFC1123Z), host, complaintReason))
+	originalRecipients := ""
+	for _, to := range msg.To {
+		originalRecipients += "Original-Rcpt-To: " + to.String() + "\n"
+	}
+	reportedDomain := strings.Split(msg.From.Address, "@")[1]
+	machineReadyReport := fmt.Sprintf(
+		"Feedback-Type: %s\n"+
+			"User-Agent: %s\n"+
+			"Version: 1\n"+
+			"Original-Mail-From: %s\n"+
+			"%s"+
+			"Arrival-Date: %s\n"+
+			"Reported-Domain: %s\n",
+		complaintReason,
+		host,
+		msg.From.String(),
+		originalRecipients,
+		time.UnixMilli(msg.Timestamp).Format(time.RFC1123Z),
+		reportedDomain)
+	fmt.Fprintln(feedbackPart, machineReadyReport)
+
+	// add original message
+	originalPartHeader := make(textproto.MIMEHeader)
+	originalPartHeader.Set("Content-Type", "message/rfc822")
+	originalPart, _ := writer.CreatePart(originalPartHeader)
+	fmt.Fprintf(originalPart, "%s", originalMsgMime)
 
 	// Close the multipart writer to finalize the boundary
 	if err := writer.Close(); err != nil {
@@ -313,4 +369,10 @@ func ToComplaint(recipient mail.Address, complaintReason string) ([]byte, error)
 	finalBuf.Write(buf.Bytes())
 
 	return finalBuf.Bytes(), nil
+}
+
+// Parsing raw mime message
+func ParseMime(mime []byte) (*types.Mail, error) {
+
+	return nil, nil
 }
