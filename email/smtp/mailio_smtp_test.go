@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mailio/go-mailio-server/types"
+	"github.com/mailio/go-mailio-server/types/mailiosmtp"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -26,7 +26,7 @@ func TestToMime(t *testing.T) {
 	if err != nil {
 		log.Fatalf("Failed to read the image data: %v", err)
 	}
-	email := types.Mail{
+	email := mailiosmtp.Mail{
 		From: mail.Address{
 			Name:    "John Doe",
 			Address: "test@test.com",
@@ -39,7 +39,7 @@ func TestToMime(t *testing.T) {
 		Subject:   "Testing mailio",
 		BodyHTML:  "<h1>Testing mailio</h1>",
 		Timestamp: time.Now().UTC().UnixMilli(),
-		Attachments: []*types.SmtpAttachment{
+		Attachments: []*mailiosmtp.SmtpAttachment{
 			{
 				ContentType: "image/jpeg",
 				Filename:    "lenna.jpg",
@@ -55,17 +55,17 @@ func TestToMime(t *testing.T) {
 }
 
 func TestToBounce(t *testing.T) {
-	receivedMsg := types.Mail{
+	receivedMsg := mailiosmtp.Mail{
 		From:                      mail.Address{Name: "John", Address: "john@doe.com"},
 		To:                        []mail.Address{{Name: "Jane", Address: "jane@jane.com"}},
 		Subject:                   "Testing mailio",
 		BodyHTML:                  "<h1>Testing mailio</h1>",
 		Timestamp:                 time.Now().UTC().UnixMilli(),
 		BodyHTMLWithoutUnsafeTags: "<h1>Testing mailio</h1>",
-		SpamVerdict:               &types.VerdictStatus{Status: "PASS"},
-		VirusVerdict:              &types.VerdictStatus{Status: "PASS"},
-		SpfVerdict:                &types.VerdictStatus{Status: "PASS"},
-		DkimVerdict:               &types.VerdictStatus{Status: "PASS"},
+		SpamVerdict:               &mailiosmtp.VerdictStatus{Status: "PASS"},
+		VirusVerdict:              &mailiosmtp.VerdictStatus{Status: "PASS"},
+		SpfVerdict:                &mailiosmtp.VerdictStatus{Status: "PASS"},
+		DkimVerdict:               &mailiosmtp.VerdictStatus{Status: "PASS"},
 		BodyText:                  "Testing mailio",
 		MessageId:                 "123456",
 	}
@@ -90,20 +90,20 @@ func TestToComplaint(t *testing.T) {
 		log.Fatalf("Failed to read the image data: %v", err)
 	}
 
-	receivedMsg := types.Mail{
+	receivedMsg := mailiosmtp.Mail{
 		From:                      mail.Address{Name: "spam person", Address: "spammer@spam.com"},
 		To:                        []mail.Address{{Name: "Jane", Address: "jane@alice.com"}},
 		Subject:                   "Testing mailio",
 		BodyHTML:                  "<h1>Testing mailio</h1>",
 		Timestamp:                 time.Now().UTC().UnixMilli(),
 		BodyHTMLWithoutUnsafeTags: "<h1>Testing mailio</h1>",
-		SpamVerdict:               &types.VerdictStatus{Status: "FAIL"},
-		VirusVerdict:              &types.VerdictStatus{Status: "PASS"},
-		SpfVerdict:                &types.VerdictStatus{Status: "FAIL"},
-		DkimVerdict:               &types.VerdictStatus{Status: "NOT_AVAILABLE"},
+		SpamVerdict:               &mailiosmtp.VerdictStatus{Status: "FAIL"},
+		VirusVerdict:              &mailiosmtp.VerdictStatus{Status: "PASS"},
+		SpfVerdict:                &mailiosmtp.VerdictStatus{Status: "FAIL"},
+		DkimVerdict:               &mailiosmtp.VerdictStatus{Status: "NOT_AVAILABLE"},
 		BodyText:                  "Testing mailio",
 		MessageId:                 "123456",
-		Attachments: []*types.SmtpAttachment{
+		Attachments: []*mailiosmtp.SmtpAttachment{
 			{
 				ContentType: "image/jpeg",
 				Filename:    "lenna.jpg",
@@ -202,17 +202,17 @@ func TestEmailParsingMultipeHeaders(t *testing.T) {
 }
 
 func TestParseBounce(t *testing.T) {
-	receivedMsg := types.Mail{
+	receivedMsg := mailiosmtp.Mail{
 		From:                      mail.Address{Name: "John", Address: "john@doe.com"},
 		To:                        []mail.Address{{Name: "Jane", Address: "jane@jane.com"}},
 		Subject:                   "Testing mailio",
 		BodyHTML:                  "<h1>Testing mailio</h1>",
 		Timestamp:                 time.Now().UTC().UnixMilli(),
 		BodyHTMLWithoutUnsafeTags: "<h1>Testing mailio</h1>",
-		SpamVerdict:               &types.VerdictStatus{Status: "PASS"},
-		VirusVerdict:              &types.VerdictStatus{Status: "PASS"},
-		SpfVerdict:                &types.VerdictStatus{Status: "PASS"},
-		DkimVerdict:               &types.VerdictStatus{Status: "PASS"},
+		SpamVerdict:               &mailiosmtp.VerdictStatus{Status: "PASS"},
+		VirusVerdict:              &mailiosmtp.VerdictStatus{Status: "PASS"},
+		SpfVerdict:                &mailiosmtp.VerdictStatus{Status: "PASS"},
+		DkimVerdict:               &mailiosmtp.VerdictStatus{Status: "PASS"},
 		BodyText:                  "Testing mailio",
 		MessageId:                 "123456",
 	}

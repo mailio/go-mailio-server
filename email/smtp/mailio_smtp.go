@@ -20,6 +20,7 @@ import (
 	"github.com/jhillyerd/enmime"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/types"
+	"github.com/mailio/go-mailio-server/types/mailiosmtp"
 	"github.com/microcosm-cc/bluemonday"
 )
 
@@ -31,7 +32,7 @@ var (
 
 type SmtpHandler interface {
 	// ReceiveMail is a method called on the specific ESP handler webhook implementation
-	ReceiveMail(request http.Request) (*types.Mail, error)
+	ReceiveMail(request http.Request) (*mailiosmtp.Mail, error)
 	// SendMimeMail returns generated message id or error
 	SendMimeMail(mime []byte, to []mail.Address) (string, error)
 }
@@ -109,7 +110,7 @@ func generateRFC2822MessageID(hostname string) (string, error) {
 }
 
 // converts a message to a mime message
-func ToMime(msg *types.Mail) ([]byte, error) {
+func ToMime(msg *mailiosmtp.Mail) ([]byte, error) {
 
 	// convert html to text
 	text := htmlToText(msg.BodyHTML)
@@ -182,7 +183,7 @@ Temporary Failure — SMTP Reply Code = 450, SMTP Status Code = 4.0.0
 
 where 4.x.x codes are soft bounces, and 5.x..x codes are hard bounces
 */
-func ToBounce(recipient mail.Address, msg types.Mail, bounceCode string, bounceReason string) ([]byte, error) {
+func ToBounce(recipient mail.Address, msg mailiosmtp.Mail, bounceCode string, bounceReason string) ([]byte, error) {
 	// Create the bounce message builder
 	host := "localhost"
 	if global.Conf.Host != "" {
@@ -267,7 +268,7 @@ The complaint also includes information about the recipient who reported the ema
 https://en.wikipedia.org/wiki/Abuse_Reporting_Format
 https://datatracker.ietf.org/doc/html/rfc5965
 */
-func ToComplaint(recipient mail.Address, reporter mail.Address, msg types.Mail, complaintReason string) ([]byte, error) {
+func ToComplaint(recipient mail.Address, reporter mail.Address, msg mailiosmtp.Mail, complaintReason string) ([]byte, error) {
 	// Set host dynamically or use "localhost" as default
 	host := "localhost"
 	if global.Conf.Host != "" {
@@ -377,13 +378,13 @@ func ToComplaint(recipient mail.Address, reporter mail.Address, msg types.Mail, 
 }
 
 // Parsing raw mime message into a Mailio structure
-func ParseMime(mime []byte) (*types.Mail, error) {
+func ParseMime(mime []byte) (*mailiosmtp.Mail, error) {
 	msg, err := enmime.ReadEnvelope(bytes.NewReader(mime))
 	if err != nil {
 		return nil, err
 	}
 
-	email := &types.Mail{}
+	email := &mailiosmtp.Mail{}
 
 	// get the headers
 	headers := msg.Root.Header
@@ -444,10 +445,10 @@ func ParseMime(mime []byte) (*types.Mail, error) {
 	}
 
 	// mime.Attachments contains the non-inline attachments. (standard email attachments)
-	var attachments []*types.SmtpAttachment
+	var attachments []*mailiosmtp.SmtpAttachment
 	if len(msg.Attachments) > 0 {
 		for _, attachment := range msg.Attachments {
-			attachments = append(attachments, &types.SmtpAttachment{
+			attachments = append(attachments, &mailiosmtp.SmtpAttachment{
 				ContentType: attachment.ContentType,
 				Filename:    attachment.FileName,
 				Content:     attachment.Content,
@@ -466,7 +467,7 @@ func ParseMime(mime []byte) (*types.Mail, error) {
 
 	// mime.Inlines is a slice of inlined attacments. These are typically images that are embedded in the HTML body
 	for _, inline := range msg.Inlines {
-		email.BodyRawPart = append(email.BodyRawPart, &types.MailBodyRaw{
+		email.BodyRawPart = append(email.BodyRawPart, &mailiosmtp.MailBodyRaw{
 			ContentType:        inline.ContentType,
 			Content:            inline.Content,
 			ContentDisposition: inline.Disposition,
