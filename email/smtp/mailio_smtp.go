@@ -3,6 +3,7 @@ package mailiosmtp
 import (
 	"bytes"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"math"
 	"math/big"
@@ -206,6 +207,7 @@ func ToBounce(recipient mail.Address, msg types.Mail, bounceCode string, bounceR
 	header.Set("Subject", "Delivery Status Notification (Failure)")
 	header.Set("Date", time.Now().Format(time.RFC1123Z))
 	header.Set("MIME-Version", "1.0")
+	header.Set("Message-ID", msg.MessageId)
 	header.Set("Content-Type", fmt.Sprintf("multipart/report; report-type=delivery-status; boundary=\"%s\"", writer.Boundary()))
 
 	// Write the top-level headers to the temporary buffer
@@ -261,6 +263,9 @@ Complaints are generated when a recipient reports an email as spam or junk.
 The recipient's email provider sends a complaint to the custom ESP.
 The complaint includes the original email that was reported as spam or junk.
 The complaint also includes information about the recipient who reported the email as spam or junk.
+
+https://en.wikipedia.org/wiki/Abuse_Reporting_Format
+https://datatracker.ietf.org/doc/html/rfc5965
 */
 func ToComplaint(recipient mail.Address, reporter mail.Address, msg types.Mail, complaintReason string) ([]byte, error) {
 	// Set host dynamically or use "localhost" as default
@@ -371,8 +376,118 @@ func ToComplaint(recipient mail.Address, reporter mail.Address, msg types.Mail, 
 	return finalBuf.Bytes(), nil
 }
 
-// Parsing raw mime message
+// Parsing raw mime message into a Mailio structure
 func ParseMime(mime []byte) (*types.Mail, error) {
+	msg, err := enmime.ReadEnvelope(bytes.NewReader(mime))
+	if err != nil {
+		return nil, err
+	}
 
-	return nil, nil
+	email := &types.Mail{}
+
+	// get the headers
+	headers := msg.Root.Header
+	email.MessageId = msg.GetHeader("Message-ID")
+	from, fErr := mail.ParseAddress(headers.Get("From"))
+	to, tErr := mail.ParseAddressList(headers.Get("To"))
+	joinedErr := errors.Join(fErr, tErr)
+	if joinedErr != nil {
+		return nil, joinedErr
+	}
+
+	if headers.Get("Cc") != "" {
+		cc, _ := mail.ParseAddressList(headers.Get("Cc"))
+		if len(cc) > 0 {
+			email.Cc = make([]mail.Address, len(cc))
+			for i, addrPtr := range cc {
+				email.Cc[i] = *addrPtr // Dereference the pointer to get the value
+			}
+		}
+	}
+	if headers.Get("Bcc") != "" {
+		bcc, _ := mail.ParseAddressList(headers.Get("Bcc"))
+		if len(bcc) > 0 {
+			email.Bcc = make([]mail.Address, len(bcc))
+			for i, addrPtr := range bcc {
+				email.Bcc[i] = *addrPtr // Dereference the pointer to get the value
+			}
+		}
+	}
+
+	email.From = *from
+	if len(to) > 0 {
+		email.To = make([]mail.Address, len(to))
+		for i, addrPtr := range to {
+			email.To[i] = *addrPtr // Dereference the pointer to get the value
+		}
+	}
+
+	// allHeaders := msg.RawHeaders()
+	email.Headers = make(map[string][]string, 0)
+	for key, value := range headers {
+		vals := []string{}
+		for _, v := range value {
+			v = strings.ReplaceAll(v, "\n", "")
+			v = strings.Trim(v, " ")
+			vals = append(vals, v)
+		}
+		email.Headers[key] = vals
+	}
+
+	// get the body
+	email.Subject = msg.GetHeader("Subject")
+	dt, tErr := msg.Date()
+	if tErr != nil {
+		email.Timestamp = time.Now().UTC().UnixMilli()
+	} else {
+		email.Timestamp = dt.UnixMilli()
+	}
+
+	// mime.Attachments contains the non-inline attachments. (standard email attachments)
+	var attachments []*types.SmtpAttachment
+	if len(msg.Attachments) > 0 {
+		for _, attachment := range msg.Attachments {
+			attachments = append(attachments, &types.SmtpAttachment{
+				ContentType: attachment.ContentType,
+				Filename:    attachment.FileName,
+				Content:     attachment.Content,
+				ContentID:   attachment.ContentID,
+			})
+		}
+	}
+	if len(attachments) > 0 {
+		email.Attachments = attachments
+	}
+
+	// body (plain, html, html cleaned)
+	email.BodyHTML = msg.HTML
+	email.BodyText = msg.Text
+	email.BodyHTMLWithoutUnsafeTags = removeUnwantedTags(email.BodyHTML)
+
+	// mime.Inlines is a slice of inlined attacments. These are typically images that are embedded in the HTML body
+	for _, inline := range msg.Inlines {
+		email.BodyRawPart = append(email.BodyRawPart, &types.MailBodyRaw{
+			ContentType:        inline.ContentType,
+			Content:            inline.Content,
+			ContentDisposition: inline.Disposition,
+			ContentID:          inline.ContentID,
+		})
+	}
+
+	return email, nil
+}
+
+func removeUnwantedTags(html string) string {
+	sanitizer := bluemonday.UGCPolicy()
+
+	// Allow only a subset of HTML elements
+	allowedElements := []string{"a", "abbr", "acronym", "address", "area", "b", "bdo", "big", "blockquote", "br", "button", "caption", "center", "cite", "code", "col", "colgroup", "dd", "del", "dfn", "dir", "div", "dl", "dt", "em", "fieldset", "font", "form", "h1", "h2", "h3", "h4", "h5", "h6", "hr", "i", "img", "input", "ins", "kbd", "label", "legend", "li", "map", "menu", "ol", "optgroup", "option", "p", "pre", "q", "s", "samp", "select", "small", "span", "strike", "strong", "sub", "sup", "table", "tbody", "td", "textarea", "tfoot", "th", "thead", "u", "tr", "tt", "u", "ul", "var"}
+	sanitizer.AllowElements(allowedElements...)
+
+	allowedStyles := []string{"azimuth", "background", "background-blend-mode", "background-clip", "background-color", "background-image", "background-origin", "background-position", "background-repeat", "background-size", "border", "border-bottom", "border-bottom-color", "border-bottom-left-radius", "border-bottom-right-radius", "border-bottom-style", "border-bottom-width", "border-collapse", "border-color", "border-left", "border-left-color", "border-left-style", "border-left-width", "border-radius", "border-right", "border-right-color", "border-right-style", "border-right-width", "border-spacing", "border-style", "border-top", "border-top-color", "border-top-left-radius", "border-top-right-radius", "border-top-style", "border-top-width", "border-width", "box-sizing", "break-after", "break-before", "break-inside", "caption-side", "clear", "color", "column-count", "column-fill", "column-gap", "column-rule", "column-rule-color", "column-rule-style", "column-rule-width", "column-span", "column-width", "columns", "direction", "display", "elevation", "empty-cells", "float", "font", "font-family", "font-feature-settings", "font-kerning", "font-size", "font-size-adjust", "font-stretch", "font-style", "font-synthesis", "font-variant", "font-variant-alternates", "font-variant-caps", "font-variant-east-asian", "font-variant-ligatures", "font-variant-numeric", "font-weight", "height", "image-orientation", "image-resolution", "isolation", "letter-spacing", "line-height", "list-style", "list-style-position", "list-style-type", "margin", "margin-bottom", "margin-left", "margin-right", "margin-top", "max-height", "max-width", "min-height", "min-width", "mix-blend-mode", "object-fit", "object-position", "opacity", "outline", "outline-color", "outline-style", "outline-width", "overflow", "padding", "padding-bottom", "padding-left", "padding-right", "padding-top", "pause", "pause-after", "pause-before", "pitch", "pitch-range", "quotes", "richness", "speak", "speak-header", "speak-numeral", "speak-punctuation", "speech-rate", "stress", "table-layout", "text-align", "text-combine-upright", "text-decoration", "text-decoration-color", "text-decoration-line", "text-decoration-skip", "text-decoration-style", "text-emphasis", "text-emphasis-color", "text-emphasis-style", "text-indent", "text-orientation", "text-overflow", "text-transform", "text-underline-position", "unicode-bidi", "vertical-align", "voice-family", "width", "word-spacing", "writing-mode"}
+	sanitizer.AllowStyles(allowedStyles...)
+
+	cleanHtml := sanitizer.Sanitize(html)
+
+	return cleanHtml
 }

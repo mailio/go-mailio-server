@@ -1,0 +1,38 @@
+Date: Sat, 23 Mar 2024 14:12:35 -0600
+Mime-Version: 1.0
+Content-Type: multipart/report; report-type=delivery-status; boundary="a9d11d8ac8da3d3321142ca68720cec2af252494367e512866ad6d6889ad"
+From: "Mailer-Daemon" <MAILER-DAEMON@localhost>
+To: "Jane" <jane@jane.com>
+Subject: Delivery Status Notification (Failure)
+
+--a9d11d8ac8da3d3321142ca68720cec2af252494367e512866ad6d6889ad
+Content-Type: text/plain; charset="utf-8"
+
+The following message to "Jane" <jane@jane.com> was undeliverable.
+
+The reason for the problem:
+5.1.1 - Recipient address rejected: User unknown in virtual mailbox table
+
+
+--a9d11d8ac8da3d3321142ca68720cec2af252494367e512866ad6d6889ad
+Content-Type: message/delivery-status
+
+Reporting-MTA: dns; localhost
+Arrival-Date: Sat, 23 Mar 2024 20:12:35 +0000
+
+Final-Recipient: rfc822; "Jane" <jane@jane.com>
+Action: failed
+Status:5.1.1
+Remote-MTA: dns; localhost
+Diagnostic-Code: smtp; 5.1.1 - Recipient address rejected: User unknown in virtual mailbox table
+
+--a9d11d8ac8da3d3321142ca68720cec2af252494367e512866ad6d6889ad
+Content-Type: message/rfc822
+
+From: "John" <john@doe.com>
+To: "Jane" <jane@jane.com>
+Subject: Testing mailio
+Date: Sat, 23 Mar 2024 20:12:35 +0000
+
+The original message was not included in this report.
+--a9d11d8ac8da3d3321142ca68720cec2af252494367e512866ad6d6889ad--
