@@ -19,7 +19,6 @@ import (
 
 	"github.com/jhillyerd/enmime"
 	"github.com/mailio/go-mailio-server/global"
-	"github.com/mailio/go-mailio-server/types"
 	"github.com/mailio/go-mailio-server/types/mailiosmtp"
 	"github.com/microcosm-cc/bluemonday"
 )
@@ -103,7 +102,7 @@ func generateRFC2822MessageID(hostname string) (string, error) {
 		return "", err
 	}
 	if hostname == "" {
-		return "", types.ErrInvalidFormat
+		return "", fmt.Errorf("hostname is required")
 	}
 	msgid := fmt.Sprintf("<%d.%d.%d@%s>", t, pid, rint, hostname)
 	return msgid, nil

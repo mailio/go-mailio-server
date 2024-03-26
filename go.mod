@@ -1,8 +1,6 @@
 module github.com/mailio/go-mailio-server
 
-go 1.21
-
-toolchain go1.22.1
+go 1.22.1
 
 require (
 	github.com/cespare/xxhash/v2 v2.2.0
@@ -19,12 +17,12 @@ require (
 	github.com/jhillyerd/enmime v1.2.0
 	github.com/lestrrat-go/jwx/v2 v2.0.19
 	github.com/mailio/go-mailio-did v0.0.0-20240219171524-88713f84b09d
+	github.com/mailio/go-mailio-server/types/mailiosmtp v0.0.0-20240326221843-9ef437ac9cd7
 	github.com/mailio/go-web3-kit v0.0.0-20230302165532-057a45112b37
 	github.com/microcosm-cc/bluemonday v1.0.26
 	github.com/prometheus/client_golang v1.15.0
 	github.com/redis/go-redis/v9 v9.0.5
 	github.com/robfig/cron/v3 v3.0.1
-	github.com/sendgrid/go-gmime v1.1.0
 	github.com/spf13/cobra v1.7.0
 	github.com/stretchr/testify v1.8.4
 	github.com/swaggo/swag v1.16.1
