@@ -18,8 +18,7 @@ import (
 	"time"
 
 	"github.com/jhillyerd/enmime"
-	"github.com/mailio/go-mailio-server/global"
-	"github.com/mailio/go-mailio-server/types/mailiosmtp"
+	mailiosmtp "github.com/mailio/go-mailio-server/email/smtp/types"
 	"github.com/microcosm-cc/bluemonday"
 )
 
@@ -109,7 +108,7 @@ func generateRFC2822MessageID(hostname string) (string, error) {
 }
 
 // converts a message to a mime message
-func ToMime(msg *mailiosmtp.Mail) ([]byte, error) {
+func ToMime(msg *mailiosmtp.Mail, mailhost string) ([]byte, error) {
 
 	// convert html to text
 	text := htmlToText(msg.BodyHTML)
@@ -145,12 +144,11 @@ func ToMime(msg *mailiosmtp.Mail) ([]byte, error) {
 
 	// add message id
 	host := "localhost"
-	if global.Conf.Host != "" {
-		host = global.Conf.Host
+	if mailhost != "" {
+		host = mailhost
 	}
 	id, idErr := generateRFC2822MessageID(host)
 	if idErr != nil {
-		global.Logger.Log("error", "error generating message id", "error", idErr)
 		return nil, idErr
 	}
 	outgoingMime = outgoingMime.Header("Message-ID", id)
@@ -158,13 +156,11 @@ func ToMime(msg *mailiosmtp.Mail) ([]byte, error) {
 	// build and encode the message
 	ep, err := outgoingMime.Build()
 	if err != nil {
-		global.Logger.Log("error", "error building mime message", "error", err)
 		return nil, err
 	}
 	var buf bytes.Buffer
 	err = ep.Encode(&buf)
 	if err != nil {
-		global.Logger.Log("error", "error encoding mime message", "error", err)
 		return nil, err
 	}
 
@@ -182,12 +178,13 @@ Temporary Failure — SMTP Reply Code = 450, SMTP Status Code = 4.0.0
 
 where 4.x.x codes are soft bounces, and 5.x..x codes are hard bounces
 */
-func ToBounce(recipient mail.Address, msg mailiosmtp.Mail, bounceCode string, bounceReason string) ([]byte, error) {
+func ToBounce(recipient mail.Address, msg mailiosmtp.Mail, bounceCode string, bounceReason string, mailhost string) ([]byte, error) {
 	// Create the bounce message builder
 	host := "localhost"
-	if global.Conf.Host != "" {
-		host = global.Conf.Host
+	if mailhost != "" {
+		host = mailhost
 	}
+
 	from := mail.Address{Name: "Mailer-Daemon", Address: fmt.Sprintf("MAILER-DAEMON@%s", host)}
 
 	// buffer to hold the headers temporarily
@@ -267,15 +264,15 @@ The complaint also includes information about the recipient who reported the ema
 https://en.wikipedia.org/wiki/Abuse_Reporting_Format
 https://datatracker.ietf.org/doc/html/rfc5965
 */
-func ToComplaint(recipient mail.Address, reporter mail.Address, msg mailiosmtp.Mail, complaintReason string) ([]byte, error) {
+func ToComplaint(recipient mail.Address, reporter mail.Address, msg mailiosmtp.Mail, complaintReason string, mailhost string) ([]byte, error) {
 	// Set host dynamically or use "localhost" as default
 	host := "localhost"
-	if global.Conf.Host != "" {
-		host = global.Conf.Host
+	if mailhost != "" {
+		host = mailhost
 	}
 
 	// Convert the original message to MIME
-	originalMsgMime, err := ToMime(&msg)
+	originalMsgMime, err := ToMime(&msg, host)
 	if err != nil {
 		return nil, err
 	}

@@ -11,9 +11,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mailio/go-mailio-server/types/mailiosmtp"
+	mailiosmtp "github.com/mailio/go-mailio-server/email/smtp/types"
 	"github.com/stretchr/testify/assert"
 )
+
+const hostname = "localhost"
 
 func TestToMime(t *testing.T) {
 	ripUrl := "https://upload.wikimedia.org/wikipedia/commons/3/38/JPEG_example_JPG_RIP_001.jpg"
@@ -47,7 +49,7 @@ func TestToMime(t *testing.T) {
 			},
 		},
 	}
-	mime, err := ToMime(&email)
+	mime, err := ToMime(&email, hostname)
 	if err != nil {
 		t.Fatalf("toMime failed: %v", err)
 	}
@@ -70,7 +72,7 @@ func TestToBounce(t *testing.T) {
 		MessageId:                 "123456",
 	}
 
-	bounce, err := ToBounce(receivedMsg.To[0], receivedMsg, "5.1.1", "Recipient address rejected: User unknown in virtual mailbox table")
+	bounce, err := ToBounce(receivedMsg.To[0], receivedMsg, "5.1.1", "Recipient address rejected: User unknown in virtual mailbox table", hostname)
 	if err != nil {
 		t.Fatalf("toBounce failed: %v", err)
 	}
@@ -116,7 +118,7 @@ func TestToComplaint(t *testing.T) {
 		mail.Address{Name: "Complaint Department", Address: "complaints@myesp.com"},
 		receivedMsg.To[0],
 		receivedMsg,
-		"spam/fraud/virus/...")
+		"spam/fraud/virus/...", hostname)
 	if err != nil {
 		t.Fatalf("toComplaint failed: %v", err)
 	}
@@ -216,7 +218,7 @@ func TestParseBounce(t *testing.T) {
 		BodyText:                  "Testing mailio",
 		MessageId:                 "123456",
 	}
-	bounceBytes, bErr := ToBounce(receivedMsg.To[0], receivedMsg, "5.1.1", "Recipient address rejected: User unknown in virtual mailbox table")
+	bounceBytes, bErr := ToBounce(receivedMsg.To[0], receivedMsg, "5.1.1", "Recipient address rejected: User unknown in virtual mailbox table", hostname)
 	if bErr != nil {
 		t.Fatalf("toBounce failed: %v", bErr)
 	}
