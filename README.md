@@ -92,6 +92,8 @@ func ToBounce(recipient mail.Address, msg mailiosmtp.Mail, bounceCode string, bo
 func ToComplaint(recipient mail.Address, reporter mail.Address, msg mailiosmtp.Mail, complaintReason string, mailhost string) ([]byte, error)
 ```
 
+#### 2. Register the SMTP handler
+
 [api_mailreceive_webhook.go](https://github.com/mailio/go-mailio-server/blob/main/api/api_mailreceive_webhook.go#L19)
 ```go
 // add your provider in th api_mailreceive_webhook.go registration loop. Example:
@@ -102,6 +104,8 @@ for _, wh := range global.Conf.MailWebhooks {
   }
 }
 ```
+
+#### 3. Update configuration
 
 Add your provider configuration under `conf.yaml` -> `mailwebhooks`:
 
