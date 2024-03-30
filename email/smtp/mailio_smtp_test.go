@@ -229,3 +229,37 @@ func TestParseBounce(t *testing.T) {
 	}
 	assert.Equal(t, mail.MessageId, receivedMsg.MessageId)
 }
+
+func TestGmailRedfin(t *testing.T) {
+	b, _ := os.ReadFile("test_data/gmail_newsletter_redfin.eml")
+	mail, err := ParseMime(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	layout := "Mon, 02 Jan 2006 15:04:05 -0700"
+	parsedTime, ptErr := time.Parse(layout, "Wed, 20 Mar 2024 10:08:58 +0000")
+	if ptErr != nil {
+		t.Fatalf("Failed to parse time: %v", ptErr)
+	}
+	tsParsed := parsedTime.UTC().UnixMilli()
+	assert.Equal(t, "Redfin", mail.From.Name)
+	assert.Equal(t, "listings_support@redfin.com", mail.ReplyTo[0].Address)
+	assert.Equal(t, 0, len(mail.Bcc))
+	assert.Equal(t, 0, len(mail.Cc))
+	assert.Equal(t, 1, len(mail.To))
+	assert.Equal(t, "igor.amplio@gmail.com", mail.To[0].Address)
+	assert.Equal(t, "Salt Lake City Tour Insights: 2684 S Melbourne St E and 1 more update", mail.Subject)
+	assert.Equal(t, tsParsed, mail.Timestamp)
+	assert.Equal(t, 0, len(mail.Attachments))
+	assert.Equal(t, "<0101018e5b55e0ef-7a8315df-2fad-40ac-93d4-5c6b27adc02e-000000@us-west-2.amazonses.com>", mail.MessageId)
+}
+
+func TestAttachmentApplication(t *testing.T) {
+	b, _ := os.ReadFile("test_data/attachment-application.eml")
+	mail, err := ParseMime(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, 1, len(mail.Attachments))
+	assert.Equal(t, "application/msword", mail.Attachments[0].ContentType)
+}

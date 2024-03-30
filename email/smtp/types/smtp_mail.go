@@ -8,10 +8,10 @@ type VerdictStatus struct {
 
 type Mail struct {
 	From                      mail.Address        `json:"from"`              // The email address of the original sender.
-	ReplyTo                   []mail.Address      `json:"replyTo,omitempty"` // The email address to which bounces (undeliverable notifications) are to be forwarded.
+	ReplyTo                   []*mail.Address     `json:"replyTo,omitempty"` // The email address to which bounces (undeliverable notifications) are to be forwarded.
 	To                        []mail.Address      `json:"to"`                // The email addresses of the recipients.
-	Cc                        []mail.Address      `json:"cc,omitempty"`      // The email addresses of the CC recipients.
-	Bcc                       []mail.Address      `json:"bcc,omitempty"`     // The email addresses of the BCC recipients.
+	Cc                        []*mail.Address     `json:"cc,omitempty"`      // The email addresses of the CC recipients.
+	Bcc                       []*mail.Address     `json:"bcc,omitempty"`     // The email addresses of the BCC recipients.
 	MessageId                 string              `json:"messageId"`         // message id
 	Subject                   string              `json:"subject"`
 	BodyText                  string              `json:"bodyText,omitempty"`                  // The text version of the email.
@@ -41,4 +41,14 @@ type SmtpAttachment struct {
 	Filename           string `json:"filename"`                     // The name of the attachment.
 	Content            []byte `json:"content"`                      // The content of the attachment.
 	ContentID          string `json:"contentId,omitempty"`          // The content id of the attachment.
+}
+
+func (m *Mail) GetHeader(key string) string {
+	if m.Headers == nil {
+		return ""
+	}
+	if values, ok := m.Headers[key]; ok {
+		return values[0]
+	}
+	return ""
 }

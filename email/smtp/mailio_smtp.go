@@ -113,22 +113,40 @@ func ToMime(msg *mailiosmtp.Mail, mailhost string) ([]byte, error) {
 	// convert html to text
 	text := htmlToText(msg.BodyHTML)
 
+	// convert replyTo to no pointer
+	var replyToNoPtr []mail.Address
+	if len(msg.ReplyTo) > 0 {
+		rtNoPtr := make([]mail.Address, 0)
+		for _, address := range msg.ReplyTo {
+			rtNoPtr = append(rtNoPtr, *address)
+		}
+		replyToNoPtr = rtNoPtr
+	}
+
 	// construct basic message
 	outgoingMime := enmime.Builder().
 		From(msg.From.Name, msg.From.Address).
 		Subject(msg.Subject).
 		ToAddrs(msg.To).
-		ReplyToAddrs(msg.ReplyTo).
+		ReplyToAddrs(replyToNoPtr).
 		Text([]byte(text)).
 		Date(time.UnixMilli(msg.Timestamp)).
 		HTML([]byte(msg.BodyHTML))
 
 	// add sender address if present
 	if msg.Cc != nil {
-		outgoingMime = outgoingMime.CCAddrs(msg.Cc)
+		var noPtrCc []mail.Address
+		for _, address := range msg.Cc {
+			noPtrCc = append(noPtrCc, *address)
+		}
+		outgoingMime = outgoingMime.CCAddrs(noPtrCc)
 	}
 	if msg.Bcc != nil {
-		outgoingMime = outgoingMime.BCCAddrs(msg.Bcc)
+		var noPtrBcc []mail.Address
+		for _, address := range msg.Bcc {
+			noPtrBcc = append(noPtrBcc, *address)
+		}
+		outgoingMime = outgoingMime.BCCAddrs(noPtrBcc)
 	}
 
 	// add headers
@@ -387,28 +405,33 @@ func ParseMime(mime []byte) (*mailiosmtp.Mail, error) {
 	email.MessageId = msg.GetHeader("Message-ID")
 	from, fErr := mail.ParseAddress(headers.Get("From"))
 	to, tErr := mail.ParseAddressList(headers.Get("To"))
-	joinedErr := errors.Join(fErr, tErr)
+	var rErr error
+	var replyTo []*mail.Address
+	if headers.Get("Reply-To") != "" {
+		rt, err := mail.ParseAddressList(headers.Get("Reply-To"))
+		rErr = err
+		replyTo = rt
+	}
+	joinedErr := errors.Join(fErr, tErr, rErr)
 	if joinedErr != nil {
 		return nil, joinedErr
 	}
 
 	if headers.Get("Cc") != "" {
-		cc, _ := mail.ParseAddressList(headers.Get("Cc"))
-		if len(cc) > 0 {
-			email.Cc = make([]mail.Address, len(cc))
-			for i, addrPtr := range cc {
-				email.Cc[i] = *addrPtr // Dereference the pointer to get the value
-			}
+		cc, ccErr := mail.ParseAddressList(headers.Get("Cc"))
+		if ccErr != nil {
+			// failed parsing CC
+			return nil, ccErr
 		}
+		email.Cc = cc
 	}
 	if headers.Get("Bcc") != "" {
-		bcc, _ := mail.ParseAddressList(headers.Get("Bcc"))
-		if len(bcc) > 0 {
-			email.Bcc = make([]mail.Address, len(bcc))
-			for i, addrPtr := range bcc {
-				email.Bcc[i] = *addrPtr // Dereference the pointer to get the value
-			}
+		bcc, bcErr := mail.ParseAddressList(headers.Get("Bcc"))
+		if bcErr != nil {
+			// failed parsing BCC
+			return nil, bcErr
 		}
+		email.Bcc = bcc
 	}
 
 	email.From = *from
@@ -418,8 +441,10 @@ func ParseMime(mime []byte) (*mailiosmtp.Mail, error) {
 			email.To[i] = *addrPtr // Dereference the pointer to get the value
 		}
 	}
+	if len(replyTo) > 0 {
+		email.ReplyTo = replyTo
+	}
 
-	// allHeaders := msg.RawHeaders()
 	email.Headers = make(map[string][]string, 0)
 	for key, value := range headers {
 		vals := []string{}
