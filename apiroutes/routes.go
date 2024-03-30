@@ -99,10 +99,12 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 		mtpRootApi.POST("/v1/mtp/message", messageMTPApi.ReceiveMessage)
 	}
 
-	// SMTP email receiving
+	// SMTP email receiving (multiple providers possible)
 	webhooks := router.Group("/", metrics.MetricsMiddleware())
 	{
-		webhooks.POST(global.Conf.MailWebhookConfig.Webhookurl, webhookApi.ReceiveMail)
+		for _, whUrl := range global.Conf.MailWebhooks {
+			webhooks.POST(whUrl.Webhookurl, webhookApi.ReceiveMail)
+		}
 	}
 
 	router.StaticFile("./well-known/did.json", "./well-known/did.json")

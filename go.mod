@@ -17,7 +17,7 @@ require (
 	github.com/lestrrat-go/jwx/v2 v2.0.19
 	github.com/mailio/go-mailio-did v0.0.0-20240219171524-88713f84b09d
 	github.com/mailio/go-mailio-mailgun-smtp-handler v1.0.0
-	github.com/mailio/go-mailio-server/email/smtp v0.0.0-20240330212702-c45570c980ce
+	github.com/mailio/go-mailio-server/email/smtp v0.0.0-20240330223406-f9749c1d7096
 	github.com/mailio/go-web3-kit v0.0.0-20230302165532-057a45112b37
 	github.com/prometheus/client_golang v1.15.0
 	github.com/redis/go-redis/v9 v9.0.5
