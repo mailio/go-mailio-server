@@ -65,6 +65,8 @@ type SmtpHandler interface {
 }
 ```
 
+Example implementation [here](https://github.com/mailio/go-mailio-mailgun-smtp-handler)
+
 You can find all helper functions [here](https://github.com/mailio/go-mailio-server/blob/main/email/smtp/mailio_smtp.go)
 
 ```go
