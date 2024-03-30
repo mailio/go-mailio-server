@@ -21,13 +21,14 @@ var MailioDID *mailiodid.DID
 var RateLimiter *redis_rate.Limiter
 
 type Config struct {
-	cfg.YamlConfig `yaml:",inline"`
-	CouchDB        CouchDBConfig    `yaml:"couchdb"`
-	AwsSmtp        AwsSmtpConfig    `yaml:"awssmtp"`
-	Mailio         MailioConfig     `yaml:"mailio"`
-	Prometheus     PrometheusConfig `yaml:"prometheus"`
-	Redis          RedisConfig      `yaml:"redis"`
-	Queue          Queue            `yaml:"queue"`
+	cfg.YamlConfig    `yaml:",inline"`
+	CouchDB           CouchDBConfig     `yaml:"couchdb"`
+	AwsSmtp           AwsSmtpConfig     `yaml:"awssmtp"`
+	Mailio            MailioConfig      `yaml:"mailio"`
+	Prometheus        PrometheusConfig  `yaml:"prometheus"`
+	Redis             RedisConfig       `yaml:"redis"`
+	Queue             Queue             `yaml:"queue"`
+	MailWebhookConfig MailWebhookConfig `yaml:"mailWebhook"`
 }
 
 type CouchDBConfig struct {
@@ -86,4 +87,12 @@ type RedisConfig struct {
 
 type Queue struct {
 	Concurrency int `yaml:"concurrency"`
+}
+
+type MailWebhookConfig struct {
+	Provider   string `yaml:"provider"`
+	Domain     string `yaml:"domain"`
+	Sendapikey string `yaml:"sendapikey"`
+	Webhookurl string `yaml:"webhookurl"`
+	Webhookkey string `yaml:"webhookkey"`
 }

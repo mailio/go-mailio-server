@@ -13,23 +13,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-// gRPC API routes
-// func ConfigGrpcRoutes(handshakeService *services.HandshakeService, env *types.Environment) *grpc.Server {
-// 	if global.Conf.Prometheus.Enabled {
-// 		metrics.InitMetrics()
-// 	}
-// 	limiter := apigrpc.NewGrpcRateLimiter()
-// 	sigValidator := apigrpc.NewGrpcSignatureValidator()
-// 	grpcServer := grpc.NewServer(
-// 		grpc.ChainUnaryInterceptor(interceptors.UnaryServerRatelimitInterceptor(limiter), interceptors.UnaryServerSignatureInterceptor(sigValidator)),
-// 	)
-// 	reflection.Register(grpcServer)
-// 	v1.RegisterPongServiceServer(grpcServer, apigrpc.NewGrpcPingPong())
-// 	// v1.RegisterHandshakeServiceServer(grpcServer, apigrpc.NewGrpcHandshake(handshakeService, env))
-
-// 	return grpcServer
-// }
-
 // REST API routes
 func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, taskServer *asynq.Server, environment *types.Environment) *gin.Engine {
 	// init metrics
@@ -58,6 +41,9 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 	didApi := api.NewDIDApi(ssiService)
 	vcApi := api.NewVCApi(ssiService)
 	messageApi := api.NewMessagingApi(ssiService, environment)
+
+	// WEBHOOK API definitions
+	webhookApi := api.NewMailReceiveWebhook(environment)
 
 	// MTP API definitions
 	handshakeMTPApi := api.NewHandshakeMTPApi(handshakeService, mtpService, environment)
@@ -113,15 +99,13 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 		mtpRootApi.POST("/v1/mtp/message", messageMTPApi.ReceiveMessage)
 	}
 
-	router.StaticFile("./well-known/did.json", "./well-known/did.json")
+	// SMTP email receiving
+	webhooks := router.Group("/", metrics.MetricsMiddleware())
+	{
+		webhooks.POST(global.Conf.MailWebhookConfig.Webhookurl, webhookApi.ReceiveMail)
+	}
 
-	// // webhook with basic authentication
-	// smtpWebhooks := router.Group("/webhooks", gin.BasicAuth(gin.Accounts{
-	// 	global.Conf.AwsSmtp.Username: global.Conf.AwsSmtp.Password,
-	// }))
-	// {
-	// 	smtpWebhooks.POST("/awssmtp", api.NewApiPingPong().PingPong)
-	// }
+	router.StaticFile("./well-known/did.json", "./well-known/did.json")
 
 	return router
 }

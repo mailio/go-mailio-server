@@ -70,6 +70,15 @@ func Handlers() []string {
 	return list
 }
 
+func GetHandler(name string) SmtpHandler {
+	handlersMu.RLock()
+	defer handlersMu.RUnlock()
+	if h, ok := handlers[name]; ok {
+		return h
+	}
+	return nil
+}
+
 func htmlToText(html string) string {
 	p := bluemonday.NewPolicy()
 	p.AllowStandardURLs()

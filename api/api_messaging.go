@@ -111,3 +111,20 @@ func (ma *MessagingApi) SendDIDMessage(c *gin.Context) {
 
 	c.JSON(http.StatusAccepted, types.DIDCommApiResponse{ID: input.ID})
 }
+
+// Send SMTP email
+// @Summary Send SMTP email
+// @Security Bearer
+// @Description Send SMTP email
+// @Tags Messaging
+// @Accept json
+// @Produce json
+// @Param handshake body types.Mail true "smtp email"
+// @Success 202 {object} types.MailApiResponse
+// @Failure 400 {object} api.ApiError "bad request"
+// @Failure 401 {object} api.ApiError "invalid signature or unauthorized to send messages"
+// @Failure 429 {object} api.ApiError "rate limit exceeded"
+// @Router /api/v1/smtp [post]
+func (ma *MessagingApi) SendSmtpMessage(c *gin.Context) {
+
+}
