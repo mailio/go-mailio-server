@@ -71,7 +71,8 @@ func TestPubKeyToMailioAddress(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	address, err := PublicKeyToMailioAddress(*pub)
+	rawPub, _ := base64.StdEncoding.DecodeString(*pub)
+	address, err := PublicKeyToMailioAddress(rawPub)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,7 +83,9 @@ func TestPubKeyToMailioAddress(t *testing.T) {
 }
 
 func TestEqualityOfCreatingMailioAddress(t *testing.T) {
-	address, err := PublicKeyToMailioAddress("lTi99FcVgGAuoHblyw0pffGs3GwZudOT3XDjZ9d7cKc=")
+	// rawKey, _ := base64.RawURLEncoding.DecodeString("lTi99FcVgGAuoHblyw0pffGs3GwZudOT3XDjZ9d7cKc=")
+	rawKey, _ := base64.StdEncoding.DecodeString("lTi99FcVgGAuoHblyw0pffGs3GwZudOT3XDjZ9d7cKc=")
+	address, err := PublicKeyToMailioAddress(rawKey)
 	if err != nil {
 		t.Fatal(err)
 	}

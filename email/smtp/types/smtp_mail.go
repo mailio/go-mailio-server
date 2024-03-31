@@ -2,6 +2,15 @@ package mailiosmtp
 
 import "net/mail"
 
+const (
+	// VerdictStatusPass is the verdict status for PASS
+	VerdictStatusPass = "PASS"
+	// VerdictStatusFail is the verdict status for FAIL
+	VerdictStatusFail = "FAIL"
+	// VerdictStatusNotAvailable is the verdict status for NOT_AVAILABLE
+	VerdictStatusNotAvailable = "NOT_AVAILABLE"
+)
+
 type VerdictStatus struct {
 	Status string `json:"status" validate:"required,oneof=PASS FAIL NOT_AVAILABLE"` // possible values: PASS, FAIL, NOT_AVAILABLE
 }
@@ -20,6 +29,7 @@ type Mail struct {
 	BodyRawPart               []*MailBodyRaw      `json:"bodyRaw,omitempty"`                   // The raw content of the email.
 	Headers                   map[string][]string `json:"headers,omitempty"`                   // The email headers. (one header can be specified multiple times with different values)
 	Attachments               []*SmtpAttachment   `json:"attachments,omitempty"`
+	SizeBytes                 int64               `json:"sizeBytes"`              // The size of the email in bytes.
 	Timestamp                 int64               `json:"timestamp"`              // since epoch in miliseconds
 	SpamVerdict               *VerdictStatus      `json:"spamVerdict,omitempty"`  // optional, spam verdict
 	VirusVerdict              *VerdictStatus      `json:"virusVerdict,omitempty"` // optional, virus verdict

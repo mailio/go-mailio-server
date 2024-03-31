@@ -285,7 +285,8 @@ func (ua *UserAccountApi) Register(c *gin.Context) {
 		return
 	}
 
-	mailioAddress, err := util.PublicKeyToMailioAddress(inputRegister.Ed25519SigningPublicKeyBase64)
+	pubKeyFRomBase, err := base64.StdEncoding.DecodeString(inputRegister.Ed25519SigningPublicKeyBase64)
+	mailioAddress, err := util.PublicKeyToMailioAddress(pubKeyFRomBase)
 	if err != nil {
 		ApiErrorf(c, http.StatusInternalServerError, "failed to generate mailio address")
 		return

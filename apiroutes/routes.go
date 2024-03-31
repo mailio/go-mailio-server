@@ -43,7 +43,7 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 	messageApi := api.NewMessagingApi(ssiService, environment)
 
 	// WEBHOOK API definitions
-	webhookApi := api.NewMailReceiveWebhook(environment)
+	webhookApi := api.NewMailReceiveWebhook(handshakeService, userService, environment)
 
 	// MTP API definitions
 	handshakeMTPApi := api.NewHandshakeMTPApi(handshakeService, mtpService, environment)

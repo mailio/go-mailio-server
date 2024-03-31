@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -49,9 +50,10 @@ func (hs *HandshakeService) Save(handshake *types.Handshake, userPublicKeyEd2551
 		return types.ErrBadRequest
 	}
 
-	ownerMailioAddr, mErr := util.PublicKeyToMailioAddress(userPublicKeyEd25519Base64)
-	if mErr != nil {
-		return mErr
+	pubKeyFromBase, pkErr := base64.StdEncoding.DecodeString(userPublicKeyEd25519Base64)
+	ownerMailioAddr, mErr := util.PublicKeyToMailioAddress(pubKeyFromBase)
+	if errors.Join(mErr, pkErr) != nil {
+		return errors.Join(mErr, pkErr)
 	}
 	if ownerMailioAddr != handshake.Content.OwnerAddressHex {
 		return errors.New("owner address does not match")
