@@ -14,33 +14,6 @@ import (
 	"github.com/mailio/go-mailio-server/util"
 )
 
-// count the number of messages in all folders except sent
-func collectFoldersExceptSent(response *types.CouchDBCountDistinctFromResponse) int {
-	total := 0
-	for _, row := range response.Rows {
-		for _, b := range row.Key {
-			if b != types.MailioFolderSent {
-				total += row.Value
-			}
-		}
-	}
-	return total
-}
-
-// count the number of sent messages
-func collectSentFolders(response *types.CouchDBCountDistinctFromResponse) int {
-	total := 0
-	for _, row := range response.Rows {
-		for _, b := range row.Key {
-			if b == types.MailioFolderSent {
-				total += row.Value
-			}
-		}
-	}
-	return total
-
-}
-
 func (msq *MessageQueue) selectMailFolder(fromDID did.DID, recipientAddress string) (string, error) {
 	// 1. if message to self, then it goes to inbox
 	if fromDID.Fragment() == recipientAddress {
@@ -69,7 +42,7 @@ func (msq *MessageQueue) selectMailFolder(fromDID did.DID, recipientAddress stri
 		return types.MailioFolderInbox, err
 	}
 
-	sentTotal := collectSentFolders(totalMessagesSent)
+	sentTotal := util.SumUpItemsFromFolderCountResponse([]string{types.MailioFolderSent}, totalMessagesSent)
 	// if sent more than 1 email to this recipient in the past 3 months, then the message goes to inbox
 	if sentTotal > 0 {
 		return types.MailioFolderInbox, nil
@@ -90,12 +63,13 @@ func (msq *MessageQueue) selectMailFolder(fromDID did.DID, recipientAddress stri
 	}
 
 	// if the recipient has read more than X% of the messages, then the message goes to inbox
-	total := collectFoldersExceptSent(totalMessagesReceived)
+	total := util.SumUpItemsFromFolderCountResponse([]string{types.MailioFolderInbox, types.MailioFolderArchive, types.MailioFolderGoodReads, types.MailioFolderOther, types.MailioFolderTrash}, totalMessagesReceived)
 	if total == 0 {
 		return types.MailioFolderOther, nil
 	}
 
-	read := collectFoldersExceptSent(totalMessagesRead)
+	// read := collectFoldersExceptSent(totalMessagesRead)
+	read := util.SumUpItemsFromFolderCountResponse([]string{types.MailioFolderInbox, types.MailioFolderArchive, types.MailioFolderGoodReads, types.MailioFolderOther, types.MailioFolderTrash}, totalMessagesRead)
 	readPercent := math.Ceil(float64(float32(read) / float32(total) * 100))
 	if readPercent >= float64(global.Conf.Mailio.ReadVsReceived) {
 		return types.MailioFolderInbox, nil

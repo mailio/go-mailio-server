@@ -169,8 +169,8 @@ github.com/mailio/go-mailio-did v0.0.0-20240219171524-88713f84b09d h1:4Gq9RYaC45
 github.com/mailio/go-mailio-did v0.0.0-20240219171524-88713f84b09d/go.mod h1:EKVVtEiXuIBXsvRrnfybDGY7v6v19aCs5NW+zuY3nwc=
 github.com/mailio/go-mailio-mailgun-smtp-handler v1.0.0 h1:/DlZG8X0CQfUwnOU9DY/n5faYsoptWUWYfKY72/6Wb4=
 github.com/mailio/go-mailio-mailgun-smtp-handler v1.0.0/go.mod h1:5sP0B7E+htEYAMjslGWM0QM+a5Tnmr+YlaCPHkuJcuU=
-github.com/mailio/go-mailio-server/email/smtp v0.0.0-20240330223406-f9749c1d7096 h1:4gv5YKWieLm5W7cOYJ9j/Z8xfh3U0vUAle49cSsY7nA=
-github.com/mailio/go-mailio-server/email/smtp v0.0.0-20240330223406-f9749c1d7096/go.mod h1:5Wj4t0/5qHydsNV9dWgYZXY7qChv0Qk8WXeBkWpHM8E=
+github.com/mailio/go-mailio-server/email/smtp v0.0.0-20240331230752-247493e47bef h1:byvV4Zq6HXh55MTYOv1zC6dVZxqZiIGM2/97HmqXQ2A=
+github.com/mailio/go-mailio-server/email/smtp v0.0.0-20240331230752-247493e47bef/go.mod h1:5Wj4t0/5qHydsNV9dWgYZXY7qChv0Qk8WXeBkWpHM8E=
 github.com/mailio/go-web3-kit v0.0.0-20230302165532-057a45112b37 h1:5JGzR1JKKV6Q/a+qhlGf8XLykR0EsgrPGsSsRJ9appk=
 github.com/mailio/go-web3-kit v0.0.0-20230302165532-057a45112b37/go.mod h1:Ifq8SY22NEf70R8M/F26nluqPKwx3gh3kY3gyRDl/GI=
 github.com/mailru/easyjson v0.0.0-20190614124828-94de47d64c63/go.mod h1:C1wdFJiN94OJF2b5HbByQZoLdCWB1Yqtg26g4irojpc=

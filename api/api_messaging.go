@@ -119,8 +119,8 @@ func (ma *MessagingApi) SendDIDMessage(c *gin.Context) {
 // @Tags Messaging
 // @Accept json
 // @Produce json
-// @Param handshake body types.Mail true "smtp email"
-// @Success 202 {object} types.MailApiResponse
+// @Param email body mailiosmtp.Mail true "smtp email"
+// @Success 202 {object} mailiosmtp.Mail
 // @Failure 400 {object} api.ApiError "bad request"
 // @Failure 401 {object} api.ApiError "invalid signature or unauthorized to send messages"
 // @Failure 429 {object} api.ApiError "rate limit exceeded"

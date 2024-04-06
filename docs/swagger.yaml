@@ -162,6 +162,149 @@ definitions:
       type:
         type: string
     type: object
+  mail.Address:
+    properties:
+      address:
+        description: user@domain
+        type: string
+      name:
+        description: Proper name; may be empty.
+        type: string
+    type: object
+  mailiosmtp.Mail:
+    properties:
+      attachments:
+        items:
+          $ref: '#/definitions/mailiosmtp.SmtpAttachment'
+        type: array
+      bcc:
+        description: The email addresses of the BCC recipients.
+        items:
+          $ref: '#/definitions/mail.Address'
+        type: array
+      bodyHTMLWithoutUnsafeTags:
+        description: The HTML version of the email with removed unsafe tags
+        type: string
+      bodyHtml:
+        description: The HTML version of the email.
+        type: string
+      bodyRaw:
+        description: The raw content of the email.
+        items:
+          $ref: '#/definitions/mailiosmtp.MailBodyRaw'
+        type: array
+      bodyText:
+        description: The text version of the email.
+        type: string
+      cc:
+        description: The email addresses of the CC recipients.
+        items:
+          $ref: '#/definitions/mail.Address'
+        type: array
+      dkimVerdict:
+        allOf:
+        - $ref: '#/definitions/mailiosmtp.VerdictStatus'
+        description: optional, dkim verdict
+      dmarcVerdict:
+        allOf:
+        - $ref: '#/definitions/mailiosmtp.VerdictStatus'
+        description: optional, dmarc verdict
+      from:
+        allOf:
+        - $ref: '#/definitions/mail.Address'
+        description: The email address of the original sender.
+      headers:
+        additionalProperties:
+          items:
+            type: string
+          type: array
+        description: The email headers. (one header can be specified multiple times
+          with different values)
+        type: object
+      messageId:
+        description: message id
+        type: string
+      replyTo:
+        description: The email address to which bounces (undeliverable notifications)
+          are to be forwarded.
+        items:
+          $ref: '#/definitions/mail.Address'
+        type: array
+      sizeBytes:
+        description: The size of the email in bytes.
+        type: integer
+      spamVerdict:
+        allOf:
+        - $ref: '#/definitions/mailiosmtp.VerdictStatus'
+        description: optional, spam verdict
+      spfVerdict:
+        allOf:
+        - $ref: '#/definitions/mailiosmtp.VerdictStatus'
+        description: optinal, spf verdict
+      subject:
+        type: string
+      timestamp:
+        description: since epoch in miliseconds
+        type: integer
+      to:
+        description: The email addresses of the recipients.
+        items:
+          $ref: '#/definitions/mail.Address'
+        type: array
+      virusVerdict:
+        allOf:
+        - $ref: '#/definitions/mailiosmtp.VerdictStatus'
+        description: optional, virus verdict
+    type: object
+  mailiosmtp.MailBodyRaw:
+    properties:
+      content:
+        description: The raw content of the email.
+        items:
+          type: integer
+        type: array
+      contentDisposition:
+        description: The content disposition of the raw email.
+        type: string
+      contentId:
+        description: The content id of the raw email.
+        type: string
+      contentType:
+        description: The content type of the raw email.
+        type: string
+    type: object
+  mailiosmtp.SmtpAttachment:
+    properties:
+      content:
+        description: The content of the attachment.
+        items:
+          type: integer
+        type: array
+      contentDisposition:
+        description: The content disposition of the attachment.
+        type: string
+      contentId:
+        description: The content id of the attachment.
+        type: string
+      contentType:
+        description: The content type of the attachment.
+        type: string
+      filename:
+        description: The name of the attachment.
+        type: string
+    type: object
+  mailiosmtp.VerdictStatus:
+    properties:
+      status:
+        description: 'possible values: PASS, FAIL, NOT_AVAILABLE'
+        enum:
+        - PASS
+        - FAIL
+        - NOT_AVAILABLE
+        type: string
+    required:
+    - status
+    type: object
   types.DIDCommApiResponse:
     properties:
       id:
@@ -235,7 +378,12 @@ definitions:
         minItems: 1
         type: array
       type:
-        description: 'a valid message type URI (MUST be: application/didcomm-encrypted+json)'
+        description: 'a valid message type URI (MUST be: application/didcomm-encrypted+json
+          or application/didcomm-signed+json or application/mailio-smtp+json)'
+        enum:
+        - application/didcomm-encrypted+json
+        - application/didcomm-signed+json
+        - application/mailio-smtp+json
         type: string
     required:
     - from
@@ -366,6 +514,9 @@ definitions:
     type: object
   types.HandshakeContent:
     properties:
+      created:
+        description: timestamp of the handshake
+        type: number
       handshakeId:
         description: handshake ID
         type: string
@@ -403,9 +554,6 @@ definitions:
       status:
         description: handshake status
         type: string
-      timestamp:
-        description: timestamp of the handshake
-        type: integer
       type:
         description: handshake type
         type: string
@@ -911,7 +1059,7 @@ paths:
           schema:
             $ref: '#/definitions/api.ApiError'
         "401":
-          description: invalid signature
+          description: invalid signature or unauthorized to send messages
           schema:
             $ref: '#/definitions/api.ApiError'
         "429":
@@ -1191,6 +1339,10 @@ paths:
           description: Failed to login (valid signature, no valid VC)
           schema:
             $ref: '#/definitions/api.ApiError'
+        "404":
+          description: Failed to login (user not registered)
+          schema:
+            $ref: '#/definitions/api.ApiError'
         "429":
           description: rate limit exceeded
           schema:
@@ -1365,6 +1517,42 @@ paths:
       summary: Register user
       tags:
       - User Account
+  /api/v1/smtp:
+    post:
+      consumes:
+      - application/json
+      description: Send SMTP email
+      parameters:
+      - description: smtp email
+        in: body
+        name: email
+        required: true
+        schema:
+          $ref: '#/definitions/mailiosmtp.Mail'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            $ref: '#/definitions/mailiosmtp.Mail'
+        "400":
+          description: bad request
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "401":
+          description: invalid signature or unauthorized to send messages
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "429":
+          description: rate limit exceeded
+          schema:
+            $ref: '#/definitions/api.ApiError'
+      security:
+      - Bearer: []
+      summary: Send SMTP email
+      tags:
+      - Messaging
   /api/v1/user/me:
     get:
       consumes:
@@ -1386,6 +1574,31 @@ paths:
       summary: Get logged inusers basic information
       tags:
       - User Account
+  /webhook/mailgun_mime:
+    post:
+      consumes:
+      - application/json
+      description: Receive a new SMTP email
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: bad request
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "401":
+          description: invalid signature/not authorized
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "500":
+          description: internal error
+          schema:
+            $ref: '#/definitions/api.ApiError'
+      summary: Receive a new SMTP email
+      tags:
+      - Smtp Webhook Handler
 securityDefinitions:
   Bearer:
     in: header
