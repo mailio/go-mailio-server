@@ -263,3 +263,14 @@ func TestAttachmentApplication(t *testing.T) {
 	assert.Equal(t, 1, len(mail.Attachments))
 	assert.Equal(t, "application/msword", mail.Attachments[0].ContentType)
 }
+
+func TestLargerExample(t *testing.T) {
+	b, _ := os.ReadFile("test_data/2mekss76lrqs8h45mnv0hfi0sk24upsf2fgn4j01.eml")
+	mail, err := ParseMime(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, mailiosmtp.VerdictStatusPass, mail.SpfVerdict.Status)
+	assert.Equal(t, mailiosmtp.VerdictStatusPass, mail.DkimVerdict.Status)
+	assert.Equal(t, mailiosmtp.VerdictStatusPass, mail.DmarcVerdict.Status)
+}

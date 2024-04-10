@@ -12,6 +12,7 @@ import (
 	"net/mail"
 	"net/textproto"
 	"os"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -475,9 +476,11 @@ func ParseMime(mime []byte) (*mailiosmtp.Mail, error) {
 	}
 
 	// mime.Attachments contains the non-inline attachments. (standard email attachments)
+	totalAttachmentsSize := int64(0)
 	var attachments []*mailiosmtp.SmtpAttachment
 	if len(msg.Attachments) > 0 {
 		for _, attachment := range msg.Attachments {
+			totalAttachmentsSize += int64(len(attachment.Content))
 			attachments = append(attachments, &mailiosmtp.SmtpAttachment{
 				ContentType: attachment.ContentType,
 				Filename:    attachment.FileName,
@@ -496,16 +499,85 @@ func ParseMime(mime []byte) (*mailiosmtp.Mail, error) {
 	email.BodyHTMLWithoutUnsafeTags = removeUnwantedTags(email.BodyHTML)
 
 	// mime.Inlines is a slice of inlined attacments. These are typically images that are embedded in the HTML body
+	totalInlineSize := int64(0)
 	for _, inline := range msg.Inlines {
-		email.BodyRawPart = append(email.BodyRawPart, &mailiosmtp.MailBodyRaw{
+		totalInlineSize += int64(len(inline.Content))
+		email.BodyInlinePart = append(email.BodyInlinePart, &mailiosmtp.MailBodyRaw{
 			ContentType:        inline.ContentType,
 			Content:            inline.Content,
 			ContentDisposition: inline.Disposition,
 			ContentID:          inline.ContentID,
 		})
 	}
+	email.SizeBytes = int64(len(mime))
+	email.SizeHtmlBodyBytes = int64(len([]byte(email.BodyHTML)))
+	email.SizeInlineBytes = totalInlineSize
+	email.SizeAttachmentsBytes = totalAttachmentsSize
+
+	spf, dkim, dmarc := parseAuthResults(email.Headers)
+	email.SpfVerdict = &mailiosmtp.VerdictStatus{Status: spf}
+	email.DkimVerdict = &mailiosmtp.VerdictStatus{Status: dkim}
+	email.DmarcVerdict = &mailiosmtp.VerdictStatus{Status: dmarc}
 
 	return email, nil
+}
+
+// parsing Authentication-Results header to get the SPF, DKIM, and DMARC results
+func parseAuthResults(emailHeaders map[string][]string) (string, string, string) {
+	spf := mailiosmtp.VerdictStatusNotAvailable
+	dkim := mailiosmtp.VerdictStatusNotAvailable
+	dmarc := mailiosmtp.VerdictStatusNotAvailable
+
+	if _, ok := emailHeaders["Authentication-Results"]; ok {
+		for _, authResult := range emailHeaders["Authentication-Results"] {
+			reSPF := regexp.MustCompile(`spf=(pass|fail|neutral|softfail|permerror|temperror)`)
+			reDKIM := regexp.MustCompile(`dkim=(pass|fail|neutral|policy|neutral|temperror|permerror)`)
+			reDMARC := regexp.MustCompile(`dmarc=(pass|fail|none|quarantine|reject)`)
+
+			// Extract and assign SPF result.
+			matches := reSPF.FindStringSubmatch(authResult)
+			if len(matches) > 0 {
+				vspf := strings.Split(matches[0], "=")
+				if len(vspf) > 1 {
+					verdictSpf := vspf[1]
+					if spf != mailiosmtp.VerdictStatusFail && verdictSpf == "pass" {
+						spf = mailiosmtp.VerdictStatusPass
+					} else {
+						spf = mailiosmtp.VerdictStatusFail
+					}
+				}
+			}
+			// Extract and assign DKIM result.
+			matches = reDKIM.FindStringSubmatch(authResult)
+			if len(matches) > 0 {
+				v := strings.Split(matches[0], "=")
+				if len(v) > 1 {
+					verdictDkim := v[1]
+					if dkim != mailiosmtp.VerdictStatusFail && verdictDkim == "pass" {
+						dkim = mailiosmtp.VerdictStatusPass
+					} else {
+						dkim = mailiosmtp.VerdictStatusFail
+					}
+				}
+			}
+
+			// Extract and assign DMARC result.
+			matches = reDMARC.FindStringSubmatch(authResult)
+			if len(matches) > 0 {
+				v := strings.Split(matches[0], "=")
+				if len(v) > 1 {
+					verdictDmarc := v[1]
+					if dmarc != mailiosmtp.VerdictStatusFail && verdictDmarc == "pass" {
+						dmarc = mailiosmtp.VerdictStatusPass
+					} else {
+						dmarc = mailiosmtp.VerdictStatusFail
+					}
+				}
+			}
+		}
+	}
+
+	return spf, dkim, dmarc
 }
 
 func removeUnwantedTags(html string) string {

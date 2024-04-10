@@ -95,10 +95,15 @@ func (m *MailReceiveWebhook) ReceiveMail(c *gin.Context) {
 		sendBounce(email, c, smtpHandler, "4.5.3", "Too many recipients")
 		return
 	}
-	// 1. Check email size (max 30 MB)
+	// Check email size (max 30 MB)
 	if email.SizeBytes > 30*1024*1024 {
 		// send bounce
 		sendBounce(email, c, smtpHandler, "5.3.4", "Email size is too large")
+		return
+	}
+	// 3 MB limit for email body
+	if len([]byte(email.BodyHTML)) > 3*1024*1024 || len([]byte(email.BodyText)) > 3*1024*1024 {
+		sendBounce(email, c, smtpHandler, "5.3.4", "Email body size is too large")
 		return
 	}
 

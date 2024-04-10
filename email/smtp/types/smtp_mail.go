@@ -26,10 +26,13 @@ type Mail struct {
 	BodyText                  string              `json:"bodyText,omitempty"`                  // The text version of the email.
 	BodyHTML                  string              `json:"bodyHtml,omitempty"`                  // The HTML version of the email.
 	BodyHTMLWithoutUnsafeTags string              `json:"bodyHTMLWithoutUnsafeTags,omitempty"` // The HTML version of the email with removed unsafe tags
-	BodyRawPart               []*MailBodyRaw      `json:"bodyRaw,omitempty"`                   // The raw content of the email.
+	BodyInlinePart            []*MailBodyRaw      `json:"bodyInlinePart,omitempty"`            // The raw inline content of the email.
 	Headers                   map[string][]string `json:"headers,omitempty"`                   // The email headers. (one header can be specified multiple times with different values)
 	Attachments               []*SmtpAttachment   `json:"attachments,omitempty"`
 	SizeBytes                 int64               `json:"sizeBytes"`              // The size of the email in bytes.
+	SizeHtmlBodyBytes         int64               `json:"sizeHtmlBodyBytes"`      // The size of the HTML body in bytes.
+	SizeInlineBytes           int64               `json:"sizeInlineBytes"`        // The size of the inline content in bytes.
+	SizeAttachmentsBytes      int64               `json:"sizeAttachmentsBytes"`   // The size of the attachments in bytes.
 	Timestamp                 int64               `json:"timestamp"`              // since epoch in miliseconds
 	SpamVerdict               *VerdictStatus      `json:"spamVerdict,omitempty"`  // optional, spam verdict
 	VirusVerdict              *VerdictStatus      `json:"virusVerdict,omitempty"` // optional, virus verdict
