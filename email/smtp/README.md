@@ -6,6 +6,8 @@ You can find example implementation using Mailgun's service [here](https://githu
 
 The code inherits the same principle as datastore/sql pluggable interfaces. In this case this interface must be implemented by your custom SMTP handler: 
 
+`go get github.com/mailio/go-mailio-mailgun-smtp-handler`
+
 ```go
 type SmtpHandler interface {
 	// ReceiveMail is a method called on the specific ESP handler webhook implementation

@@ -270,7 +270,18 @@ func TestLargerExample(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	fmt.Printf("original: %v\n", mail.BodyHTML)
+	fmt.Printf("cleaned : %v\n", mail.BodyHTMLWithoutUnsafeTags)
 	assert.Equal(t, mailiosmtp.VerdictStatusPass, mail.SpfVerdict.Status)
 	assert.Equal(t, mailiosmtp.VerdictStatusPass, mail.DkimVerdict.Status)
 	assert.Equal(t, mailiosmtp.VerdictStatusPass, mail.DmarcVerdict.Status)
+}
+
+func TestInBucketTestData_1(t *testing.T) {
+	b, _ := os.ReadFile("test_data/inbucket_test_data_1.eml")
+	mail, err := ParseMime(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Printf("cleaned : %v\n", mail.BodyHTMLWithoutUnsafeTags)
 }

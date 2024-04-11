@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"net/mail"
 	"path/filepath"
 	"strings"
@@ -74,7 +75,7 @@ func (m *MailReceiveWebhook) ReceiveMail(c *gin.Context) {
 	provider := fullPathToSmtpProvider(fullPath)
 	smtpHandler := smtpmodule.GetHandler(provider)
 	if smtpHandler == nil {
-		c.JSON(501, gin.H{"error": fmt.Sprintf("SMTP handler %s not registered", provider)})
+		c.JSON(http.StatusNotImplemented, gin.H{"error": fmt.Sprintf("SMTP handler %s not registered", provider)})
 		return
 	}
 
@@ -82,7 +83,7 @@ func (m *MailReceiveWebhook) ReceiveMail(c *gin.Context) {
 	email, mErr := smtpHandler.ReceiveMail(*c.Request)
 	if mErr != nil {
 		global.Logger.Log("error parsing mime", mErr.Error())
-		c.JSON(500, gin.H{"error parsing mime": mErr.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error parsing mime": mErr.Error()})
 		return
 	}
 	// fmt.Printf("Received mail: %v\n", email.MessageId)
@@ -101,7 +102,17 @@ func (m *MailReceiveWebhook) ReceiveMail(c *gin.Context) {
 		sendBounce(email, c, smtpHandler, "5.3.4", "Email size is too large")
 		return
 	}
-	// 3 MB limit for email body
+	// limit number of attachments
+	if len(email.Attachments) > 100 {
+		sendBounce(email, c, smtpHandler, "5.3.4", "Too many attachments")
+		return
+	}
+	// limit numbe of online attachments
+	if len(email.BodyInlinePart) > 100 {
+		sendBounce(email, c, smtpHandler, "5.3.4", "Too many inline attachments")
+		return
+	}
+	// 3 MB limit for email body without inline attachments and other attachments
 	if len([]byte(email.BodyHTML)) > 3*1024*1024 || len([]byte(email.BodyText)) > 3*1024*1024 {
 		sendBounce(email, c, smtpHandler, "5.3.4", "Email body size is too large")
 		return
@@ -155,7 +166,7 @@ func (m *MailReceiveWebhook) ReceiveMail(c *gin.Context) {
 		stats, sErr := m.userProfileService.Stats(userMapping.MailioAddress)
 		if sErr != nil {
 			global.Logger.Log("error retrieving disk usage stats", sErr.Error())
-			ApiErrorf(c, 500, fmt.Sprintf("error retrieving disk usage stats: %s", sErr.Error()))
+			ApiErrorf(c, http.StatusInternalServerError, fmt.Sprintf("error retrieving disk usage stats: %s", sErr.Error()))
 			return
 		}
 		// check if user over quota
@@ -195,7 +206,7 @@ func (m *MailReceiveWebhook) ReceiveMail(c *gin.Context) {
 		emailMarshalled, mErr := json.Marshal(email)
 		if mErr != nil {
 			global.Logger.Log("error marshalling email", mErr.Error())
-			ApiErrorf(c, 500, fmt.Sprintf("error marshalling email: %s", mErr.Error()))
+			ApiErrorf(c, http.StatusInternalServerError, fmt.Sprintf("error marshalling email: %s", mErr.Error()))
 			return
 		}
 
@@ -224,7 +235,7 @@ func (m *MailReceiveWebhook) ReceiveMail(c *gin.Context) {
 		mm, mErr := m.userService.SaveMessage(userMapping.MailioAddress, mailioMessage)
 		if mErr != nil {
 			global.Logger.Log("error saving message", mErr.Error())
-			ApiErrorf(c, 500, fmt.Sprintf("error saving message: %s", mErr.Error()))
+			ApiErrorf(c, http.StatusInternalServerError, fmt.Sprintf("error saving message: %s", mErr.Error()))
 			return
 		}
 		global.Logger.Log("message saved", mm.ID)

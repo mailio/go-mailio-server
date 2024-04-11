@@ -17,7 +17,7 @@ require (
 	github.com/lestrrat-go/jwx/v2 v2.0.19
 	github.com/mailio/go-mailio-did v0.0.0-20240219171524-88713f84b09d
 	github.com/mailio/go-mailio-mailgun-smtp-handler v1.0.0
-	github.com/mailio/go-mailio-server/email/smtp v0.0.0-20240331230752-247493e47bef
+	github.com/mailio/go-mailio-server/email/smtp v0.0.0-20240410171228-8d4e126ad3e6
 	github.com/mailio/go-web3-kit v0.0.0-20230302165532-057a45112b37
 	github.com/prometheus/client_golang v1.15.0
 	github.com/redis/go-redis/v9 v9.0.5
@@ -26,9 +26,9 @@ require (
 	github.com/stretchr/testify v1.9.0
 	github.com/swaggo/swag v1.16.1
 	github.com/tj/assert v0.0.3
-	golang.org/x/crypto v0.21.0
-	golang.org/x/net v0.22.0
-	golang.org/x/sys v0.18.0
+	golang.org/x/crypto v0.22.0
+	golang.org/x/net v0.24.0
+	golang.org/x/sys v0.19.0
 )
 
 require (

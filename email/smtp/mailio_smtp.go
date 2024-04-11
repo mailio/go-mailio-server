@@ -83,6 +83,7 @@ func GetHandler(name string) SmtpHandler {
 func htmlToText(html string) string {
 	p := bluemonday.NewPolicy()
 	p.AllowStandardURLs()
+
 	// Remove all tags to leave only text
 	clean := p.Sanitize(html)
 	clean = strings.ReplaceAll(clean, "\n", "")
@@ -496,7 +497,7 @@ func ParseMime(mime []byte) (*mailiosmtp.Mail, error) {
 	// body (plain, html, html cleaned)
 	email.BodyHTML = msg.HTML
 	email.BodyText = msg.Text
-	email.BodyHTMLWithoutUnsafeTags = removeUnwantedTags(email.BodyHTML)
+	email.BodyHTMLWithoutUnsafeTags = cleanupUGCHtml(email.BodyHTML)
 
 	// mime.Inlines is a slice of inlined attacments. These are typically images that are embedded in the HTML body
 	totalInlineSize := int64(0)
@@ -580,8 +581,17 @@ func parseAuthResults(emailHeaders map[string][]string) (string, string, string)
 	return spf, dkim, dmarc
 }
 
-func removeUnwantedTags(html string) string {
+// cleaning up user generated content html
+func cleanupUGCHtml(html string) string {
 	sanitizer := bluemonday.UGCPolicy()
+	sanitizer.AllowURLSchemes("cid", "http", "https", "data") // mid not supported
+	// sanitizer.AllowAttrs("href").OnElements("a")
+	// sanitizer.AllowAttrs("src").OnElements("img")
+	sanitizer.AllowAttrs("style").Globally()
+	sanitizer.AllowStandardAttributes()
+	sanitizer.AllowImages()
+	sanitizer.AllowRelativeURLs(true)
+	sanitizer.AllowStyling()
 
 	// Allow only a subset of HTML elements
 	allowedElements := []string{"a", "abbr", "acronym", "address", "area", "b", "bdo", "big", "blockquote", "br", "button", "caption", "center", "cite", "code", "col", "colgroup", "dd", "del", "dfn", "dir", "div", "dl", "dt", "em", "fieldset", "font", "form", "h1", "h2", "h3", "h4", "h5", "h6", "hr", "i", "img", "input", "ins", "kbd", "label", "legend", "li", "map", "menu", "ol", "optgroup", "option", "p", "pre", "q", "s", "samp", "select", "small", "span", "strike", "strong", "sub", "sup", "table", "tbody", "td", "textarea", "tfoot", "th", "thead", "u", "tr", "tt", "u", "ul", "var"}
