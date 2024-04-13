@@ -49,19 +49,10 @@ type MailBodyRaw struct {
 }
 
 type SmtpAttachment struct {
-	ContentType        string `json:"contentType"`                  // The content type of the attachment.
-	ContentDisposition string `json:"contentDisposition,omitempty"` // The content disposition of the attachment.
-	Filename           string `json:"filename"`                     // The name of the attachment.
-	Content            []byte `json:"content"`                      // The content of the attachment.
-	ContentID          string `json:"contentId,omitempty"`          // The content id of the attachment.
-}
-
-func (m *Mail) GetHeader(key string) string {
-	if m.Headers == nil {
-		return ""
-	}
-	if values, ok := m.Headers[key]; ok {
-		return values[0]
-	}
-	return ""
+	ContentType        string  `json:"contentType"`                  // The content type of the attachment.
+	ContentDisposition string  `json:"contentDisposition,omitempty"` // The content disposition of the attachment.
+	Filename           string  `json:"filename"`                     // The name of the attachment.
+	Content            []byte  `json:"content"`                      // The content of the attachment.
+	ContentURL         *string `json:"contentUrl,omitempty"`         // The content uri of the attachment.
+	ContentID          string  `json:"contentId,omitempty"`          // The content id of the attachment.
 }

@@ -201,7 +201,16 @@ func (ua *UserAccountApi) Login(c *gin.Context) {
 		return
 	}
 
-	//TODO!: check if user is disabled!
+	// check if user is disabled!
+	userProfile, upErr := ua.userProfileService.Get(inputLogin.MailioAddress)
+	if upErr != nil {
+		ApiErrorf(c, http.StatusNotFound, "user profile not found")
+		return
+	}
+	if !userProfile.Enabled {
+		ApiErrorf(c, http.StatusForbidden, "user is disabled")
+		return
+	}
 
 	// Sign the payload with servers private key.
 	token, err := interceptors.GenerateJWSToken(global.PrivateKey, mk.DID(), inputLogin.Nonce, inputLogin.Ed25519SigningPublicKeyBase64)

@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	mailgunhandler "github.com/mailio/go-mailio-mailgun-smtp-handler"
 	smtpmodule "github.com/mailio/go-mailio-server/email/smtp"
 	smtptypes "github.com/mailio/go-mailio-server/email/smtp/types"
 	"github.com/mailio/go-mailio-server/global"
@@ -31,13 +30,6 @@ type MailReceiveWebhook struct {
 }
 
 func NewMailReceiveWebhook(handshakeService *services.HandshakeService, userService *services.UserService, userProfileService *services.UserProfileService, env *types.Environment) *MailReceiveWebhook {
-	// Register the SMTP handlers (currently only mailgun)
-	for _, wh := range global.Conf.MailWebhooks {
-		if wh.Provider == "mailgun" {
-			handler := mailgunhandler.NewMailgunSmtpHandler(wh.Sendapikey, wh.Domain)
-			smtpmodule.RegisterSmtpHandler(wh.Provider, handler)
-		}
-	}
 	return &MailReceiveWebhook{Environment: env, handshakeService: handshakeService, userService: userService, userProfileService: userProfileService}
 }
 
@@ -154,6 +146,7 @@ func (m *MailReceiveWebhook) ReceiveMail(c *gin.Context) {
 				continue
 			}
 		}
+
 		// retrieve users profile
 		userProfile, upErr := m.userProfileService.Get(userMapping.MailioAddress)
 		if upErr != nil {
@@ -161,6 +154,12 @@ func (m *MailReceiveWebhook) ReceiveMail(c *gin.Context) {
 			ApiErrorf(c, 500, fmt.Sprintf("error getting user profile: %s", upErr.Error()))
 			return
 		}
+		if !userProfile.Enabled {
+			global.Logger.Log("user disabled", userMapping.MailioAddress)
+			sendBounce(email, c, smtpHandler, "5.2.1", "User disabled")
+			return
+		}
+
 		// 3. Check if users is over the disk space limit
 		//TODO!: also include S3 storage in the calculation!
 		stats, sErr := m.userProfileService.Stats(userMapping.MailioAddress)

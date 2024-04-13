@@ -283,5 +283,6 @@ func TestInBucketTestData_1(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	fmt.Printf("cleaned : %v\n", mail.BodyHTMLWithoutUnsafeTags)
 }

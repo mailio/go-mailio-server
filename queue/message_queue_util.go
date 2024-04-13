@@ -37,25 +37,25 @@ func (msq *MessageQueue) extractDIDMessageEndpoint(didDoc *did.Document) string 
 }
 
 // validates senders DID Docxument (if it matches the From field)
-func (msq *MessageQueue) validateSenderDID(message *types.DIDCommMessage, userAddress string) (*did.DID, error) {
-	senderDid, sdidErr := msq.ssiService.GetDIDDocument(userAddress)
-	if sdidErr != nil {
-		global.Logger.Log(sdidErr.Error(), "failed to retrieve did document", userAddress)
-		return nil, fmt.Errorf("failed to retrieve DID document: %v: %w", sdidErr, asynq.SkipRetry)
-	}
+// func (msq *MessageQueue) validateSenderDID(message *types.DIDCommMessage, userAddress string) (*did.DID, error) {
+// 	senderDid, sdidErr := msq.ssiService.GetDIDDocument(userAddress)
+// 	if sdidErr != nil {
+// 		global.Logger.Log(sdidErr.Error(), "failed to retrieve did document", userAddress)
+// 		return nil, fmt.Errorf("failed to retrieve DID document: %v: %w", sdidErr, asynq.SkipRetry)
+// 	}
 
-	fromDID, didErr := did.ParseDID(message.From)
-	if didErr != nil {
-		global.Logger.Log(didErr.Error(), "sender verification failed")
-		return nil, fmt.Errorf("failed to retrieve DID document: %v: %w", didErr, asynq.SkipRetry)
-	}
+// 	fromDID, didErr := did.ParseDID(message.From)
+// 	if didErr != nil {
+// 		global.Logger.Log(didErr.Error(), "sender verification failed")
+// 		return nil, fmt.Errorf("failed to retrieve DID document: %v: %w", didErr, asynq.SkipRetry)
+// 	}
 
-	// addresses from and logged in users must match
-	if fromDID.Fragment() != senderDid.ID.Value() {
-		return nil, fmt.Errorf("from field invalid: %v: %w", sdidErr, asynq.SkipRetry)
-	}
-	return &fromDID, nil
-}
+// 	// addresses from and logged in users must match
+// 	if fromDID.Fragment() != senderDid.ID.Value() {
+// 		return nil, fmt.Errorf("from field invalid: %v: %w", sdidErr, asynq.SkipRetry)
+// 	}
+// 	return &fromDID, nil
+// }
 
 // validateRecipientDid validates the recipient DIDs and collect valid DIDs in a recipientDidMap
 // invalid recipients are added to MailioMessage as MTPStatusCodes
@@ -69,7 +69,7 @@ func (msq *MessageQueue) validateRecipientDIDs(message *types.DIDCommMessage) (m
 		rec, didErr := did.ParseDID(recipient)
 		if didErr != nil {
 			global.Logger.Log(didErr.Error(), "recipient verification failed", rec.Fragment())
-			mtpStatusErrors = append(mtpStatusErrors, types.NewMTPStatusCode(5, 1, 1, fmt.Sprintf("failed to validate recipient", types.WithRecAddress(rec.Fragment()))))
+			mtpStatusErrors = append(mtpStatusErrors, types.NewMTPStatusCode(5, 1, 1, "failed to validate recipient", types.WithRecAddress(rec.Fragment())))
 			continue
 		}
 
@@ -83,7 +83,7 @@ func (msq *MessageQueue) validateRecipientDIDs(message *types.DIDCommMessage) (m
 			r, rErr := msq.ssiService.GetDIDDocument(rec.Fragment())
 			if rErr != nil {
 				global.Logger.Log(rErr.Error(), "failed to validate recipient", rec.Fragment())
-				mtpStatusErrors = append(mtpStatusErrors, types.NewMTPStatusCode(5, 1, 1, fmt.Sprintf("failed to validate recipient", types.WithRecAddress(rec.Fragment()))))
+				mtpStatusErrors = append(mtpStatusErrors, types.NewMTPStatusCode(5, 1, 1, "failed to validate recipient", types.WithRecAddress(rec.Fragment())))
 				continue
 			} else {
 				result = *r
@@ -161,7 +161,7 @@ func (msq *MessageQueue) httpSend(message *types.DIDCommMessage,
 	response, rErr := msq.restyClient.R().SetBody(signedRequest).SetResult(&responseResult).Post(endpoint)
 	if rErr != nil {
 		global.Logger.Log(rErr.Error(), "failed to send message", endpoint)
-		return types.NewMTPStatusCode(5, 4, 4, fmt.Sprintf("failed to send message")), types.ErrContinue
+		return types.NewMTPStatusCode(5, 4, 4, "failed to send message"), types.ErrContinue
 	}
 	if response.IsError() {
 		// if response.StatusCode() >= 405 && response.StatusCode() < 500 {
@@ -170,13 +170,13 @@ func (msq *MessageQueue) httpSend(message *types.DIDCommMessage,
 
 		// }
 		global.Logger.Log(response.String(), "failed to send message", endpoint, "code", response.StatusCode(), "body", string(response.Body()))
-		return types.NewMTPStatusCode(4, 4, 4, fmt.Sprintf("failed to send message")), types.ErrContinue
+		return types.NewMTPStatusCode(4, 4, 4, "failed to send message"), types.ErrContinue
 	}
 	// validate response receipt
 	responseId := responseResult.DIDCommRequest.DIDCommMessage.ID
 	if responseId != message.ID {
 		global.Logger.Log("response ID", responseId, "message ID", message.ID, "message ids don't match", endpoint)
-		return types.NewMTPStatusCode(5, 4, 4, fmt.Sprintf("failed to send message")), types.ErrContinue
+		return types.NewMTPStatusCode(5, 4, 4, "failed to send message"), types.ErrContinue
 	}
 	cbor, rcErr := base64.StdEncoding.DecodeString(responseResult.CborPayloadBase64)
 	signature, rsErr := base64.StdEncoding.DecodeString(responseResult.SignatureBase64)
@@ -204,28 +204,28 @@ func (msq *MessageQueue) httpSend(message *types.DIDCommMessage,
 }
 
 // checks if user already recieved a message with given messageID
-func (msq *MessageQueue) hasAlreadyReceivedMessage(messageID string, did did.DID) bool {
-	userAddress := did.Fragment()
-	if userAddress == "" {
-		userAddress = did.Value()
-	}
-	if userAddress == "" {
-		global.Logger.Log("user address is empty", "failed to check if message exists", did.String())
-		return true
-	}
+// func (msq *MessageQueue) hasAlreadyReceivedMessage(messageID string, did did.DID) bool {
+// 	userAddress := did.Fragment()
+// 	if userAddress == "" {
+// 		userAddress = did.Value()
+// 	}
+// 	if userAddress == "" {
+// 		global.Logger.Log("user address is empty", "failed to check if message exists", did.String())
+// 		return true
+// 	}
 
-	// msg, exErr := msq.userService.GetMessage(userAddress, messageID)
-	// if exErr != nil {
-	// 	if exErr != types.ErrNotFound {
-	// 		global.Logger.Log(exErr.Error(), "failed to check if message exists", userAddress)
-	// 		return false
-	// 	} else if exErr == types.ErrNotFound {
-	// 		return false
-	// 	}
-	// }
-	// // received messages must not be in sent folder
-	// if msg != nil && msg.Folder == types.MailioFolderSent {
-	// 	return false
-	// }
-	return true
-}
+// 	// msg, exErr := msq.userService.GetMessage(userAddress, messageID)
+// 	// if exErr != nil {
+// 	// 	if exErr != types.ErrNotFound {
+// 	// 		global.Logger.Log(exErr.Error(), "failed to check if message exists", userAddress)
+// 	// 		return false
+// 	// 	} else if exErr == types.ErrNotFound {
+// 	// 		return false
+// 	// 	}
+// 	// }
+// 	// // received messages must not be in sent folder
+// 	// if msg != nil && msg.Folder == types.MailioFolderSent {
+// 	// 	return false
+// 	// }
+// 	return true
+// }

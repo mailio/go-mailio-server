@@ -22,11 +22,71 @@ couchdb:
   port: 5984
   scheme: http
   username: admin
-  password: admin
+  password: YOURPASSWORD
+
+redis:
+  host: localhost
+  port: 6379
+  username: default
+  password: YOURPASSWORD
 
 awssmtp:
   username: test
-  password: test
+  password: YOURPASSWORD
+
+queue:
+  concurrency: 50
+
+mailio:
+  domain: localhost:8080 # e.g. test.example.com
+  serverKeysPath: test_server_keys.json
+  emailSaltHex: 6162636465666768 # 8 bytes hex (abcdefgh)
+  authenticationPath: /api/v1/didauth # don't change unless you know what you're doing
+  messagingPath: /api/v1/mtp/message # don't change unless you know what you're doing
+  diskSpace: 524288000 # initial maximum disk size in bytes (500 MB) per user
+  recaptchaV3SiteKey: YOURKEY
+  readVsReceived: 30 # 30% read makes a message go to goodreads, less to other
+  serverHandshake:
+    id: "mail_io_server_handshake" # guessable id
+    originServer: localhost:8080 # e.g test.example.com
+    type: 3 # 3 - server specific, 1 = personal, 2 = signup
+    subtypes:
+      - subtype: 1
+        frequencyMinutes: 0 # 0 - no limit
+      - subtype: 2 # product updates
+        frequencyMinutes: 43800 # 30 days
+      - subtype: 3 # security updates
+        frequencyMinutes: 0
+      - subtype: 4 # promotional updates
+        frequencyMinutes: 43800 # 30 days
+      - subtype: 5
+        frequencyMinutes: 43800 # 30 days
+      - subtype: 6
+        frequencyMinutes: 43800 # 30 days
+    minimumLevel: 1 # reCaptchaV3
+    signatureScheme: EdDSA_X25519
+    senderMailioAddress: 0xabc # mailio address of the sender info@mail.io
+    senderEmailAddress: info@mail.io
+
+prometheus:
+  enabled: true
+  username: prometheus
+  password: YOURPASSWORD
+
+# currently only mailgun supported
+# check docs to implement: https://github.com/mailio/go-mailio-mailgun-smtp-handler
+mailwebhooks:
+  - provider: mailgun
+    domain: sndmail.example.com
+    sendapikey: sendapikey
+    webhookurl: /webhook/mailgun_mime
+    webhookkey: webhookkey
+
+storage:
+  type: s3
+  key: YOURKET
+  secret: YOURPASSWORD
+  bucket: my-bucket-name
 ```
 3. `swag init --parseDependency=true` to re-create documentation
 4. `go run environment.go main.go` to run the app

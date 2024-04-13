@@ -40,7 +40,7 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 	accountApi := api.NewUserAccountApi(userService, userProfileService, nonceService, ssiService)
 	didApi := api.NewDIDApi(ssiService)
 	vcApi := api.NewVCApi(ssiService)
-	messageApi := api.NewMessagingApi(ssiService, environment)
+	messageApi := api.NewMessagingApi(ssiService, userService, userProfileService, environment)
 
 	// WEBHOOK API definitions
 	webhookApi := api.NewMailReceiveWebhook(handshakeService, userService, userProfileService, environment)
@@ -80,6 +80,7 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 
 		// Messaging
 		rootApi.POST("/v1/didmessage", messageApi.SendDIDMessage)
+		rootApi.POST("/v1/smtp", messageApi.SendSmtpMessage)
 
 		// VCs
 		rootApi.GET("/v1/credentials/list/:address", vcApi.ListVCs)

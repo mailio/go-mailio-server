@@ -29,6 +29,7 @@ type Config struct {
 	Redis          RedisConfig          `yaml:"redis"`
 	Queue          Queue                `yaml:"queue"`
 	MailWebhooks   []*MailWebhookConfig `yaml:"mailwebhooks"`
+	Storage        StorageConfig        `yaml:"storage"`
 }
 
 type CouchDBConfig struct {
@@ -95,4 +96,11 @@ type MailWebhookConfig struct {
 	Sendapikey string `yaml:"sendapikey"`
 	Webhookurl string `yaml:"webhookurl"`
 	Webhookkey string `yaml:"webhookkey"`
+}
+
+type StorageConfig struct {
+	Type   string `yaml:"type"`
+	Key    string `yaml:"key"`
+	Secret string `yaml:"secret"`
+	Bucket string `yaml:"bucket"`
 }

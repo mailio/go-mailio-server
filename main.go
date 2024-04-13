@@ -125,8 +125,10 @@ func initAsyncQueue(dbSelector *repository.CouchDBSelector, env *types.Environme
 	taskService := queue.NewMessageQueue(dbSelector, env)
 	// start a task processing server
 	mux := asynq.NewServeMux()
-	mux.HandleFunc(types.QueueTypeDIDCommRecv, taskService.ProcessTask)
-	mux.HandleFunc(types.QueueTypeDIDCommSend, taskService.ProcessTask)
+	mux.HandleFunc(types.QueueTypeDIDCommRecv, taskService.ProcessDIDCommTask)
+	mux.HandleFunc(types.QueueTypeDIDCommSend, taskService.ProcessDIDCommTask)
+	mux.HandleFunc(types.QueueTypeSMTPCommSend, taskService.ProcessSMTPTask)
+	mux.HandleFunc(types.QueueTypeSMTPCommReceive, taskService.ProcessSMTPTask)
 
 	if err := taskServer.Start(mux); err != nil {
 		log.Fatalf("could not start server: %v", err)
@@ -189,6 +191,9 @@ func main() {
 
 	dbSelector := ConfigDBSelector()
 	ConfigDBIndexing(dbSelector.(*repository.CouchDBSelector), env)
+
+	// register SMTP handlers from config
+	RegisterSmtpHandlers(&global.Conf)
 
 	taskServer, taskClient := initAsyncQueue(dbSelector.(*repository.CouchDBSelector), env)
 	defer taskClient.Close()

@@ -104,7 +104,7 @@ func htmlToText(html string) string {
 // - The calling PID
 // - A cryptographically random int64
 // - The sending hostname
-func generateRFC2822MessageID(hostname string) (string, error) {
+func GenerateRFC2822MessageID(hostname string) (string, error) {
 	t := time.Now().UnixNano()
 	pid := os.Getpid()
 	rint, err := rand.Int(rand.Reader, maxBigInt)
@@ -118,11 +118,28 @@ func generateRFC2822MessageID(hostname string) (string, error) {
 	return msgid, nil
 }
 
-// converts a message to a mime message
-func ToMime(msg *mailiosmtp.Mail, mailhost string) ([]byte, error) {
+// converts a message to a mime message. Required rfc2822 compliant message id
+func ToMime(msg *mailiosmtp.Mail, rfc2822MessageID string) ([]byte, error) {
 
-	// convert html to text
-	text := htmlToText(msg.BodyHTML)
+	if rfc2822MessageID == "" {
+		return nil, errors.New("rfc2822MessageID is required")
+	}
+
+	// simple message id validation
+	if !strings.HasPrefix(rfc2822MessageID, "<") || !strings.HasSuffix(rfc2822MessageID, ">") || !strings.Contains(rfc2822MessageID, "@") {
+		return nil, errors.New("rfc2822MessageID is not valid")
+	}
+
+	// convert html to text (remove unwanted tags)
+	text := msg.BodyText
+	if msg.BodyText == "" {
+		text = htmlToText(msg.BodyHTML)
+	}
+
+	cleanHtml := msg.BodyHTML
+	if msg.BodyHTML != "" {
+		cleanHtml = cleanupUGCHtml(msg.BodyHTML)
+	}
 
 	// convert replyTo to no pointer
 	var replyToNoPtr []mail.Address
@@ -142,7 +159,7 @@ func ToMime(msg *mailiosmtp.Mail, mailhost string) ([]byte, error) {
 		ReplyToAddrs(replyToNoPtr).
 		Text([]byte(text)).
 		Date(time.UnixMilli(msg.Timestamp)).
-		HTML([]byte(msg.BodyHTML))
+		HTML([]byte(cleanHtml))
 
 	// add sender address if present
 	if msg.Cc != nil {
@@ -171,16 +188,7 @@ func ToMime(msg *mailiosmtp.Mail, mailhost string) ([]byte, error) {
 
 	}
 
-	// add message id
-	host := "localhost"
-	if mailhost != "" {
-		host = mailhost
-	}
-	id, idErr := generateRFC2822MessageID(host)
-	if idErr != nil {
-		return nil, idErr
-	}
-	outgoingMime = outgoingMime.Header("Message-ID", id)
+	outgoingMime = outgoingMime.Header("Message-ID", rfc2822MessageID)
 
 	// build and encode the message
 	ep, err := outgoingMime.Build()

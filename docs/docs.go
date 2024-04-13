@@ -1459,8 +1459,8 @@ const docTemplate = `{
                     "description": "The HTML version of the email.",
                     "type": "string"
                 },
-                "bodyRaw": {
-                    "description": "The raw content of the email.",
+                "bodyInlinePart": {
+                    "description": "The raw inline content of the email.",
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/mailiosmtp.MailBodyRaw"
@@ -1522,8 +1522,20 @@ const docTemplate = `{
                         "$ref": "#/definitions/mail.Address"
                     }
                 },
+                "sizeAttachmentsBytes": {
+                    "description": "The size of the attachments in bytes.",
+                    "type": "integer"
+                },
                 "sizeBytes": {
                     "description": "The size of the email in bytes.",
+                    "type": "integer"
+                },
+                "sizeHtmlBodyBytes": {
+                    "description": "The size of the HTML body in bytes.",
+                    "type": "integer"
+                },
+                "sizeInlineBytes": {
+                    "description": "The size of the inline content in bytes.",
                     "type": "integer"
                 },
                 "spamVerdict": {

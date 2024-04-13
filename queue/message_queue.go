@@ -21,6 +21,7 @@ type MessageQueue struct {
 	handshakeService *services.HandshakeService
 	deliveryService  *services.MessageDeliveryService
 	restyClient      *resty.Client
+	env              *types.Environment
 }
 
 func NewMessageQueue(dbSelector *repository.CouchDBSelector, env *types.Environment) *MessageQueue {
@@ -32,10 +33,31 @@ func NewMessageQueue(dbSelector *repository.CouchDBSelector, env *types.Environm
 	handshakeService := services.NewHandshakeService(dbSelector)
 	deliveryService := services.NewMessageDeliveryService(dbSelector)
 
-	return &MessageQueue{ssiService: ssiService, userService: userService, mtpService: mtpService, handshakeService: handshakeService, deliveryService: deliveryService, restyClient: rcClient}
+	return &MessageQueue{ssiService: ssiService, userService: userService, mtpService: mtpService, handshakeService: handshakeService, deliveryService: deliveryService, restyClient: rcClient, env: env}
 }
 
-func (mqs *MessageQueue) ProcessTask(ctx context.Context, t *asynq.Task) error {
+// Processing of SMTP tasks
+func (mqs *MessageQueue) ProcessSMTPTask(ctx context.Context, t *asynq.Task) error {
+	var task types.SmtpTask
+	if err := json.Unmarshal(t.Payload(), &task); err != nil {
+		return fmt.Errorf("json.Unmarshal failed: %v: %w", err, asynq.SkipRetry)
+	}
+	switch t.Type() {
+	case types.QueueTypeSMTPCommSend:
+		// send the message
+		taskId := t.ResultWriter().TaskID()
+		mqs.SendSMTPMessage(task.Address, task.Mail, taskId)
+	case types.QueueTypeSMTPCommReceive:
+		// receive the message
+		// mqs.ReceiveSMTPMessage(task.From, task.Mail)
+	default:
+		return fmt.Errorf("unexpected task type: %s, %w", t.Type(), asynq.SkipRetry)
+	}
+	return nil
+}
+
+// processing od DIDComm tasks
+func (mqs *MessageQueue) ProcessDIDCommTask(ctx context.Context, t *asynq.Task) error {
 	// return nil if task is successfully processed, otherwise return an error.
 	var task types.Task
 	if err := json.Unmarshal(t.Payload(), &task); err != nil {
@@ -47,10 +69,10 @@ func (mqs *MessageQueue) ProcessTask(ctx context.Context, t *asynq.Task) error {
 	switch t.Type() {
 	case types.QueueTypeDIDCommSend:
 		// send the message
-		mqs.SendMessage(task.Address, task.DIDCommMessage)
+		mqs.DIDCommSendMessage(task.Address, task.DIDCommMessage)
 	case types.QueueTypeDIDCommRecv:
 		// receive the message
-		mqs.ReceiveMessage(task.DIDCommMessage)
+		mqs.DidCommReceiveMessage(task.DIDCommMessage)
 	default:
 		// no responses on unrecognized messages
 		return fmt.Errorf("unexpected task type: %s, %w", t.Type(), asynq.SkipRetry)
@@ -60,7 +82,7 @@ func (mqs *MessageQueue) ProcessTask(ctx context.Context, t *asynq.Task) error {
 }
 
 // SendMessage sends encrypted DIDComm message to recipient
-func (msq *MessageQueue) SendMessage(userAddress string, message *types.DIDCommMessage) error {
+func (msq *MessageQueue) DIDCommSendMessage(userAddress string, message *types.DIDCommMessage) error {
 	global.Logger.Log("sending from", userAddress, "intent", message.Intent)
 
 	if message.Thid == "" {
@@ -122,7 +144,7 @@ func (msq *MessageQueue) SendMessage(userAddress string, message *types.DIDCommM
 }
 
 // SendMessage sends encrypted DIDComm message to recipient
-func (msq *MessageQueue) ReceiveMessage(message *types.DIDCommMessage) error {
+func (msq *MessageQueue) DidCommReceiveMessage(message *types.DIDCommMessage) error {
 	global.Logger.Log("received msg intent", message.Intent, "id", message.ID, "from", message.From)
 	fmt.Printf("received msg intent %s id %s from %s\n", message.Intent, message.ID, message.From)
 	switch message.Intent {

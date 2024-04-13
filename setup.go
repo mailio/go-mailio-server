@@ -4,11 +4,23 @@ import (
 	"errors"
 	"strconv"
 
+	mailgunhandler "github.com/mailio/go-mailio-mailgun-smtp-handler"
+	smtpmodule "github.com/mailio/go-mailio-server/email/smtp"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/repository"
 	"github.com/mailio/go-mailio-server/services"
 	"github.com/mailio/go-mailio-server/types"
 )
+
+func RegisterSmtpHandlers(conf *global.Config) {
+	// Register the SMTP handlers (currently only mailgun)
+	for _, wh := range conf.MailWebhooks {
+		if wh.Provider == "mailgun" {
+			handler := mailgunhandler.NewMailgunSmtpHandler(wh.Sendapikey, wh.Domain)
+			smtpmodule.RegisterSmtpHandler(wh.Provider, handler)
+		}
+	}
+}
 
 func ConfigDBSelector() repository.DBSelector {
 	// configure Repository (couchDB)

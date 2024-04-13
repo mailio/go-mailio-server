@@ -3,9 +3,10 @@ package types
 var DENIED_EXTENSIONS = map[string]string{"ade": "ade", "adp": "adp", "apk": "apk", "appx": "appx", "appxbundle": "appxbundle", "bat": "bat", "cab": "cab", "chm": "chm", "cmd": "cmd", "com": "com", "cpl": "cpl", "dll": "dll", "dmg": "dmg", "ex": "ex", "ex_": "ex_", "exe": "exe", "hta": "hta", "ins": "ins", "isp": "isp", "iso": "iso", "jar": "jar", "js": "js", "jse": "jse", "lib": "lib", "lnk": "lnk", "mde": "mde", "msc": "msc", "msi": "msi", "msix": "msix", "msixbundle": "msixbundle", "msp": "msp", "mst": "mst", "nsh": "nsh", "pif": "pif", "ps1": "ps1", "scr": "scr", "sct": "sct", "shb": "shb", "sys": "sys", "vb": "vb", "vbe": "vbe", "vbs": "vbs", "vxd": "vxd", "wsc": "wsc", "wsf": "wsf", "wsh": "wsh"}
 
 var (
-	DIDCommIntentMessage   = "message"   // ordinary message
-	DIDCommIntentHandshake = "handshake" // handshake message
-	DIDCommIntentDelivery  = "delivery"  // delivery message (acknowledgement, failure, etc.)
+	DIDCommIntentMessage   = "message"     // ordinary message
+	DIDCommIntentHandshake = "handshake"   // handshake message
+	DIDCommIntentDelivery  = "delivery"    // delivery message (acknowledgement, failure, etc.)
+	SMPTIntentMessage      = "smtpmessage" // ordinary smtp message
 
 	MailioFolderInbox     = "inbox"
 	MailioFolderGoodReads = "goodreads"
@@ -47,8 +48,10 @@ type DIDCommMessage struct {
 	FromPrior            string                 `json:"fromPrior,omitempty"`                                                                                                            // A DID is rotated by sending a message of any type to the recipient to be notified of the rotation
 	Intent               string                 `json:"intent,omitempty" validate:"omitempty,oneof=message handshake delivery"`                                                         // the intent of the message (if empty, ordinary message
 	EncryptedBody        *EncryptedBody         `json:"body,omitempty"`                                                                                                                 // the body attribute contains all the data and structure defined uniquely for the schema associated with the type attribute. It MUST be a JSON object conforming to RFC 7159                              // the encrypted message body
-	PlainBodyBase64      string                 `json:"plainBodyBase64,omitempty" validate:"omitempty,base64"`                                                                          // the plain text message body, base64 encoded (optional)
 	EncryptedAttachments []*EncryptedAttachment `json:"attachments,omitempty"`                                                                                                          // attachments to the message                                                // MTP status message
+	PlainBodyBase64      string                 `json:"plainBodyBase64,omitempty" validate:"omitempty,base64"`                                                                          // the plain text message body, base64 encoded (optional)
+	PlainAttachments     []*PlainAttachment     `json:"plainAttachments,omitempty"`                                                                                                     // attachments to the message
+
 }
 
 type DIDCommRequest struct {
@@ -119,4 +122,7 @@ type Signature struct {
 type SignatureDetail struct {
 	Signature string `json:"signature"`
 	Protected string `json:"protected"` // Base64URL encoded JSON string containing the header parameters used for the signature
+}
+
+type PlainAttachment struct {
 }
