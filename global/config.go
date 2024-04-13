@@ -23,7 +23,6 @@ var RateLimiter *redis_rate.Limiter
 type Config struct {
 	cfg.YamlConfig `yaml:",inline"`
 	CouchDB        CouchDBConfig        `yaml:"couchdb"`
-	AwsSmtp        AwsSmtpConfig        `yaml:"awssmtp"`
 	Mailio         MailioConfig         `yaml:"mailio"`
 	Prometheus     PrometheusConfig     `yaml:"prometheus"`
 	Redis          RedisConfig          `yaml:"redis"`
@@ -36,11 +35,6 @@ type CouchDBConfig struct {
 	Host     string `yaml:"host"`
 	Port     int    `yaml:"port"`
 	Scheme   string `yaml:"scheme"`
-	Username string `yaml:"username"`
-	Password string `yaml:"password"`
-}
-
-type AwsSmtpConfig struct {
 	Username string `yaml:"username"`
 	Password string `yaml:"password"`
 }
@@ -103,4 +97,5 @@ type StorageConfig struct {
 	Key    string `yaml:"key"`
 	Secret string `yaml:"secret"`
 	Bucket string `yaml:"bucket"`
+	Region string `yaml:"region"`
 }

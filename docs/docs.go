@@ -1624,6 +1624,10 @@ const docTemplate = `{
                     "description": "The content type of the attachment.",
                     "type": "string"
                 },
+                "contentUrl": {
+                    "description": "The content uri of the attachment.",
+                    "type": "string"
+                },
                 "filename": {
                     "description": "The name of the attachment.",
                     "type": "string"

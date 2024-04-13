@@ -3,6 +3,7 @@ module github.com/mailio/go-mailio-server
 go 1.22.1
 
 require (
+	github.com/aws/aws-sdk-go v1.51.21
 	github.com/cespare/xxhash/v2 v2.2.0
 	github.com/fxamacker/cbor/v2 v2.5.0
 	github.com/gin-gonic/gin v1.9.1
@@ -17,7 +18,7 @@ require (
 	github.com/lestrrat-go/jwx/v2 v2.0.19
 	github.com/mailio/go-mailio-did v0.0.0-20240219171524-88713f84b09d
 	github.com/mailio/go-mailio-mailgun-smtp-handler v1.0.0
-	github.com/mailio/go-mailio-server/email/smtp v0.0.0-20240410171228-8d4e126ad3e6
+	github.com/mailio/go-mailio-server/email/smtp v0.0.0-20240413195105-8ba8479db6fd
 	github.com/mailio/go-web3-kit v0.0.0-20230302165532-057a45112b37
 	github.com/prometheus/client_golang v1.15.0
 	github.com/redis/go-redis/v9 v9.0.5
@@ -58,6 +59,7 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jaytaylor/html2text v0.0.0-20230321000545-74c2419ad056 // indirect
 	github.com/jhillyerd/enmime v1.2.0 // indirect
+	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.4 // indirect

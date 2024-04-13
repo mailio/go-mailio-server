@@ -28,7 +28,7 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 	}
 
 	// SERVICE definitions
-	userService := services.NewUserService(dbSelector)
+	userService := services.NewUserService(dbSelector, environment)
 	nonceService := services.NewNonceService(dbSelector)
 	ssiService := services.NewSelfSovereignService(dbSelector)
 	handshakeService := services.NewHandshakeService(dbSelector)

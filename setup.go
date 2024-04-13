@@ -4,6 +4,10 @@ import (
 	"errors"
 	"strconv"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	mailgunhandler "github.com/mailio/go-mailio-mailgun-smtp-handler"
 	smtpmodule "github.com/mailio/go-mailio-server/email/smtp"
 	"github.com/mailio/go-mailio-server/global"
@@ -82,4 +86,16 @@ func ConfigDBIndexing(dbSelector *repository.CouchDBSelector, environment *types
 	environment.Cron.AddFunc("@every 5m", nonceService.RemoveExpiredNonces) // remove expired tokens every 5 minutes
 	environment.Cron.Start()
 	go nonceService.RemoveExpiredNonces() // run once on startup
+}
+
+func ConfigS3Storage(conf *global.Config, env *types.Environment) {
+	// configure S3 storage
+	session := session.Must(session.NewSession(&aws.Config{
+		Region:      aws.String(conf.Storage.Region),
+		Credentials: credentials.NewStaticCredentials(conf.Storage.Key, conf.Storage.Secret, ""),
+	}))
+	uploader := s3manager.NewUploader(session)
+	downloader := s3manager.NewDownloader(session)
+	env.AddS3Uploader(uploader)
+	env.AddS3Downloader(downloader)
 }

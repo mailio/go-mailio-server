@@ -28,7 +28,7 @@ func NewMessageQueue(dbSelector *repository.CouchDBSelector, env *types.Environm
 
 	rcClient := resty.New()
 	ssiService := services.NewSelfSovereignService(dbSelector)
-	userService := services.NewUserService(dbSelector)
+	userService := services.NewUserService(dbSelector, env)
 	mtpService := services.NewMtpService(dbSelector)
 	handshakeService := services.NewHandshakeService(dbSelector)
 	deliveryService := services.NewMessageDeliveryService(dbSelector)

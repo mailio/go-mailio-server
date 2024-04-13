@@ -1,6 +1,7 @@
 package services
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"errors"
@@ -10,6 +11,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/go-resty/resty/v2"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/repository"
@@ -19,9 +22,10 @@ import (
 type UserService struct {
 	repoSelector *repository.CouchDBSelector
 	restyClient  *resty.Client
+	env          *types.Environment
 }
 
-func NewUserService(repoSelector *repository.CouchDBSelector) *UserService {
+func NewUserService(repoSelector *repository.CouchDBSelector, env *types.Environment) *UserService {
 	if repoSelector == nil {
 		panic("repoSelector cannot be nil")
 	}
@@ -40,6 +44,7 @@ func NewUserService(repoSelector *repository.CouchDBSelector) *UserService {
 	return &UserService{
 		repoSelector: repoSelector,
 		restyClient:  client,
+		env:          env,
 	}
 }
 
@@ -262,3 +267,38 @@ func (us *UserService) CountNumberOfReceivedMessages(address string, from string
 	}
 	return &response, nil
 }
+
+// upload attachment to s3
+func (us *UserService) UploadAttachment(bucket, path string, content []byte) (string, error) {
+	if len(content) == 0 {
+		return "", types.ErrBadRequest
+	}
+	ioReader := bytes.NewReader(content)
+	us.env.S3Uploader.Upload(&s3manager.UploadInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(path),
+		Body:   ioReader,
+	})
+	attachmentUrl := fmt.Sprintf("s3://%s/%s", bucket, path)
+	return attachmentUrl, nil
+}
+
+// download attachment from s3
+// func (us *UserService) DownloadAttachment(attachmentUrl string) ([]byte, error) {
+// 	if attachmentUrl == "" {
+// 		return nil, types.ErrBadRequest
+// 	}
+// 	splitted := strings.Split(attachmentUrl, "s3://"+global.Conf.Storage.Bucket+"/")
+// 	if len(splitted) != 2 {
+// 		return nil, types.ErrBadRequest
+// 	}
+// 	buf := aws.NewWriteAtBuffer([]byte{})
+// 	_, err := us.env.S3Downloader.Download(buf, &s3manager.DownloadInput{
+// 		Bucket: aws.String(global.Conf.Storage.Bucket),
+// 		Key:    aws.String(attachmentUrl),
+// 	})
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	return buf.Bytes(), nil
+// }

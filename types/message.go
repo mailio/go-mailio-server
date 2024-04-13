@@ -50,8 +50,6 @@ type DIDCommMessage struct {
 	EncryptedBody        *EncryptedBody         `json:"body,omitempty"`                                                                                                                 // the body attribute contains all the data and structure defined uniquely for the schema associated with the type attribute. It MUST be a JSON object conforming to RFC 7159                              // the encrypted message body
 	EncryptedAttachments []*EncryptedAttachment `json:"attachments,omitempty"`                                                                                                          // attachments to the message                                                // MTP status message
 	PlainBodyBase64      string                 `json:"plainBodyBase64,omitempty" validate:"omitempty,base64"`                                                                          // the plain text message body, base64 encoded (optional)
-	PlainAttachments     []*PlainAttachment     `json:"plainAttachments,omitempty"`                                                                                                     // attachments to the message
-
 }
 
 type DIDCommRequest struct {
@@ -122,7 +120,4 @@ type Signature struct {
 type SignatureDetail struct {
 	Signature string `json:"signature"`
 	Protected string `json:"protected"` // Base64URL encoded JSON string containing the header parameters used for the signature
-}
-
-type PlainAttachment struct {
 }

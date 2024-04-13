@@ -88,7 +88,7 @@ storage:
   secret: YOURPASSWORD
   bucket: my-bucket-name
 ```
-3. `swag init --parseDependency=true` to re-create documentation
+3. `swag init --parseDependency=true` to re-create swagger documentation
 4. `go run environment.go main.go` to run the app
 
 ## Adding SMTP handler implementation

@@ -192,13 +192,18 @@ func main() {
 	dbSelector := ConfigDBSelector()
 	ConfigDBIndexing(dbSelector.(*repository.CouchDBSelector), env)
 
+	// configure S3 storage
+	ConfigS3Storage(&global.Conf, env)
+
 	// register SMTP handlers from config
 	RegisterSmtpHandlers(&global.Conf)
 
+	// initialize the async queue
 	taskServer, taskClient := initAsyncQueue(dbSelector.(*repository.CouchDBSelector), env)
 	defer taskClient.Close()
 	env.TaskClient = taskClient
 
+	// configure routes
 	router = apiroutes.ConfigRoutes(router, dbSelector.(*repository.CouchDBSelector), taskServer, env)
 
 	// start server
