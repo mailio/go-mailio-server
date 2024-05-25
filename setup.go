@@ -20,8 +20,20 @@ func RegisterSmtpHandlers(conf *global.Config) {
 	// Register the SMTP handlers (currently only mailgun)
 	for _, wh := range conf.MailWebhooks {
 		if wh.Provider == "mailgun" {
-			handler := mailgunhandler.NewMailgunSmtpHandler(wh.Sendapikey, wh.Domain)
+			handler := mailgunhandler.NewMailgunSmtpHandler(wh.Sendapikey, wh.Webhookkey, wh.Domain)
 			smtpmodule.RegisterSmtpHandler(wh.Provider, handler)
+		}
+	}
+}
+
+func RegisterCronHandlers(conf *global.Config) {
+	// Register the Cron handlers
+	for _, ch := range conf.CronHandlers {
+		if ch.Handler == "send-vcs" {
+			// Register the send-vcs cron handler
+			// cron.AddFunc(ch.CronSchedule, func() {
+			// 	// Send VCS
+			// })
 		}
 	}
 }
@@ -38,8 +50,9 @@ func ConfigDBSelector() repository.DBSelector {
 	domainRepo, dErr := repository.NewCouchDBRepository(repoUrl, repository.Domain, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
 	messageDeliveryRepo, mdErr := repository.NewCouchDBRepository(repoUrl, repository.MessageDelivery, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
 	userProfileRepo, upErr := repository.NewCouchDBRepository(repoUrl, repository.UserProfile, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
+	attachmentSize, asErr := repository.NewCouchDBRepository(repoUrl, repository.AttachmentSize, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
 
-	repoErr := errors.Join(handshakeRepoErr, nonceRepoErr, userRepoErr, mappingRepoErr, didRErr, vscrErr, dErr, mdErr, upErr)
+	repoErr := errors.Join(handshakeRepoErr, nonceRepoErr, userRepoErr, mappingRepoErr, didRErr, vscrErr, dErr, mdErr, upErr, asErr)
 	if repoErr != nil {
 		panic(repoErr)
 	}
@@ -55,6 +68,7 @@ func ConfigDBSelector() repository.DBSelector {
 	dbSelector.AddDB(domainRepo)
 	dbSelector.AddDB(messageDeliveryRepo)
 	dbSelector.AddDB(userProfileRepo)
+	dbSelector.AddDB(attachmentSize)
 
 	return dbSelector
 }

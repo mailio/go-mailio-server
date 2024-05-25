@@ -173,10 +173,10 @@ github.com/mailgun/mailgun-go/v4 v4.12.0 h1:TtuQCgqSp4cB6swPxP5VF/u4JeeBIAjTdpuQ
 github.com/mailgun/mailgun-go/v4 v4.12.0/go.mod h1:L9s941Lgk7iB3TgywTPz074pK2Ekkg4kgbnAaAyJ2z8=
 github.com/mailio/go-mailio-did v0.0.0-20240219171524-88713f84b09d h1:4Gq9RYaC45GKuivQU1FqKsJD1C2bspzfYEbVO1X2+j0=
 github.com/mailio/go-mailio-did v0.0.0-20240219171524-88713f84b09d/go.mod h1:EKVVtEiXuIBXsvRrnfybDGY7v6v19aCs5NW+zuY3nwc=
-github.com/mailio/go-mailio-mailgun-smtp-handler v1.0.0 h1:/DlZG8X0CQfUwnOU9DY/n5faYsoptWUWYfKY72/6Wb4=
-github.com/mailio/go-mailio-mailgun-smtp-handler v1.0.0/go.mod h1:5sP0B7E+htEYAMjslGWM0QM+a5Tnmr+YlaCPHkuJcuU=
-github.com/mailio/go-mailio-server/email/smtp v0.0.0-20240413195105-8ba8479db6fd h1:tHVn1apFT5y8a2FJQQ3HQHL9LaAWfpyZDzhaNn39MqE=
-github.com/mailio/go-mailio-server/email/smtp v0.0.0-20240413195105-8ba8479db6fd/go.mod h1:5Wj4t0/5qHydsNV9dWgYZXY7qChv0Qk8WXeBkWpHM8E=
+github.com/mailio/go-mailio-mailgun-smtp-handler v1.0.3 h1:iPW4jcpGMTx7i1GyTe7m70C5zWpwZo/i8cmph8PDuws=
+github.com/mailio/go-mailio-mailgun-smtp-handler v1.0.3/go.mod h1:5sP0B7E+htEYAMjslGWM0QM+a5Tnmr+YlaCPHkuJcuU=
+github.com/mailio/go-mailio-server/email/smtp v0.0.0-20240413213630-6d046582a97a h1:Az7bgoqYTAJladN+wAyyWTUKhWWIxOyvWxEu1+T0BM4=
+github.com/mailio/go-mailio-server/email/smtp v0.0.0-20240413213630-6d046582a97a/go.mod h1:5Wj4t0/5qHydsNV9dWgYZXY7qChv0Qk8WXeBkWpHM8E=
 github.com/mailio/go-web3-kit v0.0.0-20230302165532-057a45112b37 h1:5JGzR1JKKV6Q/a+qhlGf8XLykR0EsgrPGsSsRJ9appk=
 github.com/mailio/go-web3-kit v0.0.0-20230302165532-057a45112b37/go.mod h1:Ifq8SY22NEf70R8M/F26nluqPKwx3gh3kY3gyRDl/GI=
 github.com/mailru/easyjson v0.0.0-20190614124828-94de47d64c63/go.mod h1:C1wdFJiN94OJF2b5HbByQZoLdCWB1Yqtg26g4irojpc=

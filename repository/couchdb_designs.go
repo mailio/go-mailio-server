@@ -106,6 +106,25 @@ func CreateDesign_CountFromAddress(databaseName string, designName string, viewN
 	return createDesignAndView(databaseName, designName, viewName, mapFunction, "_approx_count_distinct")
 }
 
+func CreateDesign_SentToCountView(databaseName string, designName string, viewName string) error {
+	mapFunction := `function(doc)
+						{
+							const emailRegex = /[\w.-]+@[\w.-]+\.\w+/g;
+							if (doc.didCommMessage && doc.didCommMessage.to && doc.folder == "sent") {
+								doc.didCommMessage.to.forEach(function(email) {
+									if (email.includes("@")) {
+										const matches = email.match(emailRegex);
+										const found = matches ? matches[0] : "No email found";
+										emit(found, 1);
+									} else {
+										emit(email, 1);
+									}
+								});
+							}
+						}`
+	return createDesignAndView(databaseName, designName, viewName, mapFunction, "_count")
+}
+
 // created for each user database
 func CreateDesign_CountFromAddressRead(databaseName string, designName string, viewName string) error {
 	mapFunction := `function(doc)

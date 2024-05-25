@@ -91,10 +91,11 @@ func (us *UserService) CreateUser(user *types.User, databasePassword string) (*t
 
 	// create required indexes
 	iErr := repository.CreateUserDatabaseFolderCreatedIndex(userRepo, hexUser)
+	xErr := repository.CreateDesign_SentToCountView(hexUser, "sent-to", "count-view")
 	aErr := repository.CreateDesign_CountFromAddress(hexUser, "count", "from-address")
 	arErr := repository.CreateDesign_CountFromAddressRead(hexUser, "count-read", "from-address-read")
-	if errors.Join(iErr, aErr, arErr) != nil {
-		return nil, errors.Join(iErr, aErr, arErr)
+	if errors.Join(iErr, aErr, arErr, xErr) != nil {
+		return nil, errors.Join(iErr, aErr, arErr, xErr)
 	}
 
 	return user, nil
@@ -195,6 +196,33 @@ func (us *UserService) SaveMessage(userAddress string, mailioMessage *types.Mail
 	}
 
 	return mailioMessage, nil
+}
+
+// counts the number of sent messages from mailio user to specific recipient (regular email or mailio address)
+func (us *UserService) CountNumberOfSentByRecipientMessages(address string, recipient string, from int64, to int64) (*types.CouchDBCountDistinctFromResponse, error) {
+	viewPath := "_design/sent-to/_view/count-view"
+	hexUser := "userdb-" + hex.EncodeToString([]byte(address))
+
+	// format: address, folder, timestamp
+	params := url.Values{}
+	params.Add("key", fmt.Sprintf("\"%s\"", recipient))
+	params.Add("group_level", "1")
+
+	url := fmt.Sprintf("%s/%s?%s", hexUser, viewPath, params.Encode())
+
+	var couchError types.CouchDBError
+	var response types.CouchDBCountDistinctFromResponse
+
+	httpResp, httpErr := us.restyClient.R().SetResult(&response).SetError(&couchError).Get(url)
+	if httpErr != nil {
+		global.Logger.Log(httpErr.Error(), "failed to send message", hexUser)
+		return nil, httpErr
+	}
+	if httpResp.IsError() {
+		global.Logger.Log(httpResp.String(), "failed to send message", hexUser, couchError.Error, couchError.Reason)
+		return nil, fmt.Errorf("code: %s, reason: %s", couchError.Error, couchError.Reason)
+	}
+	return &response, nil
 }
 
 // counts the number of sent messages by user between two timestamps

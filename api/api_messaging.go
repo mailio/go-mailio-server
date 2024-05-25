@@ -163,6 +163,7 @@ func (ma *MessagingApi) SendSmtpMessage(c *gin.Context) {
 	}
 
 	// validate if sender can send emails
+	//TODO: Add a check if domain is a valid domain to be sent from
 	vsErr := ma.validateSmtpSender(c, mail.From.Address)
 	if vsErr != nil {
 		return
@@ -207,9 +208,9 @@ func (ma *MessagingApi) SendSmtpMessage(c *gin.Context) {
 	}
 
 	taskInfo, tqErr := ma.env.TaskClient.Enqueue(sendTask,
-		asynq.MaxRetry(3),              // max number of times to retry the task
-		asynq.Timeout(600*time.Second), // max time to process the task
-		asynq.TaskID(id),               // unique task id
+		asynq.MaxRetry(3),             // max number of times to retry the task
+		asynq.Timeout(60*time.Second), // max time to process the task
+		asynq.TaskID(id),              // unique task id
 		asynq.ProcessIn(time.Second*time.Duration(taskDelaySeconds)), // delay processing for 5 seconds (user has time to cancel the smtp send)
 		asynq.Unique(time.Second*10))                                 // unique for 10 seconds (preventing multiple equal messages in the queue)
 	if tqErr != nil {
@@ -220,54 +221,6 @@ func (ma *MessagingApi) SendSmtpMessage(c *gin.Context) {
 	global.Logger.Log(fmt.Sprintf("message SMTP sent: %s", taskInfo.ID), "message queued")
 
 	c.JSON(http.StatusAccepted, types.DIDCommApiResponse{ID: id})
-
-	// mime, mErr := mailiosmtp.ToMime(&mail, global.Conf.Mailio.Domain)
-	// if mErr != nil {
-	// 	ApiErrorf(c, http.StatusInternalServerError, "failed to create mime")
-	// 	return
-	// }
-	// fmt.Printf("mime: %s\n", mime)
-	// //TODO: support multiple domains (based on the FROM domain use the handler for instance)
-	// mgHandler := mailiosmtp.GetHandler("mailgun")
-	// if mgHandler == nil {
-	// 	ApiErrorf(c, http.StatusInternalServerError, "failed to get mailgun handler")
-	// 	return
-	// }
-	// id := "123"
-	// // id, err := mgHandler.SendMimeMail(mime, mail.To)
-	// // if err != nil {
-	// // 	global.Logger.Log(err.Error(), "failed to send email")
-	// // 	ApiErrorf(c, http.StatusInternalServerError, err.Error())
-	// // 	return
-	// // }
-	// // log message sent id
-	// global.Logger.Log(fmt.Sprintf("message sent: %s", id), "message sent")
-
-	// tos := []string{}
-	// for _, to := range mail.To {
-	// 	tos = append(tos, to.String())
-	// }
-	// // store message in the database
-	// mm := &types.MailioMessage{
-	// 	ID:      id,
-	// 	From:    mail.From.Address,
-	// 	Folder:  types.MailioFolderSent,
-	// 	Created: time.Now().UTC().UnixMilli(),
-	// 	IsRead:  true, // send messages are read by default
-	// 	DIDCommMessage: &types.DIDCommMessage{
-	// 		Type:            "application/mailio-smtp+json",
-	// 		ID:              id,
-	// 		From:            mail.From.String(),
-	// 		To:              tos,
-	// 		Thid:            id,
-	// 		CreatedTime:     time.Now().UTC().UnixMilli(),
-	// 		Intent:          types.SMPTIntentMessage,
-	// 		PlainBodyBase64: "", //TODO! create a plain message body (attachment references in s3, ...)
-	// 	},
-	// }
-	// fmt.Printf("mm: %+v\n", mm)
-	// //TODO: store id in the database
-	// c.JSON(http.StatusAccepted, mail)
 }
 
 // check if user is honest about the from email address

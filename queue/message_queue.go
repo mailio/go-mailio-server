@@ -15,13 +15,14 @@ import (
 )
 
 type MessageQueue struct {
-	ssiService       *services.SelfSovereignService
-	userService      *services.UserService
-	mtpService       *services.MtpService
-	handshakeService *services.HandshakeService
-	deliveryService  *services.MessageDeliveryService
-	restyClient      *resty.Client
-	env              *types.Environment
+	ssiService         *services.SelfSovereignService
+	userService        *services.UserService
+	userProfileService *services.UserProfileService
+	mtpService         *services.MtpService
+	handshakeService   *services.HandshakeService
+	deliveryService    *services.MessageDeliveryService
+	restyClient        *resty.Client
+	env                *types.Environment
 }
 
 func NewMessageQueue(dbSelector *repository.CouchDBSelector, env *types.Environment) *MessageQueue {
@@ -32,8 +33,9 @@ func NewMessageQueue(dbSelector *repository.CouchDBSelector, env *types.Environm
 	mtpService := services.NewMtpService(dbSelector)
 	handshakeService := services.NewHandshakeService(dbSelector)
 	deliveryService := services.NewMessageDeliveryService(dbSelector)
+	userProfileService := services.NewUserProfileService(dbSelector, env)
 
-	return &MessageQueue{ssiService: ssiService, userService: userService, mtpService: mtpService, handshakeService: handshakeService, deliveryService: deliveryService, restyClient: rcClient, env: env}
+	return &MessageQueue{ssiService: ssiService, userService: userService, mtpService: mtpService, handshakeService: handshakeService, deliveryService: deliveryService, restyClient: rcClient, env: env, userProfileService: userProfileService}
 }
 
 // Processing of SMTP tasks
@@ -42,14 +44,14 @@ func (mqs *MessageQueue) ProcessSMTPTask(ctx context.Context, t *asynq.Task) err
 	if err := json.Unmarshal(t.Payload(), &task); err != nil {
 		return fmt.Errorf("json.Unmarshal failed: %v: %w", err, asynq.SkipRetry)
 	}
+	taskId := t.ResultWriter().TaskID()
 	switch t.Type() {
 	case types.QueueTypeSMTPCommSend:
 		// send the message
-		taskId := t.ResultWriter().TaskID()
 		mqs.SendSMTPMessage(task.Address, task.Mail, taskId)
 	case types.QueueTypeSMTPCommReceive:
 		// receive the message
-		// mqs.ReceiveSMTPMessage(task.From, task.Mail)
+		mqs.ReceiveSMTPMessage(task.Mail, taskId, task.SmtpProvider)
 	default:
 		return fmt.Errorf("unexpected task type: %s, %w", t.Type(), asynq.SkipRetry)
 	}
