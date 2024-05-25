@@ -26,16 +26,16 @@ func RegisterSmtpHandlers(conf *global.Config) {
 	}
 }
 
-func RegisterCronHandlers(conf *global.Config) {
+func RegisterDiskUsageHandlers(conf *global.Config) {
 	// Register the Cron handlers
-	for _, ch := range conf.CronHandlers {
-		if ch.Handler == "send-vcs" {
-			// Register the send-vcs cron handler
-			// cron.AddFunc(ch.CronSchedule, func() {
-			// 	// Send VCS
-			// })
-		}
-	}
+	// for _, ch := range conf.CronHandlers {
+	// 	if ch.Handler == "send-vcs" {
+	// 		// Register the send-vcs cron handler
+	// 		// cron.AddFunc(ch.CronSchedule, func() {
+	// 		// 	// Send VCS
+	// 		// })
+	// 	}
+	// }
 }
 
 func ConfigDBSelector() repository.DBSelector {
