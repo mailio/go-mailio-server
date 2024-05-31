@@ -17,7 +17,7 @@ type DiskUsageHandler interface {
 	// or any other inventory system. The module will collect the disk usage but will not store the information.
 	// it's responsability of the implemented module to retrieve/store/handle the data any way it sees fit.
 	// address - mailio address
-	GetDiskUsage(address string) ([]*types.DiskUsage, error)
+	GetDiskUsage(address string) (*types.DiskUsage, error)
 }
 
 // RegisterCronHandler makes a smtp handler available by the provided name.

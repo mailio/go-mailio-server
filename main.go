@@ -197,6 +197,7 @@ func main() {
 
 	// register SMTP handlers from config
 	RegisterSmtpHandlers(&global.Conf)
+	RegisterDiskUsageHandlers(&global.Conf)
 
 	// initialize the async queue
 	taskServer, taskClient := initAsyncQueue(dbSelector.(*repository.CouchDBSelector), env)

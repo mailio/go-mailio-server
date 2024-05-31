@@ -8,7 +8,9 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	diskusagehandler "github.com/mailio/go-mailio-diskusage-handler"
 	mailgunhandler "github.com/mailio/go-mailio-mailgun-smtp-handler"
+	"github.com/mailio/go-mailio-server/diskusage"
 	smtpmodule "github.com/mailio/go-mailio-server/email/smtp"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/repository"
@@ -27,15 +29,14 @@ func RegisterSmtpHandlers(conf *global.Config) {
 }
 
 func RegisterDiskUsageHandlers(conf *global.Config) {
-	// Register the Cron handlers
-	// for _, ch := range conf.CronHandlers {
-	// 	if ch.Handler == "send-vcs" {
-	// 		// Register the send-vcs cron handler
-	// 		// cron.AddFunc(ch.CronSchedule, func() {
-	// 		// 	// Send VCS
-	// 		// })
-	// 	}
-	// }
+	for _, du := range conf.DiskUsageHandlers {
+		if du.Provider == "aws" {
+			// Register the AWS disk usage handler
+			// refresh every 23 hours or so
+			handler := diskusagehandler.NewAwsDiskUsageHandler(conf.Storage.Key, conf.Storage.Secret, conf.Storage.Region, du.Path, 60*60*23)
+			diskusage.RegisterDiskUsageHandler(du.Provider, handler)
+		}
+	}
 }
 
 func ConfigDBSelector() repository.DBSelector {
