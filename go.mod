@@ -19,7 +19,7 @@ require (
 	github.com/mailio/go-mailio-did v0.0.0-20240219171524-88713f84b09d
 	github.com/mailio/go-mailio-diskusage-handler v1.0.0
 	github.com/mailio/go-mailio-mailgun-smtp-handler v1.0.3
-	github.com/mailio/go-mailio-server/diskusage v0.0.0-20240525221244-cb4c2c27bf34
+	github.com/mailio/go-mailio-server/diskusage v0.0.0-20240531204144-2069ccd8b024
 	github.com/mailio/go-mailio-server/email/smtp v0.0.0-20240413213630-6d046582a97a
 	github.com/mailio/go-web3-kit v0.0.0-20230302165532-057a45112b37
 	github.com/prometheus/client_golang v1.15.0

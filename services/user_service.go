@@ -187,11 +187,11 @@ func (us *UserService) SaveMessage(userAddress string, mailioMessage *types.Mail
 	var postError types.CouchDBError
 	httpResp, httpErr := us.restyClient.R().SetBody(mailioMessage).SetResult(&postResult).SetError(&postError).Put(url)
 	if httpErr != nil {
-		global.Logger.Log(httpErr.Error(), "failed to send message", hexUser)
+		global.Logger.Log(httpErr.Error(), "failed to save message", hexUser)
 		return nil, httpErr
 	}
 	if httpResp.IsError() {
-		global.Logger.Log(httpResp.String(), "failed to send message", hexUser, postError.Error, postError.Reason)
+		global.Logger.Log(httpResp.String(), "failed to save message", hexUser, postError.Error, postError.Reason)
 		return nil, fmt.Errorf("code: %s, reason: %s", postError.Error, postError.Reason)
 	}
 
@@ -302,13 +302,16 @@ func (us *UserService) UploadAttachment(bucket, path string, content []byte) (st
 		return "", types.ErrBadRequest
 	}
 	ioReader := bytes.NewReader(content)
-	us.env.S3Uploader.Upload(&s3manager.UploadInput{
+	_, uErr := us.env.S3Uploader.Upload(&s3manager.UploadInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String(path),
 		Body:   ioReader,
 	})
-	attachmentUrl := fmt.Sprintf("s3://%s/%s", bucket, path)
-	return attachmentUrl, nil
+	if uErr != nil {
+		global.Logger.Log(uErr.Error(), "failed to upload attachment", path)
+		return "", uErr
+	}
+	return fmt.Sprintf("s3://%s%s", global.Conf.Storage.Bucket, path), nil
 }
 
 // download attachment from s3

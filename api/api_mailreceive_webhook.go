@@ -144,8 +144,8 @@ func (m *MailReceiveWebhook) ReceiveMail(c *gin.Context) {
 		asynq.TaskID(id),               // unique task id
 		asynq.Unique(time.Second*10))   // unique for 10 seconds (preventing multiple equal messages in the queue)
 	if tqErr != nil {
-		global.Logger.Log(tqErr.Error(), "failed to send message")
-		ApiErrorf(c, http.StatusInternalServerError, "failed to send message")
+		global.Logger.Log(tqErr.Error(), "failed to receive message")
+		ApiErrorf(c, http.StatusInternalServerError, "failed to receive message")
 		return
 	}
 

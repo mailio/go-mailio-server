@@ -18,6 +18,7 @@ import (
 	"github.com/mailio/go-mailio-server/types"
 )
 
+// Register external modules that implements the SMTP handler
 func RegisterSmtpHandlers(conf *global.Config) {
 	// Register the SMTP handlers (currently only mailgun)
 	for _, wh := range conf.MailWebhooks {
@@ -28,6 +29,7 @@ func RegisterSmtpHandlers(conf *global.Config) {
 	}
 }
 
+// Register external modules that implements the DiskUsageHandler
 func RegisterDiskUsageHandlers(conf *global.Config) {
 	for _, du := range conf.DiskUsageHandlers {
 		if du.Provider == "aws" {
@@ -39,6 +41,7 @@ func RegisterDiskUsageHandlers(conf *global.Config) {
 	}
 }
 
+// Configure DB Repositories and create DB Selector
 func ConfigDBSelector() repository.DBSelector {
 	// configure Repository (couchDB)
 	repoUrl := global.Conf.CouchDB.Scheme + "://" + global.Conf.CouchDB.Host + ":" + strconv.Itoa(global.Conf.CouchDB.Port)

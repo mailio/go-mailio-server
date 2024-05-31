@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/hibiken/asynq"
+	diskusagehandler "github.com/mailio/go-mailio-diskusage-handler"
+	"github.com/mailio/go-mailio-server/diskusage"
 	mailiosmtp "github.com/mailio/go-mailio-server/email/smtp"
 	smtptypes "github.com/mailio/go-mailio-server/email/smtp/types"
 	"github.com/mailio/go-mailio-server/global"
@@ -68,23 +70,10 @@ func (msq *MessageQueue) SendSMTPMessage(fromMailioAddress string, email *smtpty
 		return fmt.Errorf("failed converting email to mime: %v: %w", mErr, asynq.SkipRetry)
 	}
 
-	// strip out and upload attachments to s3
-	if len(email.Attachments) > 0 {
-		for _, attachment := range email.Attachments {
-			attachmentID, aErr := util.SmtpMailToUniqueID(email, attachment.Filename)
-			if aErr != nil {
-				global.Logger.Log(aErr.Error(), "failed to create attachment ID")
-			}
-			attPath := fmt.Sprintf("/%s/%s", fromMailioAddress, attachmentID)
-			_, s3Err := msq.userService.UploadAttachment(global.Conf.Storage.Bucket, attPath, attachment.Content)
-			if s3Err != nil {
-				global.Logger.Log(s3Err.Error(), "failed to upload attachment")
-				return fmt.Errorf("failed uploading attachment: %v: %w", s3Err, asynq.SkipRetry)
-			}
-			attachment.Content = []byte{} // clear the content
-			url := fmt.Sprintf("s3://%s/%s", global.Conf.Storage.Bucket, attPath)
-			attachment.ContentURL = &url
-		}
+	paErr := msq.processAttachments(email, fromMailioAddress)
+	if paErr != nil {
+		global.Logger.Log(paErr.Error(), "failed processing attachments")
+		return fmt.Errorf("failed processing attachments: %v: %w", paErr, asynq.SkipRetry)
 	}
 
 	// store the email in the database
@@ -163,26 +152,10 @@ func (msq *MessageQueue) ReceiveSMTPMessage(email *smtptypes.Mail, taskId string
 		folder = types.MailioFolderSpam
 	}
 
-	// prepare the parsed email to be stored in database
-	emailMarshalled, mErr := json.Marshal(email)
-	if mErr != nil {
-		global.Logger.Log("error marshalling email", mErr.Error())
-		return nil
-	}
 	// prepare to fields
 	allTo := []string{}
 	for _, to := range email.To {
 		allTo = append(allTo, to.String())
-	}
-	// prepare the "DIDComm" extended message for regular SMTP emails (which is not technically DIDComm, only for client main json structure compatibility)
-	dcMsg := &types.DIDCommMessage{
-		Type:            "application/mailio-smtp+json",
-		From:            email.From.Address,
-		Intent:          types.DIDCommIntentMessage,
-		To:              allTo,
-		ID:              email.MessageId,
-		CreatedTime:     time.Now().UnixMilli(),
-		PlainBodyBase64: base64.StdEncoding.EncodeToString(emailMarshalled),
 	}
 
 	for _, to := range email.To {
@@ -194,7 +167,7 @@ func (msq *MessageQueue) ReceiveSMTPMessage(email *smtptypes.Mail, taskId string
 		scryptedBaseUrl64 := base64.URLEncoding.EncodeToString(scryptedMail)
 		userMapping, umErr := msq.userService.FindUserByScryptEmail(scryptedBaseUrl64)
 		if umErr != nil {
-			if umErr != types.ErrNotFound {
+			if umErr == types.ErrNotFound {
 				global.Logger.Log("error, find user by scrypt not found", to.Address, umErr.Error())
 				sendBounce(email, smtpHandler, "4.3.0", fmt.Sprintf("Recipient not found: %s", to.Address))
 				continue
@@ -213,13 +186,34 @@ func (msq *MessageQueue) ReceiveSMTPMessage(email *smtptypes.Mail, taskId string
 			continue
 		}
 
-		//TODO! // check if user is over disk space limit on S3 attachments bucket
+		// check if user is over disk space limit on external disk storages
+		totalDiskUsageFromHandlers := int64(0)
+		for _, diskUsageHandler := range diskusage.Handlers() {
+			awsDiskUsage, awsDuErr := diskusage.GetHandler(diskUsageHandler).GetDiskUsage(userMapping.MailioAddress)
+			if awsDuErr != nil {
+				if awsDuErr != diskusagehandler.ErrNotFound {
+					global.Logger.Log("error retrieving disk usage stats", awsDuErr.Error())
+				}
+			}
+			if awsDiskUsage != nil {
+				totalDiskUsageFromHandlers += awsDiskUsage.SizeBytes
+			}
+		}
+
 		stats, sErr := msq.userProfileService.Stats(userMapping.MailioAddress)
 		if sErr != nil {
 			global.Logger.Log("error retrieving disk usage stats", sErr.Error())
 		}
-		if stats.FileSize > userProfile.DiskSpace {
+		totalDiskUsage := stats.FileSize + totalDiskUsageFromHandlers
+		if totalDiskUsage > userProfile.DiskSpace {
 			sendBounce(email, smtpHandler, "5.2.2", "Over disk space limit")
+			continue
+		}
+
+		paErr := msq.processAttachments(email, userMapping.MailioAddress)
+		if paErr != nil {
+			global.Logger.Log("error processing attachments", paErr.Error())
+			sendBounce(email, smtpHandler, "5.3.4", "Error processing attachments")
 			continue
 		}
 
@@ -243,6 +237,23 @@ func (msq *MessageQueue) ReceiveSMTPMessage(email *smtptypes.Mail, taskId string
 				// if handshake hasn't deemed the email to be in the inbox, then check statistics
 				folder = msq.getFolderByStats(userMapping.MailioAddress, email.From.Address)
 			}
+		}
+
+		// prepare the parsed email to be stored in database
+		emailMarshalled, mErr := json.Marshal(email)
+		if mErr != nil {
+			global.Logger.Log("error marshalling email", mErr.Error())
+			return nil
+		}
+		// prepare the "DIDComm" extended message for regular SMTP emails (which is not technically DIDComm, only for client main json structure compatibility)
+		dcMsg := &types.DIDCommMessage{
+			Type:            "application/mailio-smtp+json",
+			From:            email.From.Address,
+			Intent:          types.DIDCommIntentMessage,
+			To:              allTo,
+			ID:              email.MessageId,
+			CreatedTime:     time.Now().UnixMilli(),
+			PlainBodyBase64: base64.StdEncoding.EncodeToString(emailMarshalled),
 		}
 
 		mailioMessage := &types.MailioMessage{
@@ -361,4 +372,33 @@ func isReply(email *smtptypes.Mail) bool {
 		}
 	}
 	return false
+}
+
+// processAttachments processes the attachments of the given email.
+// It generates a unique ID for each attachment, uploads the attachment
+// to the specified storage bucket, and updates the attachment's ContentURL.
+// It also clears the content of the attachment after uploading.
+//
+// Parameters:
+//
+//	email - A pointer to the Mail object containing the email and its attachments.
+//	mailioAddress - A string representing the mailio address for constructing the attachment path.
+func (msq *MessageQueue) processAttachments(email *smtptypes.Mail, mailioAddress string) error {
+	if len(email.Attachments) > 0 {
+		for i := range email.Attachments {
+			attachmentID, aErr := util.SmtpMailToUniqueID(email, email.Attachments[i].Filename)
+			if aErr != nil {
+				global.Logger.Log(aErr.Error(), "failed to create attachment ID")
+			}
+			attPath := fmt.Sprintf("/%s/%s", mailioAddress, attachmentID)
+			url, s3Err := msq.userService.UploadAttachment(global.Conf.Storage.Bucket, attPath, email.Attachments[i].Content)
+			if s3Err != nil {
+				global.Logger.Log(s3Err.Error(), "failed to upload attachment")
+				return fmt.Errorf("failed uploading attachment: %v: %w", s3Err, asynq.SkipRetry)
+			}
+			email.Attachments[i].ContentURL = &url
+			email.Attachments[i].Content = []byte{} // clear the content
+		}
+	}
+	return nil
 }
