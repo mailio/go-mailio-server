@@ -794,7 +794,18 @@ definitions:
       nonce:
         type: string
     type: object
-  types.OutputFindAddress:
+  types.OutputBasicUserInfo:
+    properties:
+      address:
+        type: string
+      created:
+        type: integer
+      totalDisk:
+        type: integer
+      usedDisk:
+        type: integer
+    type: object
+  types.OutputUserAddress:
     properties:
       address:
         type: string
@@ -1100,7 +1111,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/types.OutputFindAddress'
+            $ref: '#/definitions/types.OutputUserAddress'
         "429":
           description: rate limit exceeded
           schema:
@@ -1576,7 +1587,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/types.OutputFindAddress'
+            $ref: '#/definitions/types.OutputBasicUserInfo'
         "429":
           description: rate limit exceeded
           schema:

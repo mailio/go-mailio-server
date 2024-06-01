@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/go-resty/resty/v2"
@@ -163,20 +164,24 @@ func (s *UserProfileService) Stats(address string) (*types.UserProfileStats, err
 		return nil, uErr
 	}
 	upStats := types.UserProfileStats{}
-	if docCount, ok := statsMap["doc_count"].(int64); ok {
-		upStats.DocCount = docCount
+	if docCount, ok := statsMap["doc_count"]; ok {
+		upStats.DocCount = int64(math.Round(docCount.(float64)))
 	}
-	if docDelCount, ok := statsMap["doc_del_count"].(int64); ok {
-		upStats.DocDelCount = docDelCount
+	if docDelCount, ok := statsMap["doc_del_count"]; ok {
+		upStats.DocDelCount = int64(math.Round(docDelCount.(float64)))
 	}
-	if activeSize, ok := statsMap["sizes"].(map[string]interface{})["active"].(int64); ok {
-		upStats.ActiveSize = activeSize
-	}
-	if externalSize, ok := statsMap["sizes"].(map[string]interface{})["external"].(int64); ok {
-		upStats.ExternalSize = externalSize
-	}
-	if fileSize, ok := statsMap["sizes"].(map[string]interface{})["file"].(int64); ok {
-		upStats.FileSize = fileSize
+	if sizes, ok := statsMap["sizes"]; ok {
+		// .(map[string]interface{})["active"].(int64)
+		allSizes := sizes.(map[string]interface{})
+		if activeSize, ok := allSizes["active"]; ok {
+			upStats.ActiveSize = int64(math.Round(activeSize.(float64)))
+		}
+		if externalSize, ok := allSizes["external"]; ok {
+			upStats.ExternalSize = int64(math.Round(externalSize.(float64)))
+		}
+		if fileSize, ok := allSizes["file"]; ok {
+			upStats.FileSize = int64(math.Round(fileSize.(float64)))
+		}
 	}
 	return &upStats, nil
 }

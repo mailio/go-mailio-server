@@ -204,7 +204,7 @@ func (msq *MessageQueue) ReceiveSMTPMessage(email *smtptypes.Mail, taskId string
 		if sErr != nil {
 			global.Logger.Log("error retrieving disk usage stats", sErr.Error())
 		}
-		totalDiskUsage := stats.FileSize + totalDiskUsageFromHandlers
+		totalDiskUsage := stats.ActiveSize + totalDiskUsageFromHandlers
 		if totalDiskUsage > userProfile.DiskSpace {
 			sendBounce(email, smtpHandler, "5.2.2", "Over disk space limit")
 			continue
@@ -306,15 +306,17 @@ func (msq *MessageQueue) getFolderByStats(mailioAddress, from string) string {
 	if csErr != nil {
 		global.Logger.Log("error counting number of sent messages to email", csErr.Error())
 	} else {
-		sent = util.SumUpItemsFromFolderCountResponse([]string{from}, countSent)
+		if len(countSent.Rows) > 0 {
+			sent = countSent.Rows[0].Value
+		}
 	}
 	// check if any sent message in the past 3 months (if yes, then store response in inbox)
 	if sent > 0 {
 		return types.MailioFolderInbox
 	}
 
-	countReceivedAll, crErr := msq.userService.CountNumberOfReceivedMessages(mailioAddress, from, false, fromTimestamp, toTimestamp)
-	countReceivedRead, crrErr := msq.userService.CountNumberOfReceivedMessages(mailioAddress, from, true, fromTimestamp, toTimestamp)
+	countReceivedAll, crErr := msq.userService.CountNumberOfMessages(mailioAddress, from, "", false, fromTimestamp, toTimestamp)
+	countReceivedRead, crrErr := msq.userService.CountNumberOfMessages(mailioAddress, from, "", true, fromTimestamp, toTimestamp)
 	if errors.Join(crErr, crrErr) != nil {
 		global.Logger.Log("error counting number of received messages", errors.Join(crErr, crrErr).Error())
 	} else {

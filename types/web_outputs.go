@@ -1,6 +1,13 @@
 package types
 
-type OutputFindAddress struct {
+type OutputBasicUserInfo struct {
+	Address   string `json:"address"`
+	TotalDisk int64  `json:"totalDisk,omitempty"`
+	UsedDisk  int64  `json:"usedDisk,omitempty"`
+	Created   int64  `json:"created,omitempty"`
+}
+
+type OutputUserAddress struct {
 	Address string `json:"address"`
 }
 

@@ -49,16 +49,11 @@ type CouchDBCountDistinctFromRow struct {
 	Value int      `json:"value"`
 }
 
-// // Attachment represents a file attachment to a document.
-// type Attachment struct {
-// 	Filename        string        `json:"-"`
-// 	ContentType     string        `json:"content_type"`
-// 	Stub            bool          `json:"stub"`
-// 	Follows         bool          `json:"follows"`
-// 	Content         io.ReadCloser `json:"-"`
-// 	Size            int64         `json:"length"`
-// 	ContentEncoding string        `json:"encoding"`
-// 	EncodedLength   int64         `json:"encoded_length"`
-// 	RevPos          int64         `json:"revpos"`
-// 	Digest          string        `json:"digest"`
-// }
+type CouchDBCountResponse struct {
+	Rows []*CouchDBCountRow `json:"rows"`
+}
+
+type CouchDBCountRow struct {
+	Key   string `json:"key"`
+	Value int    `json:"value"`
+}

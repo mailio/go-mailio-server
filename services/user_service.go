@@ -199,7 +199,7 @@ func (us *UserService) SaveMessage(userAddress string, mailioMessage *types.Mail
 }
 
 // counts the number of sent messages from mailio user to specific recipient (regular email or mailio address)
-func (us *UserService) CountNumberOfSentByRecipientMessages(address string, recipient string, from int64, to int64) (*types.CouchDBCountDistinctFromResponse, error) {
+func (us *UserService) CountNumberOfSentByRecipientMessages(address string, recipient string, from int64, to int64) (*types.CouchDBCountResponse, error) {
 	viewPath := "_design/sent-to/_view/count-view"
 	hexUser := "userdb-" + hex.EncodeToString([]byte(address))
 
@@ -211,7 +211,7 @@ func (us *UserService) CountNumberOfSentByRecipientMessages(address string, reci
 	url := fmt.Sprintf("%s/%s?%s", hexUser, viewPath, params.Encode())
 
 	var couchError types.CouchDBError
-	var response types.CouchDBCountDistinctFromResponse
+	var response types.CouchDBCountResponse
 
 	httpResp, httpErr := us.restyClient.R().SetResult(&response).SetError(&couchError).Get(url)
 	if httpErr != nil {
@@ -254,12 +254,13 @@ func (us *UserService) CountNumberOfSentMessages(address string, from int64, to 
 }
 
 // address is the user's mailio address, from is a message sender (it can be Mailio address or ordinary email address)
-func (us *UserService) CountNumberOfReceivedMessages(address string, from string, isRead bool, fromTimestamp int64, toTimestamp int64) (*types.CouchDBCountDistinctFromResponse, error) {
+func (us *UserService) CountNumberOfMessages(address string, from string, folder string, isRead bool, fromTimestamp int64, toTimestamp int64) (*types.CouchDBCountDistinctFromResponse, error) {
 	// query for couchdb statistics
 
 	//_design/count-from/_view/count-from-address (how many messages are received from user)
 	//_design/count-from/_view/count-from-address-read (how many messages are read)
-	// startkey=["inbox", "0x1869cc058092317800727afa25981bfd2a3d0969", 0]&endkey=["inbox", "0x1869cc058092317800727afa25981bfd2a3d0969", \u0000]&group_level=1
+	// startkey=["0x1869cc058092317800727afa25981bfd2a3d0969","", 0]&endkey=["0x1869cc058092317800727afa25981bfd2a3d0969", "\uffff", 213456789]&group_level=2
+	// startkey=["test@example.com","sent", 0]&endkey=["test@example.com", "sent", 12344432342342]&group_level=2
 
 	//expected response (for both views):
 	/**
@@ -268,15 +269,23 @@ func (us *UserService) CountNumberOfReceivedMessages(address string, from string
 		{"key":["sent"],"value":4}
 	]}
 	**/
+	folderFrom := ""
+	folderTo := "\uffff"
+	if folder != "" {
+		folderFrom = folder
+		folderTo = folder
+	}
 	viewPath := "_design/count/_view/from-address"
 	if isRead {
 		viewPath = "_design/count-read/_view/from-address-read"
 	}
 	hexUser := "userdb-" + hex.EncodeToString([]byte(address))
 
+	startKey := fmt.Sprintf("[\"%s\",\"%s\",%d]", from, folderFrom, fromTimestamp)
+	endKey := fmt.Sprintf("[\"%s\",\"%s\",%d]", from, folderTo, toTimestamp)
 	params := url.Values{}
-	params.Add("startkey", fmt.Sprintf("[\"%s\",\"%s\",%d]", address, "", fromTimestamp))
-	params.Add("endkey", fmt.Sprintf("[\"%s\",\"%s\", %d]", address, "\uffff", toTimestamp))
+	params.Add("startkey", startKey)
+	params.Add("endkey", endKey)
 	params.Add("group_level", "2")
 
 	url := fmt.Sprintf("%s/%s?%s", hexUser, viewPath, params.Encode())

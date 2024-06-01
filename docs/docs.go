@@ -334,7 +334,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/types.OutputFindAddress"
+                            "$ref": "#/definitions/types.OutputUserAddress"
                         }
                     },
                     "429": {
@@ -1076,7 +1076,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/types.OutputFindAddress"
+                            "$ref": "#/definitions/types.OutputBasicUserInfo"
                         }
                     },
                     "429": {
@@ -2316,7 +2316,24 @@ const docTemplate = `{
                 }
             }
         },
-        "types.OutputFindAddress": {
+        "types.OutputBasicUserInfo": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "created": {
+                    "type": "integer"
+                },
+                "totalDisk": {
+                    "type": "integer"
+                },
+                "usedDisk": {
+                    "type": "integer"
+                }
+            }
+        },
+        "types.OutputUserAddress": {
             "type": "object",
             "properties": {
                 "address": {

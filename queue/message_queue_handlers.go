@@ -36,13 +36,15 @@ func (msq *MessageQueue) selectMailFolder(fromDID did.DID, recipientAddress stri
 	now := time.Now().UTC()
 	monthsAgo := now.AddDate(0, -3, 0)
 
-	totalMessagesSent, err := msq.userService.CountNumberOfSentMessages(recipientAddress, monthsAgo.UnixMilli(), now.UnixMilli())
+	// check the number of sent messages in the past 3 months (read = true is by default for sent messages)
+	totalMessagesSent, err := msq.userService.CountNumberOfMessages(recipientAddress, recipientAddress, types.MailioFolderSent, true, monthsAgo.UnixMilli(), now.UnixMilli())
 	if err != nil {
 		global.Logger.Log(err.Error(), "failed to count number of read messages", recipientAddress, fromDID.Fragment())
 		return types.MailioFolderInbox, err
 	}
 
 	sentTotal := util.SumUpItemsFromFolderCountResponse([]string{types.MailioFolderSent}, totalMessagesSent)
+
 	// if sent more than 1 email to this recipient in the past 3 months, then the message goes to inbox
 	if sentTotal > 0 {
 		return types.MailioFolderInbox, nil
@@ -51,12 +53,12 @@ func (msq *MessageQueue) selectMailFolder(fromDID did.DID, recipientAddress stri
 	// 4. check the read vs received ratio
 	fromTimestamp := int64(0)
 	toTimestamp := time.Now().UnixMilli()
-	totalMessagesReceived, err := msq.userService.CountNumberOfReceivedMessages(recipientAddress, fromDID.Fragment(), false, fromTimestamp, toTimestamp)
+	totalMessagesReceived, err := msq.userService.CountNumberOfMessages(recipientAddress, fromDID.Fragment(), "", false, fromTimestamp, toTimestamp)
 	if err != nil {
 		global.Logger.Log(err.Error(), "failed to count number of received messages", recipientAddress, fromDID.Fragment())
 		return types.MailioFolderInbox, err
 	}
-	totalMessagesRead, err := msq.userService.CountNumberOfReceivedMessages(recipientAddress, fromDID.Fragment(), true, fromTimestamp, toTimestamp)
+	totalMessagesRead, err := msq.userService.CountNumberOfMessages(recipientAddress, fromDID.Fragment(), "", true, fromTimestamp, toTimestamp)
 	if err != nil {
 		global.Logger.Log(err.Error(), "failed to count number of read messages", recipientAddress, fromDID.Fragment())
 		return types.MailioFolderInbox, err
