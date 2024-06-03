@@ -23,8 +23,8 @@ func RegisterSmtpHandlers(conf *global.Config) {
 	// Register the SMTP handlers (currently only mailgun)
 	for _, wh := range conf.MailWebhooks {
 		if wh.Provider == "mailgun" {
-			handler := mailgunhandler.NewMailgunSmtpHandler(wh.Sendapikey, wh.Webhookkey, wh.Domain)
-			smtpmodule.RegisterSmtpHandler(wh.Provider, handler)
+			handler := mailgunhandler.NewMailgunSmtpHandler(wh.Sendapikey, wh.Webhookkey, nil)
+			smtpmodule.RegisterSmtpHandler(wh.Domain, handler)
 		}
 	}
 }

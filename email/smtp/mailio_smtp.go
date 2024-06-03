@@ -33,7 +33,7 @@ type SmtpHandler interface {
 	// ReceiveMail is a method called on the specific ESP handler webhook implementation
 	ReceiveMail(request http.Request) (*mailiosmtp.Mail, error)
 	// SendMimeMail returns generated message id or error
-	SendMimeMail(mime []byte, to []mail.Address) (string, error)
+	SendMimeMail(from mail.Address, mime []byte, to []mail.Address) (string, error)
 	// return list of supported domains by the smtp
 	ListDomains() ([]string, error)
 }
