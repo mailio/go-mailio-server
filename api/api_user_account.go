@@ -308,6 +308,10 @@ func (ua *UserAccountApi) Register(c *gin.Context) {
 		return
 	}
 
+	// validate if the domain is supported
+	if !util.IsSupportedDomain(emailAddr.Address) {
+	}
+
 	// if everything checks out, create users database, DID document and Verifiable Credential of owning the email address
 	// then store all to database
 	scryptedEmail, sErr := util.ScryptEmail(emailAddr.Address)

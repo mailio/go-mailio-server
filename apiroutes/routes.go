@@ -41,6 +41,7 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 	didApi := api.NewDIDApi(ssiService)
 	vcApi := api.NewVCApi(ssiService)
 	messageApi := api.NewMessagingApi(ssiService, userService, userProfileService, environment)
+	domainApi := api.NewDomainApi()
 
 	// WEBHOOK API definitions
 	webhookApi := api.NewMailReceiveWebhook(handshakeService, userService, userProfileService, environment)
@@ -64,8 +65,7 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 		publicApi.POST("/v1/login", accountApi.Login)
 		publicApi.GET("/v1/nonce", accountApi.ChallengeNonce)
 		publicApi.GET("/v1/findaddress", accountApi.FindUsersAddressByEmail)
-
-		// publicApi.GET("/v1/handshake/lookup/:ownerAddress/:senderAddress", handshakeApi.LookupHandshake)
+		publicApi.GET("/v1/domains", domainApi.List)
 	}
 
 	rootApi := router.Group("/api", metrics.MetricsMiddleware(), restinterceptors.RateLimitMiddleware(), restinterceptors.JWSMiddleware(userProfileService))
@@ -103,7 +103,7 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 	// SMTP email receiving (multiple providers possible)
 	webhooks := router.Group("/", metrics.MetricsMiddleware())
 	{
-		for _, whUrl := range global.Conf.MailWebhooks {
+		for _, whUrl := range global.Conf.SmtpServers {
 			webhooks.POST(whUrl.Webhookurl, webhookApi.ReceiveMail)
 		}
 	}

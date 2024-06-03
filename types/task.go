@@ -21,9 +21,9 @@ type Task struct {
 }
 
 type SmtpTask struct {
-	Mail         *smtptypes.Mail `json:"mail" validate:"required"`
-	Address      string          `json:"address,omitempty"`      // sender/receiver mailio address
-	SmtpProvider string          `json:"smtpProvider,omitempty"` // smtp email provider (e.g. mailgun)
+	Mail    *smtptypes.Mail `json:"mail" validate:"required"`
+	Address string          `json:"address,omitempty"` // sender/receiver mailio address
+	// SmtpProvider string          `json:"smtpProvider,omitempty"` // smtp email provider (e.g. mailgun)
 }
 
 func NewDIDCommSendTask(message *Task) (*asynq.Task, error) {

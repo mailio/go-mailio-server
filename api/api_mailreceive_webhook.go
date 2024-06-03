@@ -32,15 +32,15 @@ func NewMailReceiveWebhook(handshakeService *services.HandshakeService, userServ
 }
 
 // converts a path to smtp provider (e.g. /webhook/mailgun_mime -> mailgun)
-func fullPathToSmtpProvider(fullPath string) string {
-	provider := ""
-	for _, wh := range global.Conf.MailWebhooks {
+func fullPathToSupportedDomains(fullPath string) []*global.MailDomains {
+	mailDomains := []*global.MailDomains{}
+	for _, wh := range global.Conf.SmtpServers {
 		if wh.Webhookurl == fullPath {
-			provider = wh.Provider
+			mailDomains = append(mailDomains, wh.Domains...)
 			break
 		}
 	}
-	return provider
+	return mailDomains
 }
 
 // ReceiveMail webhook implementations
@@ -58,14 +58,19 @@ func (m *MailReceiveWebhook) ReceiveMail(c *gin.Context) {
 	fullPath := c.FullPath()
 	handlers := smtpmodule.Handlers()
 	if len(handlers) == 0 {
-		c.JSON(501, gin.H{"error": "No SMTP handler registered"})
+		c.JSON(http.StatusNotImplemented, gin.H{"error": "No SMTP handler registered"})
 		return
 	}
 	// finding the SMTP handler based on the path
-	provider := fullPathToSmtpProvider(fullPath)
-	smtpHandler := smtpmodule.GetHandler(provider)
+	supportedDomains := fullPathToSupportedDomains(fullPath)
+	if len(supportedDomains) == 0 {
+		c.JSON(http.StatusBadGateway, gin.H{"error": "SMTP handler not found"})
+		return
+	}
+	// doesn't matter for which domain is the handler as long as it's for the appropriate provider
+	smtpHandler := smtpmodule.GetHandler(supportedDomains[0].Domain)
 	if smtpHandler == nil {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": fmt.Sprintf("SMTP handler %s not registered", provider)})
+		c.JSON(http.StatusNotImplemented, gin.H{"error": fmt.Sprintf("SMTP handler %s not registered", supportedDomains[0].Domain)})
 		return
 	}
 
@@ -122,8 +127,8 @@ func (m *MailReceiveWebhook) ReceiveMail(c *gin.Context) {
 
 	// add to queue
 	task := &types.SmtpTask{
-		Mail:         email,
-		SmtpProvider: provider,
+		Mail: email,
+		// SmtpProvider: provider,
 	}
 	receiveTask, tErr := types.NewSmtpCommReceiveTask(task)
 	if tErr != nil {
@@ -161,7 +166,7 @@ func sendBounce(email *smtptypes.Mail, c *gin.Context, smtpHandler smtpmodule.Sm
 		ApiErrorf(c, 500, fmt.Sprintf("error creating bounce email: %s", bErr.Error()))
 		return
 	}
-	_, sndErr := smtpHandler.SendMimeMail(bounceMail, []mail.Address{email.From})
+	_, sndErr := smtpHandler.SendMimeMail(email.From, bounceMail, []mail.Address{email.From})
 	if sndErr != nil {
 		global.Logger.Log("error sending bounce email", sndErr.Error())
 		ApiErrorf(c, 500, fmt.Sprintf("error sending bounce email: %s", sndErr.Error()))

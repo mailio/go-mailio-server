@@ -45,16 +45,20 @@ func (msq *MessageQueue) SendSMTPMessage(fromMailioAddress string, email *smtpty
 		return nil
 	}
 
-	// get the registered handler (only mailgun for now, but later based on "from" domain)
-	//TODO!: support multiple domains (based on the FROM domain use the handler for instance)
-	mgHandler := mailiosmtp.GetHandler("mailgun")
+	// support multiple domains (based on the FROM domain use the handler for instance)
+	domain := strings.Split(email.From.Address, "@")[1]
+	if !util.IsSupportedDomain(domain) {
+		global.Logger.Log("unsupported domain", domain)
+		return fmt.Errorf("unsupported domain: %w", asynq.SkipRetry)
+	}
+	mgHandler := mailiosmtp.GetHandler(domain)
 	if mgHandler == nil {
 		global.Logger.Log("failed retrieving an smtp handler")
 		return fmt.Errorf("failed retrieving an smtp handler: %w", asynq.SkipRetry)
 	}
 
 	// generate message ID
-	rfc2822MessageID, idErr := mailiosmtp.GenerateRFC2822MessageID(global.Conf.Mailio.Domain)
+	rfc2822MessageID, idErr := mailiosmtp.GenerateRFC2822MessageID(domain)
 	if idErr != nil {
 		global.Logger.Log(idErr.Error(), "failed to generate message ID")
 		return fmt.Errorf("failed generating message ID: %v: %w", idErr, asynq.SkipRetry)
@@ -117,7 +121,7 @@ func (msq *MessageQueue) SendSMTPMessage(fromMailioAddress string, email *smtpty
 		return fmt.Errorf("failed saving message: %v: %w", msErr, asynq.SkipRetry)
 	}
 
-	docID, err := mgHandler.SendMimeMail(mime, email.To)
+	docID, err := mgHandler.SendMimeMail(email.From, mime, email.To)
 	if err != nil {
 		global.Logger.Log(err.Error(), "failed to send smtp email")
 		return fmt.Errorf("failed sending smtp email: %v: %w", err, asynq.SkipRetry)
@@ -127,20 +131,37 @@ func (msq *MessageQueue) SendSMTPMessage(fromMailioAddress string, email *smtpty
 	return nil
 }
 
-// process received email message using SMTP
-func (msq *MessageQueue) ReceiveSMTPMessage(email *smtptypes.Mail, taskId string, smtpProvider string) error {
-
-	//TODO! Check if user is subscribed user??? (in the future - effects the disk space and the folder selection)
-	//TODO! Make sure the incoming email is for someone with the locally registered domain
-	//TODO! Make sure multiple domains are supported (web based initial config?)
-
-	// get the smtp provider from register
-	smtpHandler := mailiosmtp.GetHandler(smtpProvider)
-	if smtpHandler == nil {
-		global.Logger.Log("failed retrieving an smtp handler")
-		return fmt.Errorf("failed retrieving an smtp handler: %w", asynq.SkipRetry)
-	}
-
+// ReceiveSMTPMessage processes an incoming SMTP email message and handles it according to various rules and checks.
+// The function performs the following steps:
+//  1. Determines the default folder for the email.
+//  2. Checks if the email is marked as spam and adjusts the folder accordingly.
+//  3. Prepares the recipients list.
+//  4. Iterates over each recipient to perform various checks and actions:
+//     a. Retrieves the SMTP handler for the recipient's domain.
+//     b. Checks if the user exists in the database.
+//     c. Retrieves the user's profile and checks if the user is enabled.
+//     d. Checks if the user is over the disk space limit on external disk storages.
+//     e. Processes any attachments in the email.
+//     f. If the email is not spam, performs additional checks using handshakes and statistics to determine the folder.
+//  5. Prepares the email for storage by marshalling it into JSON.
+//  6. Constructs a DIDCommMessage for compatibility with the client main JSON structure.
+//  7. Saves the email message to the database.
+//
+// Detailed Description:
+// - The default folder is initially set to `MailioFolderOther`.
+// - If the email's SpamVerdict status is `VerdictStatusFail`, the email is marked as spam and the folder is set to `MailioFolderSpam`.
+// - For each recipient in the email:
+//   - The SMTP handler for the recipient's domain is retrieved using `mailiosmtp.GetHandler`.
+//   - The recipient's email address is hashed and encoded to check for user existence in the database.
+//   - The user's profile is retrieved and checked if it is enabled.
+//   - The total disk usage for the user is calculated and compared against their disk space limit.
+//   - Attachments in the email are processed using `processAttachments`.
+//   - If the email is not marked as spam, additional checks are performed using handshakes and email statistics to determine the appropriate folder.
+//
+// - The email is marshalled into JSON format and a DIDCommMessage is constructed.
+// - The email message is saved to the database using `userService.SaveMessage`.
+// - Errors are logged using `global.Logger.Log` and appropriate bounce messages are sent using `sendBounce`.
+func (msq *MessageQueue) ReceiveSMTPMessage(email *smtptypes.Mail, taskId string) error {
 	// default folder
 	folder := types.MailioFolderOther
 
@@ -159,17 +180,25 @@ func (msq *MessageQueue) ReceiveSMTPMessage(email *smtptypes.Mail, taskId string
 	}
 
 	for _, to := range email.To {
+		// get the smtp provider from the recipient domain
+		toDomain := strings.Split(to.Address, "@")[1]
+		smtpHandler := mailiosmtp.GetHandler(toDomain)
+		if smtpHandler == nil {
+			global.Logger.Log("failed retrieving an smtp handler")
+			return fmt.Errorf("failed retrieving an smtp handler: %w", asynq.SkipRetry)
+		}
+
 		// check if user exists in the database
 		scryptedMail, err := util.ScryptEmail(to.Address)
 		if err != nil {
-			sendBounce(email, smtpHandler, "4.3.0", fmt.Sprintf("Recipient not found: %s", to.Address))
+			sendBounce(to, email, smtpHandler, "4.3.0", fmt.Sprintf("Recipient not found: %s", to.Address))
 		}
 		scryptedBaseUrl64 := base64.URLEncoding.EncodeToString(scryptedMail)
 		userMapping, umErr := msq.userService.FindUserByScryptEmail(scryptedBaseUrl64)
 		if umErr != nil {
 			if umErr == types.ErrNotFound {
 				global.Logger.Log("error, find user by scrypt not found", to.Address, umErr.Error())
-				sendBounce(email, smtpHandler, "4.3.0", fmt.Sprintf("Recipient not found: %s", to.Address))
+				sendBounce(to, email, smtpHandler, "4.3.0", fmt.Sprintf("Recipient not found: %s", to.Address))
 				continue
 			}
 		}
@@ -178,11 +207,11 @@ func (msq *MessageQueue) ReceiveSMTPMessage(email *smtptypes.Mail, taskId string
 		userProfile, upErr := msq.userProfileService.Get(userMapping.MailioAddress)
 		if upErr != nil {
 			global.Logger.Log("error", upErr.Error())
-			sendBounce(email, smtpHandler, "4.3.0", fmt.Sprintf("Recipient not found: %s", to.Address))
+			sendBounce(to, email, smtpHandler, "4.3.0", fmt.Sprintf("Recipient not found: %s", to.Address))
 		}
 		if !userProfile.Enabled {
 			global.Logger.Log("user disabled", userMapping.MailioAddress)
-			sendBounce(email, smtpHandler, "5.1.1", "Mailbox unavailable")
+			sendBounce(to, email, smtpHandler, "5.1.1", "Mailbox unavailable")
 			continue
 		}
 
@@ -206,14 +235,15 @@ func (msq *MessageQueue) ReceiveSMTPMessage(email *smtptypes.Mail, taskId string
 		}
 		totalDiskUsage := stats.ActiveSize + totalDiskUsageFromHandlers
 		if totalDiskUsage > userProfile.DiskSpace {
-			sendBounce(email, smtpHandler, "5.2.2", "Over disk space limit")
+			sendBounce(to, email, smtpHandler, "5.2.2", "Over disk space limit")
 			continue
 		}
 
+		// uploads attachments to s3 and stores references in the email object
 		paErr := msq.processAttachments(email, userMapping.MailioAddress)
 		if paErr != nil {
 			global.Logger.Log("error processing attachments", paErr.Error())
-			sendBounce(email, smtpHandler, "5.3.4", "Error processing attachments")
+			sendBounce(to, email, smtpHandler, "5.3.4", "Error processing attachments")
 			continue
 		}
 
@@ -277,13 +307,21 @@ func (msq *MessageQueue) ReceiveSMTPMessage(email *smtptypes.Mail, taskId string
 	return nil
 }
 
-func sendBounce(email *smtptypes.Mail, smtpHandler mailiosmtp.SmtpHandler, code, message string) error {
+// sendBounce sends a bounce email to the sender of the original email.
+//
+// Parameters:
+//   - bounceFromEmail: The email address from which the bounce email will be sent.
+//   - email: A pointer to the original smtptypes.Mail object that triggered the bounce.
+//   - smtpHandler: The SmtpHandler object used to send the bounce email.
+//   - code: The SMTP status code to include in the bounce email.
+//   - message: The message to include in the bounce email.
+func sendBounce(bounceFromEmail mail.Address, email *smtptypes.Mail, smtpHandler mailiosmtp.SmtpHandler, code, message string) error {
 	bounceMail, bErr := mailiosmtp.ToBounce(email.From, *email, code, message, global.Conf.Host)
 	if bErr != nil {
 		global.Logger.Log("error", bErr.Error())
 		return bErr
 	}
-	_, sndErr := smtpHandler.SendMimeMail(bounceMail, []mail.Address{email.From})
+	_, sndErr := smtpHandler.SendMimeMail(bounceFromEmail, bounceMail, []mail.Address{email.From})
 	if sndErr != nil {
 		global.Logger.Log("error sending bounce email", sndErr.Error())
 		return sndErr
@@ -291,6 +329,14 @@ func sendBounce(email *smtptypes.Mail, smtpHandler mailiosmtp.SmtpHandler, code,
 	return nil
 }
 
+// getFolderByStats determines the appropriate folder for an incoming email based on statistical analysis of past email interactions.
+//
+// Parameters:
+//   - mailioAddress: The Mailio address of the recipient.
+//   - from: The sender's email address.
+//
+// Returns:
+//   - string: The folder name where the email should be stored. Possible values are "Inbox", "GoodReads", or "Other".
 func (msq *MessageQueue) getFolderByStats(mailioAddress, from string) string {
 	receivedAll := 0
 	receivedRead := 0

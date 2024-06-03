@@ -1094,6 +1094,25 @@ paths:
       summary: Send end-to-end encrypted message to DID recipients
       tags:
       - Messaging
+  /api/v1/domains:
+    get:
+      consumes:
+      - application/json
+      description: Returns a list of all supported domains
+      produces:
+      - application/json
+      responses:
+        "429":
+          description: rate limit exceeded
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "500":
+          description: error creating server did
+          schema:
+            $ref: '#/definitions/api.ApiError'
+      summary: List all domains
+      tags:
+      - Domains
   /api/v1/findaddress:
     get:
       consumes:

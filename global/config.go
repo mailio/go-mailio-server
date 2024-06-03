@@ -27,7 +27,7 @@ type Config struct {
 	Prometheus        PrometheusConfig     `yaml:"prometheus"`
 	Redis             RedisConfig          `yaml:"redis"`
 	Queue             Queue                `yaml:"queue"`
-	MailWebhooks      []*MailWebhookConfig `yaml:"mailwebhooks"`
+	SmtpServers       []*SmtpServerConfig  `yaml:"smtpservers"`
 	DiskUsageHandlers []*DiskUsageHandlers `yaml:"diskusagehandlers"`
 	Storage           StorageConfig        `yaml:"storage"`
 }
@@ -85,12 +85,16 @@ type Queue struct {
 	Concurrency int `yaml:"concurrency"`
 }
 
-type MailWebhookConfig struct {
-	Provider   string `yaml:"provider"`
+type SmtpServerConfig struct {
+	Provider   string         `yaml:"provider"`
+	Webhookurl string         `yaml:"webhookurl"`
+	Webhookkey string         `yaml:"webhookkey"`
+	Domains    []*MailDomains `yaml:"domains"`
+}
+
+type MailDomains struct {
 	Domain     string `yaml:"domain"`
 	Sendapikey string `yaml:"sendapikey"`
-	Webhookurl string `yaml:"webhookurl"`
-	Webhookkey string `yaml:"webhookkey"`
 }
 
 type StorageConfig struct {

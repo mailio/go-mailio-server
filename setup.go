@@ -21,10 +21,14 @@ import (
 // Register external modules that implements the SMTP handler
 func RegisterSmtpHandlers(conf *global.Config) {
 	// Register the SMTP handlers (currently only mailgun)
-	for _, wh := range conf.MailWebhooks {
+	for _, wh := range conf.SmtpServers {
 		if wh.Provider == "mailgun" {
-			handler := mailgunhandler.NewMailgunSmtpHandler(wh.Sendapikey, wh.Webhookkey, nil)
-			smtpmodule.RegisterSmtpHandler(wh.Domain, handler)
+			for _, domain := range wh.Domains {
+				// development api key not needed for now (but prepared for later versions)
+				handler := mailgunhandler.NewMailgunSmtpHandler(wh.Webhookkey, "", nil)
+				handler.SetDomainAndSendApiKey(domain.Sendapikey, domain.Domain)
+				smtpmodule.RegisterSmtpHandler(domain.Domain, handler)
+			}
 		}
 	}
 }

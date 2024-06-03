@@ -51,7 +51,7 @@ func (mqs *MessageQueue) ProcessSMTPTask(ctx context.Context, t *asynq.Task) err
 		mqs.SendSMTPMessage(task.Address, task.Mail, taskId)
 	case types.QueueTypeSMTPCommReceive:
 		// receive the message
-		mqs.ReceiveSMTPMessage(task.Mail, taskId, task.SmtpProvider)
+		mqs.ReceiveSMTPMessage(task.Mail, taskId)
 	default:
 		return fmt.Errorf("unexpected task type: %s, %w", t.Type(), asynq.SkipRetry)
 	}

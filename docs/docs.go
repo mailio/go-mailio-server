@@ -308,6 +308,35 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/domains": {
+            "get": {
+                "description": "Returns a list of all supported domains",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Domains"
+                ],
+                "summary": "List all domains",
+                "responses": {
+                    "429": {
+                        "description": "rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "500": {
+                        "description": "error creating server did",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/findaddress": {
             "get": {
                 "description": "Returns a mailio address",
