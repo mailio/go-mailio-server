@@ -250,8 +250,6 @@ github.com/mailio/go-mailio-mailgun-smtp-handler v1.0.4 h1:68oH4EVYSrLLh80bcFCsZ
 github.com/mailio/go-mailio-mailgun-smtp-handler v1.0.4/go.mod h1:g/5NIpR1Li4mhbnAw+KtcDp1yMadUNqHU8FvkfVBekc=
 github.com/mailio/go-mailio-server/diskusage v0.0.0-20240531204144-2069ccd8b024 h1:gMPEhCFEtuZQMzWHLJ7PeZgwv5eb71xwQO5ry1N1dAM=
 github.com/mailio/go-mailio-server/diskusage v0.0.0-20240531204144-2069ccd8b024/go.mod h1:gk/ImjvOfHzamPCzV7Xowu9v1b8YgyDTKVR78qPAZcQ=
-github.com/mailio/go-mailio-server/email/smtp v0.0.0-20240603165008-20cf4f3124b2 h1:h7lJZJurW6veyVZWnRP3AX6ZYHVqN5Ku/j83mDMKWdI=
-github.com/mailio/go-mailio-server/email/smtp v0.0.0-20240603165008-20cf4f3124b2/go.mod h1:cseAAWNn3XRxay0cAUJ5kGh27Rq8dj3Vi0+i9PchqP0=
 github.com/mailio/go-mailio-server/email/smtp v0.0.0-20240603202341-a693f069999e h1:/++6dLm4bLeFPBuT8H2+9a6NCLpOJSwChLxDjSICMkM=
 github.com/mailio/go-mailio-server/email/smtp v0.0.0-20240603202341-a693f069999e/go.mod h1:cseAAWNn3XRxay0cAUJ5kGh27Rq8dj3Vi0+i9PchqP0=
 github.com/mailio/go-web3-kit v0.0.0-20230302165532-057a45112b37 h1:5JGzR1JKKV6Q/a+qhlGf8XLykR0EsgrPGsSsRJ9appk=

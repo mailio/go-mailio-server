@@ -149,7 +149,8 @@ func main() {
 	var (
 		configFile string
 	)
-	// configuration file optional path. Default:  current dir with  filename conf.yaml
+	// configuration file optional path.
+	// Default (if not config provided), takes current dir with filename conf.yaml
 	flag.StringVar(&configFile, "c", "conf.yaml", "Configuration file path.")
 	flag.StringVar(&configFile, "config", "conf.yaml", "Configuration file path.")
 	flag.Usage = usage
