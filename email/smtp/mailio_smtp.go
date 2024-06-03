@@ -34,6 +34,8 @@ type SmtpHandler interface {
 	ReceiveMail(request http.Request) (*mailiosmtp.Mail, error)
 	// SendMimeMail returns generated message id or error
 	SendMimeMail(mime []byte, to []mail.Address) (string, error)
+	// return list of supported domains by the smtp
+	ListDomains() ([]string, error)
 }
 
 // RegisterSmtpHandler makes a smtp handler available by the provided name.
