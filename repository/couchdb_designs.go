@@ -76,7 +76,7 @@ func createDesignAndView(databaseName string, designName string, viewName string
 		panic(err)
 	}
 	if resp.IsError() {
-		panic(resp.Error())
+		panic(handleError(resp))
 	}
 
 	return nil

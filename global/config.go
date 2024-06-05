@@ -65,13 +65,11 @@ type PrometheusConfig struct {
 }
 
 type ServerHandshakeConfig struct {
-	ID                  string                         `yaml:"id"`
-	OriginServer        string                         `yaml:"originServer"`
-	Type                int                            `yaml:"type"`
-	MinimumLevel        int                            `yaml:"minimumLevel"`
-	SenderMailioAddress string                         `yaml:"senderMailioAddress"`
-	SenderEmailAddress  string                         `yaml:"senderEmailAddress"`
-	Subtypes            []ServerHandshakeSubtypeConfig `yaml:"subtypes"`
+	ID           string                         `yaml:"id"`
+	OriginServer string                         `yaml:"originServer"`
+	Type         int                            `yaml:"type"`
+	MinimumLevel int                            `yaml:"minimumLevel"`
+	Subtypes     []ServerHandshakeSubtypeConfig `yaml:"subtypes"`
 }
 
 type ServerHandshakeSubtypeConfig struct {

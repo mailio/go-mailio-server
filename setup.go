@@ -59,8 +59,12 @@ func ConfigDBSelector() repository.DBSelector {
 	messageDeliveryRepo, mdErr := repository.NewCouchDBRepository(repoUrl, repository.MessageDelivery, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
 	userProfileRepo, upErr := repository.NewCouchDBRepository(repoUrl, repository.UserProfile, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
 
-	repoErr := errors.Join(handshakeRepoErr, nonceRepoErr, userRepoErr, mappingRepoErr, didRErr, vscrErr, dErr, mdErr, upErr)
+	// ensure _users exist
+	users_Err := repository.CreateUsers_IfNotExists(userRepo, repoUrl)
+
+	repoErr := errors.Join(handshakeRepoErr, nonceRepoErr, userRepoErr, mappingRepoErr, didRErr, vscrErr, dErr, mdErr, upErr, users_Err)
 	if repoErr != nil {
+		global.Logger.Log("error", "Failed to create repositories", "error", repoErr.Error())
 		panic(repoErr)
 	}
 
@@ -92,7 +96,6 @@ func ConfigDBIndexing(dbSelector *repository.CouchDBSelector, environment *types
 
 	icVcsErr := repository.CreateVcsCredentialSubjectIDIndex(vcsRepo)
 	hiErr := repository.CreateHandshakeIndex(handshakeRepo)
-	// aErr := repository.CreateHandshakeAddressIndex(handshakeRepo)
 	iErr := errors.Join(icVcsErr, hiErr)
 	if iErr != nil {
 		panic(iErr)

@@ -187,7 +187,7 @@ func (ua *UserAccountApi) Login(c *gin.Context) {
 	// retrieve appropriate mailio DID by domain
 	userProfile, upErr := ua.userProfileService.Get(inputLogin.MailioAddress)
 	if upErr != nil {
-		ApiErrorf(c, http.StatusNotFound, "user profile not found")
+		ApiErrorf(c, http.StatusNotFound, "user not found")
 		return
 	}
 	// check if user is disabled!
