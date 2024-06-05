@@ -8,23 +8,21 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/go-kit/log/level"
 	"github.com/go-resty/resty/v2"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/repository"
 	"github.com/mailio/go-mailio-server/types"
-	"github.com/mailio/go-mailio-server/util"
 )
 
 // returns default server handshake (used when there is no users handshake related to the sender)
-func GetServerHandshake(senderAddress string) (*types.Handshake, error) {
-	handshake, hErr := util.ServerSideHandshake(global.PublicKey, global.PrivateKey, global.Conf.Mailio.Domain)
-	if hErr != nil {
-		level.Error(global.Logger).Log("msg", "error while creating handshake", "err", hErr)
-		return nil, hErr
-	}
-	return handshake, nil
-}
+// func GetServerHandshake(senderAddress string) (*types.Handshake, error) {
+// 	handshake, hErr := util.ServerSideHandshake(global.PublicKey, global.PrivateKey, global.Conf.Mailio.Domain)
+// 	if hErr != nil {
+// 		level.Error(global.Logger).Log("msg", "error while creating handshake", "err", hErr)
+// 		return nil, hErr
+// 	}
+// 	return handshake, nil
+// }
 
 // Get handshake by ID
 func GetByID(handshakeRepo repository.Repository, handshakeID string) (*types.StoredHandshake, error) {

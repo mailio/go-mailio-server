@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/mail"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -183,8 +184,35 @@ func (ua *UserAccountApi) Login(c *gin.Context) {
 		return
 	}
 
+	// retrieve appropriate mailio DID by domain
+	userProfile, upErr := ua.userProfileService.Get(inputLogin.MailioAddress)
+	if upErr != nil {
+		ApiErrorf(c, http.StatusNotFound, "user profile not found")
+		return
+	}
+	// check if user is disabled!
+	if !userProfile.Enabled {
+		ApiErrorf(c, http.StatusForbidden, "user is disabled")
+		return
+	}
+	if _, ok := global.MailioDIDByDomain[userProfile.Domain]; !ok {
+		ApiErrorf(c, http.StatusNotFound, "domain not supported")
+		return
+	}
+	if _, ok := global.PrivateKeysByDomain[userProfile.Domain]; !ok {
+		ApiErrorf(c, http.StatusNotFound, "domain missing private key")
+		return
+	}
+	if _, ok := global.PublicKeyByDomain[userProfile.Domain]; !ok {
+		ApiErrorf(c, http.StatusNotFound, "domain missing public key")
+		return
+	}
+	mailioDID := global.MailioDIDByDomain[userProfile.Domain]
+	privateKey := global.PrivateKeysByDomain[userProfile.Domain]
+	publicKey := global.PublicKeyByDomain[userProfile.Domain]
+
 	// validate also VC for the user (proof that user was registered at host)
-	vc, vcErr := ua.ssiService.GetAuthorizedAppVCByAddress(inputLogin.MailioAddress, global.MailioDID.String())
+	vc, vcErr := ua.ssiService.GetAuthorizedAppVCByAddress(inputLogin.MailioAddress, mailioDID.String())
 	if vcErr != nil {
 		if vcErr == types.ErrNotFound {
 			ApiErrorf(c, http.StatusNotFound, "user not found")
@@ -193,7 +221,7 @@ func (ua *UserAccountApi) Login(c *gin.Context) {
 		ApiErrorf(c, http.StatusInternalServerError, "failed to retrieve a Verifiable Cred.")
 		return
 	}
-	isVCValid, vcValidateErr := vc.VerifyProof(global.PublicKey)
+	isVCValid, vcValidateErr := vc.VerifyProof(publicKey)
 	if vcValidateErr != nil {
 		ApiErrorf(c, http.StatusForbidden, "user not registered at this host (failed proof validation)")
 		return
@@ -203,19 +231,8 @@ func (ua *UserAccountApi) Login(c *gin.Context) {
 		return
 	}
 
-	// check if user is disabled!
-	userProfile, upErr := ua.userProfileService.Get(inputLogin.MailioAddress)
-	if upErr != nil {
-		ApiErrorf(c, http.StatusNotFound, "user profile not found")
-		return
-	}
-	if !userProfile.Enabled {
-		ApiErrorf(c, http.StatusForbidden, "user is disabled")
-		return
-	}
-
 	// Sign the payload with servers private key.
-	token, err := interceptors.GenerateJWSToken(global.PrivateKey, mk.DID(), inputLogin.Nonce, inputLogin.Ed25519SigningPublicKeyBase64)
+	token, err := interceptors.GenerateJWSToken(privateKey, mk.DID(), mailioDID, inputLogin.Nonce, inputLogin.Ed25519SigningPublicKeyBase64)
 	if err != nil {
 		ApiErrorf(c, http.StatusInternalServerError, "Failed to sign token")
 		return
@@ -309,7 +326,10 @@ func (ua *UserAccountApi) Register(c *gin.Context) {
 	}
 
 	// validate if the domain is supported
-	if !util.IsSupportedDomain(emailAddr.Address) {
+	userDomain := strings.Split(emailAddr.Address, "@")[1]
+	if !util.IsSupportedMailioDomain(userDomain) {
+		ApiErrorf(c, http.StatusBadRequest, "mailio domain not supported")
+		return
 	}
 
 	// if everything checks out, create users database, DID document and Verifiable Credential of owning the email address
@@ -352,6 +372,18 @@ func (ua *UserAccountApi) Register(c *gin.Context) {
 		return
 	}
 
+	_, upErr := ua.userProfileService.Save(user.MailioAddress, &types.UserProfile{
+		Enabled:   true,
+		DiskSpace: global.Conf.Mailio.DiskSpace,
+		Domain:    userDomain,
+		Created:   time.Now().UTC().UnixMilli(),
+		Modified:  time.Now().UTC().UnixMilli(),
+	})
+	if upErr != nil {
+		ApiErrorf(c, http.StatusInternalServerError, "failed to create user profile")
+		return
+	}
+
 	// create DID ID and DID document and store it in database!
 	mk := &did.MailioKey{
 		MasterSignKey: &did.Key{
@@ -363,13 +395,25 @@ func (ua *UserAccountApi) Register(c *gin.Context) {
 			PublicKey: encryptionPublicKey,
 		},
 	}
-	ssiErr := ua.ssiService.StoreRegistrationSSI(mk)
+	ssiErr := ua.ssiService.StoreRegistrationSSI(mk, userDomain)
 	if ssiErr != nil {
 		ApiErrorf(c, http.StatusInternalServerError, "failed to store self-sovereign identity")
 		return
 	}
 
-	token, tErr := interceptors.GenerateJWSToken(global.PrivateKey, mk.DID(), inputRegister.Nonce, inputRegister.X25519PublicKeyBase64)
+	if _, ok := global.MailioDIDByDomain[userDomain]; !ok {
+		ApiErrorf(c, http.StatusNotFound, "domain not supported")
+		return
+	}
+	mailioDID := global.MailioDIDByDomain[userDomain]
+
+	if _, ok := global.PrivateKeysByDomain[userDomain]; !ok {
+		ApiErrorf(c, http.StatusNotFound, "domain not supported")
+		return
+	}
+	privateKey := global.PrivateKeysByDomain[userDomain]
+
+	token, tErr := interceptors.GenerateJWSToken(privateKey, mk.DID(), mailioDID, inputRegister.Nonce, inputRegister.X25519PublicKeyBase64)
 	if tErr != nil {
 		ApiErrorf(c, http.StatusInternalServerError, "Failed to sign token")
 		return

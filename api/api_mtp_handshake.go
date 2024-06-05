@@ -76,7 +76,16 @@ func (hs *HandshakeMTPApi) GetLocalHandshakes(c *gin.Context) {
 		ApiErrorf(c, http.StatusBadRequest, "failed to cbor encode response")
 		return
 	}
-	signature, sErr := util.Sign(cbBytes, global.PrivateKey)
+
+	// based on the host determine which key to use to sign response
+	domain := util.GetHostFromRequest(*c.Request)
+	if _, ok := global.PrivateKeysByDomain[domain]; !ok {
+		ApiErrorf(c, http.StatusBadRequest, "invalid domain")
+		return
+	}
+	privateKey := global.PrivateKeysByDomain[domain]
+
+	signature, sErr := util.Sign(cbBytes, privateKey)
 	if sErr != nil {
 		ApiErrorf(c, http.StatusBadRequest, "failed to sign response")
 		return

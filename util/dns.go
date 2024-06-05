@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net"
+	"net/http"
 	"strings"
 
 	"github.com/mailio/go-mailio-server/global"
@@ -101,14 +102,18 @@ func MailioDNSDiscover(ctx context.Context, domain string) (*types.Discovery, er
 
 	if strings.Contains(domain, "localhost") {
 		// if development server take the local public key
-		pk := base64.StdEncoding.EncodeToString(global.PublicKey)
-		return &types.Discovery{
-			Domain:        "localhost",
-			IsMailio:      true,
-			Ips:           []string{"127.0.0.1"},
-			PublicKeyType: "ed25519",
-			PublicKey:     pk,
-		}, nil
+		for domain, publicKey := range global.PublicKeyByDomain {
+			pk := base64.StdEncoding.EncodeToString(publicKey)
+			if strings.Contains(domain, "localhost") {
+				return &types.Discovery{
+					Domain:        "localhost",
+					IsMailio:      true,
+					Ips:           []string{"127.0.0.1"},
+					PublicKeyType: "ed25519",
+					PublicKey:     pk,
+				}, nil
+			}
+		}
 	}
 
 	txts, err := r.LookupTXT(ctx, "mailio._mailiokey."+domain)
@@ -199,4 +204,12 @@ func GenerateTXTRecord(domain string, publicKeyBase64 string) (*string, error) {
 
 	txtRR := fmt.Sprintf("mailio._mailiokey.%s.\tIN\tTXT\t%s", domain, txtRecord)
 	return &txtRR, nil
+}
+
+func GetHostFromRequest(req http.Request) string {
+	host := req.Header.Get("X-Forwarded-Host")
+	if host == "" {
+		host = req.Host
+	}
+	return host
 }

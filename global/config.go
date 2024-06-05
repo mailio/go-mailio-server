@@ -12,10 +12,12 @@ import (
 var Conf Config
 
 // Public and Private key of a server (loaded from serverKeysPath in conf.yaml)
-var PublicKey ed25519.PublicKey
-var PrivateKey ed25519.PrivateKey
-var MailioKeysCreated int64
-var MailioDID *mailiodid.DID
+var PublicKeyByDomain = make(map[string]ed25519.PublicKey)
+var PrivateKeysByDomain = make(map[string]ed25519.PrivateKey)
+
+// var MailioDID *mailiodid.DID
+var MailioDIDByDomain = make(map[string]*mailiodid.DID)
+var MailioKeysCreatedByDomain = make(map[string]int64)
 
 // Global rate limiter
 var RateLimiter *redis_rate.Limiter
@@ -41,14 +43,18 @@ type CouchDBConfig struct {
 }
 
 type MailioConfig struct {
+	DiskSpace          int64                `yaml:"diskSpace"`
+	MailioDomainConfig []MailioDomainConfig `yaml:"domains"`
+	AuthenticationPath string               `yaml:"authenticationPath"`
+	MessagingPath      string               `yaml:"messagingPath"`
+	EmailSaltHex       string               `yaml:"emailSaltHex"`
+}
+
+type MailioDomainConfig struct {
 	Domain             string                `yaml:"domain"`
 	ServerKeysPath     string                `yaml:"serverKeysPath"`
-	EmailSaltHex       string                `yaml:"emailSaltHex"`
-	DiskSpace          int64                 `yaml:"diskSpace"`
 	RecaptchaV3SiteKey string                `yaml:"recaptchaV3SiteKey"`
 	ServerHanshake     ServerHandshakeConfig `yaml:"serverHandshake"`
-	AuthenticationPath string                `yaml:"authenticationPath"`
-	MessagingPath      string                `yaml:"messagingPath"`
 	ReadVsReceived     int                   `yaml:"readVsReceived"`
 }
 
@@ -63,7 +69,6 @@ type ServerHandshakeConfig struct {
 	OriginServer        string                         `yaml:"originServer"`
 	Type                int                            `yaml:"type"`
 	MinimumLevel        int                            `yaml:"minimumLevel"`
-	SignatureScheme     string                         `yaml:"signatureScheme"`
 	SenderMailioAddress string                         `yaml:"senderMailioAddress"`
 	SenderEmailAddress  string                         `yaml:"senderEmailAddress"`
 	Subtypes            []ServerHandshakeSubtypeConfig `yaml:"subtypes"`

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -39,7 +40,9 @@ func NewDIDApi(ssiService *services.SelfSovereignService) *DIDApi {
 // @Router /.well-known/did.json [get]
 func (did *DIDApi) CreateServerDID(c *gin.Context) {
 
-	didDoc, err := util.CreateMailioDIDDocument()
+	domain := util.GetHostFromRequest(*c.Request)
+
+	didDoc, err := util.CreateMailioDIDDocument(domain)
 	if err != nil {
 		ApiErrorf(c, http.StatusInternalServerError, "error creating did: %s", err)
 		return
@@ -63,21 +66,40 @@ func (da *DIDApi) CreateServerDIDConfiguration(c *gin.Context) {
 		"@context": "https://identity.foundation/.well-known/did-configuration/v1",
 	}
 
-	vc := did.NewVerifiableCredential(global.MailioDID.String())
+	domain := util.GetHostFromRequest(*c.Request)
+	if _, ok := global.MailioDIDByDomain[domain]; !ok {
+		ApiErrorf(c, http.StatusInternalServerError, "error creating server did configuration")
+		return
+	}
+	mailioDID := global.MailioDIDByDomain[domain]
+
+	if _, ok := global.MailioKeysCreatedByDomain[domain]; !ok {
+		ApiErrorf(c, http.StatusInternalServerError, "error creating server did configuration (key creation date)")
+		return
+	}
+	mailioKeysCreated := global.MailioKeysCreatedByDomain[domain]
+
+	if _, ok := global.PrivateKeysByDomain[domain]; !ok {
+		ApiErrorf(c, http.StatusInternalServerError, "error creating server did configuration (private key)")
+		return
+	}
+	privateKey := global.PrivateKeysByDomain[domain]
+
+	vc := did.NewVerifiableCredential(mailioDID.String())
 	vc.Context = []string{"https://www.w3.org/2018/credentials/v1",
 		"https://identity.foundation/.well-known/did-configuration/v1"}
-	vc.Issuer = global.MailioDID.String()
-	vc.IssuanceDate = time.UnixMilli(global.MailioKeysCreated)
+	vc.Issuer = mailioDID.String()
+	vc.IssuanceDate = time.UnixMilli(mailioKeysCreated)
 	vc.Type = []string{"VerifiableCredential", "DomainLinkageCredential"}
 	vc.CredentialSubject = did.CredentialSubject{
-		ID:     global.MailioDID.String(),
-		Origin: "https://mail.io",
+		ID:     mailioDID.String(),
+		Origin: fmt.Sprintf("https://%s", domain),
 	}
 
 	// JWT version of the above proof as an alternative format
 	jwtToken, jwtErr := jwt.NewBuilder().
-		Issuer(global.MailioDID.String()).
-		Subject(global.MailioDID.String()).
+		Issuer(mailioDID.String()).
+		Subject(mailioDID.String()).
 		NotBefore(time.Now().UTC()).
 		Build()
 	if jwtErr != nil {
@@ -86,14 +108,14 @@ func (da *DIDApi) CreateServerDIDConfiguration(c *gin.Context) {
 	}
 
 	jwtToken.Set("vc", vc)
-	jwtSigned, jwtErr := jwt.Sign(jwtToken, jwt.WithKey(jwa.EdDSA, global.PrivateKey))
+	jwtSigned, jwtErr := jwt.Sign(jwtToken, jwt.WithKey(jwa.EdDSA, privateKey))
 	if jwtErr != nil {
 		ApiErrorf(c, http.StatusInternalServerError, "error signing jwt: %s", jwtErr)
 		return
 	}
 
 	// proof section
-	pErr := vc.CreateProof(global.PrivateKey)
+	pErr := vc.CreateProof(privateKey)
 	if pErr != nil {
 		ApiErrorf(c, http.StatusInternalServerError, "error creating proof: %s", pErr)
 		return

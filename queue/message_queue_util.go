@@ -1,9 +1,11 @@
 package queue
 
 import (
+	"crypto/ed25519"
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -35,27 +37,6 @@ func (msq *MessageQueue) extractDIDMessageEndpoint(didDoc *did.Document) string 
 	}
 	return endpoint
 }
-
-// validates senders DID Docxument (if it matches the From field)
-// func (msq *MessageQueue) validateSenderDID(message *types.DIDCommMessage, userAddress string) (*did.DID, error) {
-// 	senderDid, sdidErr := msq.ssiService.GetDIDDocument(userAddress)
-// 	if sdidErr != nil {
-// 		global.Logger.Log(sdidErr.Error(), "failed to retrieve did document", userAddress)
-// 		return nil, fmt.Errorf("failed to retrieve DID document: %v: %w", sdidErr, asynq.SkipRetry)
-// 	}
-
-// 	fromDID, didErr := did.ParseDID(message.From)
-// 	if didErr != nil {
-// 		global.Logger.Log(didErr.Error(), "sender verification failed")
-// 		return nil, fmt.Errorf("failed to retrieve DID document: %v: %w", didErr, asynq.SkipRetry)
-// 	}
-
-// 	// addresses from and logged in users must match
-// 	if fromDID.Fragment() != senderDid.ID.Value() {
-// 		return nil, fmt.Errorf("from field invalid: %v: %w", sdidErr, asynq.SkipRetry)
-// 	}
-// 	return &fromDID, nil
-// }
 
 // validateRecipientDid validates the recipient DIDs and collect valid DIDs in a recipientDidMap
 // invalid recipients are added to MailioMessage as MTPStatusCodes
@@ -143,7 +124,23 @@ func (msq *MessageQueue) httpSend(message *types.DIDCommMessage,
 		level.Error(global.Logger).Log("msg", "failed to cbor encode request", "err", cErr)
 		return nil, fmt.Errorf("failed to cbor encode request: %v, %w", cErr, asynq.SkipRetry)
 	}
-	signature, sErr := util.Sign(cborPayload, global.PrivateKey)
+	// get the domain of the endpoint
+	parsedURL, pErr := url.Parse(endpoint)
+	if pErr != nil {
+		level.Error(global.Logger).Log("msg", "failed to parse url", "err", pErr)
+		return nil, fmt.Errorf("failed to parse url: %v, %w", pErr, asynq.SkipRetry)
+	}
+	// get the private for the domain
+	var privateKey ed25519.PrivateKey
+	if p, ok := global.PrivateKeysByDomain[parsedURL.Host]; ok {
+		privateKey = p
+	}
+	if privateKey == nil {
+		level.Error(global.Logger).Log("msg", "failed to get private key for domain", "err", pErr)
+		return nil, fmt.Errorf("failed to get private key for domain: %v, %w", pErr, asynq.SkipRetry)
+	}
+
+	signature, sErr := util.Sign(cborPayload, privateKey)
 	if sErr != nil {
 		level.Error(global.Logger).Log("msg", "failed to sign request", "err", sErr)
 		return nil, fmt.Errorf("failed to sign request: %v, %w", sErr, asynq.SkipRetry)

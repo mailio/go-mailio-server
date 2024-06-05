@@ -860,6 +860,13 @@ definitions:
       signature:
         type: string
     type: object
+  types.UserDomain:
+    properties:
+      name:
+        type: string
+      type:
+        type: string
+    type: object
   types.VCValidationResponse:
     properties:
       requestId:
@@ -1102,6 +1109,12 @@ paths:
       produces:
       - application/json
       responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/types.UserDomain'
+            type: array
         "429":
           description: rate limit exceeded
           schema:

@@ -58,9 +58,8 @@ func ConfigDBSelector() repository.DBSelector {
 	domainRepo, dErr := repository.NewCouchDBRepository(repoUrl, repository.Domain, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
 	messageDeliveryRepo, mdErr := repository.NewCouchDBRepository(repoUrl, repository.MessageDelivery, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
 	userProfileRepo, upErr := repository.NewCouchDBRepository(repoUrl, repository.UserProfile, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
-	attachmentSize, asErr := repository.NewCouchDBRepository(repoUrl, repository.AttachmentSize, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
 
-	repoErr := errors.Join(handshakeRepoErr, nonceRepoErr, userRepoErr, mappingRepoErr, didRErr, vscrErr, dErr, mdErr, upErr, asErr)
+	repoErr := errors.Join(handshakeRepoErr, nonceRepoErr, userRepoErr, mappingRepoErr, didRErr, vscrErr, dErr, mdErr, upErr)
 	if repoErr != nil {
 		panic(repoErr)
 	}
@@ -76,7 +75,6 @@ func ConfigDBSelector() repository.DBSelector {
 	dbSelector.AddDB(domainRepo)
 	dbSelector.AddDB(messageDeliveryRepo)
 	dbSelector.AddDB(userProfileRepo)
-	dbSelector.AddDB(attachmentSize)
 
 	return dbSelector
 }

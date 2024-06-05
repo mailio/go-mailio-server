@@ -15,7 +15,6 @@ const (
 	VCS             = "vcs"              // verifiable credentials
 	MessageDelivery = "message_delivery" // message delivery statuses
 	UserProfile     = "user_profile"     // user profile (for system use only)
-	AttachmentSize  = "attachment_size"  // attachment sizes stored on aws s3
 )
 
 type CouchDBSelector struct {

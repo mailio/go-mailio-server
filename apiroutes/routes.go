@@ -36,7 +36,7 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 	userProfileService := services.NewUserProfileService(dbSelector, environment)
 
 	// API definitions
-	handshakeApi := api.NewHandshakeApi(handshakeService, nonceService, mtpService)
+	handshakeApi := api.NewHandshakeApi(handshakeService, nonceService, mtpService, userProfileService)
 	accountApi := api.NewUserAccountApi(userService, userProfileService, nonceService, ssiService)
 	didApi := api.NewDIDApi(ssiService)
 	vcApi := api.NewVCApi(ssiService)

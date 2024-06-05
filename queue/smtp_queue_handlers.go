@@ -47,7 +47,7 @@ func (msq *MessageQueue) SendSMTPMessage(fromMailioAddress string, email *smtpty
 
 	// support multiple domains (based on the FROM domain use the handler for instance)
 	domain := strings.Split(email.From.Address, "@")[1]
-	if !util.IsSupportedDomain(domain) {
+	if !util.IsSupportedSmtpDomain(domain) {
 		global.Logger.Log("unsupported domain", domain)
 		return fmt.Errorf("unsupported domain: %w", asynq.SkipRetry)
 	}
@@ -373,10 +373,24 @@ func (msq *MessageQueue) getFolderByStats(mailioAddress, from string) string {
 	if receivedAll == 0 {
 		return types.MailioFolderInbox
 	}
+
+	userProfile, pErr := msq.userProfileService.Get(mailioAddress)
+	if pErr != nil {
+		global.Logger.Log("error retrieving user profile", pErr.Error())
+
+	}
+	readVsReceived := float64(30)
+	for _, domain := range global.Conf.Mailio.MailioDomainConfig {
+		if domain.Domain == userProfile.Domain {
+			readVsReceived = float64(domain.ReadVsReceived)
+			break
+		}
+	}
+
 	// ratio of read messages vs all received messages
-	ratio := float32(receivedRead) / float32(receivedAll)
+	ratio := float64(receivedRead) / float64(receivedAll)
 	// if more than X% of the messages are read, then store in goodreads
-	ratioThreshold := float32(global.Conf.Mailio.ReadVsReceived) / 100.0
+	ratioThreshold := readVsReceived / 100.0
 	if ratio >= ratioThreshold {
 		return types.MailioFolderGoodReads
 	}

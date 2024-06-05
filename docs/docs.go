@@ -322,6 +322,15 @@ const docTemplate = `{
                 ],
                 "summary": "List all domains",
                 "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/types.UserDomain"
+                            }
+                        }
+                    },
                     "429": {
                         "description": "rate limit exceeded",
                         "schema": {
@@ -2439,6 +2448,17 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "signature": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.UserDomain": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "type": {
                     "type": "string"
                 }
             }
