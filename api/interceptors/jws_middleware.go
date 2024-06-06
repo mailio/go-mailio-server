@@ -58,14 +58,9 @@ func JWSMiddleware(userProfileService *services.UserProfileService) gin.HandlerF
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "User account is disabled"})
 			return
 		}
-		if _, ok := global.PublicKeyByDomain[userProfile.Domain]; !ok {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid domain"})
-			return
-		}
-		publicKey := global.PublicKeyByDomain[userProfile.Domain]
 
 		// Verify the signature
-		_, err = object.Verify(publicKey)
+		_, err = object.Verify(global.PublicKey)
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Failed to verify JWS message"})
 			return

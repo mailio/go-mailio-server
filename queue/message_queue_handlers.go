@@ -70,19 +70,8 @@ func (msq *MessageQueue) selectMailFolder(fromDID did.DID, recipientAddress stri
 		return types.MailioFolderOther, nil
 	}
 
-	userProfile, pErr := msq.userProfileService.Get(recipientAddress)
-	if pErr != nil {
-		global.Logger.Log(pErr.Error(), "failed to get user profile", recipientAddress)
-		return types.MailioFolderInbox, pErr
-	}
 	// find domain specific setttings
-	readVsReceivedPercent := float64(30.0)
-	for _, confDomain := range global.Conf.Mailio.MailioDomainConfig {
-		if confDomain.Domain == userProfile.Domain {
-			readVsReceivedPercent = float64(confDomain.ReadVsReceived)
-			break
-		}
-	}
+	readVsReceivedPercent := global.Conf.Mailio.ReadVsReceived
 
 	// read := collectFoldersExceptSent(totalMessagesRead)
 	read := util.SumUpItemsFromFolderCountResponse([]string{types.MailioFolderInbox, types.MailioFolderArchive, types.MailioFolderGoodReads, types.MailioFolderOther, types.MailioFolderTrash}, totalMessagesRead)
@@ -143,14 +132,9 @@ func (msq *MessageQueue) handleReceivedDIDCommMessage(message *types.DIDCommMess
 			continue
 		}
 
-		// get the recipients domain
-		profile, pErr := msq.userProfileService.Get(parsedDid.Fragment())
-		if pErr != nil {
-			global.Logger.Log(pErr.Error(), "failed to get user profile", recAddress)
-			continue
-		}
-
-		if parsedDid.Value() == profile.Domain {
+		// collects only recipients that might be on this server based on the DIDs
+		// since message may contain messages to recipients on multiple different servers
+		if parsedDid.Value() == global.Conf.Mailio.ServerDomain {
 			if _, ok := addedMap[parsedDid.Fragment()]; !ok { // if not yet added
 				localRecipientsAddresses = append(localRecipientsAddresses, parsedDid.Fragment())
 				addedMap[parsedDid.Fragment()] = parsedDid.Fragment()
@@ -158,6 +142,7 @@ func (msq *MessageQueue) handleReceivedDIDCommMessage(message *types.DIDCommMess
 		}
 	}
 
+	// collect delivery status codes (possible than more than 1)
 	deliveryStatuses := []*types.MTPStatusCode{}
 	if len(localRecipientsAddresses) == 0 {
 		// Handles the case when there are no local recipients.
@@ -212,7 +197,7 @@ func (msq *MessageQueue) handleReceivedDIDCommMessage(message *types.DIDCommMess
 		global.Logger.Log(delErr.Error(), "failed to marshal delivery message")
 		return fmt.Errorf("failed to marshal delivery message: %v: %w", delErr, asynq.SkipRetry)
 	}
-	thisServerDIDDoc, err := util.CreateMailioDIDDocument(domain)
+	thisServerDIDDoc, err := util.CreateMailioDIDDocument()
 	if err != nil {
 		global.Logger.Log(err.Error(), "failed to create Mailio DID document")
 		return fmt.Errorf("failed to create Mailio DID document: %v: %w", err, asynq.SkipRetry)

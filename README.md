@@ -15,7 +15,7 @@ scheme: http # http or https
 title: Mailio Server
 description: Mailio Server implementation based on mirs.mail.io specification
 swagger: true
-mode: debug # "debug": or "release"
+mode: release # "debug": or "release"
 
 couchdb:
   host: localhost
@@ -30,26 +30,26 @@ redis:
   username: default
   password: YOURPASSWORD
 
-awssmtp:
-  username: test
-  password: YOURPASSWORD
-
 queue:
   concurrency: 50
 
 mailio:
-  domain: localhost:8080 # e.g. test.example.com
-  serverKeysPath: test_server_keys.json
-  emailSaltHex: 6162636465666768 # 8 bytes hex (abcdefgh)
+  diskSpace: 524288000 # initial maximum disk size in bytes (500 MB)
   authenticationPath: /api/v1/didauth # don't change unless you know what you're doing
   messagingPath: /api/v1/mtp/message # don't change unless you know what you're doing
-  diskSpace: 524288000 # initial maximum disk size in bytes (500 MB) per user
+  emailSaltHex: abcdefgh # 8 bytes hex (abcdefgh)
+  serverKeysPath: test_server_keys.json
   recaptchaV3SiteKey: YOURKEY
   readVsReceived: 30 # 30% read makes a message go to goodreads, less to other
+  serverDomain: mio.example.com # where this server is located on the internet
+  serverSubdomainQueryList: # standard subdomains for the mail server. e.g. mio.example.com, mailio.example.com, ...
+    - prefix: mio
+    - prefix: mailio
+    - prefix: didcomm
   serverHandshake:
     id: "mail_io_server_handshake" # guessable id
-    originServer: localhost:8080 # e.g test.example.com
     type: 3 # 3 - server specific, 1 = personal, 2 = signup
+    minimumLevel: 1 # reCaptchaV3
     subtypes:
       - subtype: 1
         frequencyMinutes: 0 # 0 - no limit
@@ -63,10 +63,9 @@ mailio:
         frequencyMinutes: 43800 # 30 days
       - subtype: 6
         frequencyMinutes: 43800 # 30 days
-    minimumLevel: 1 # reCaptchaV3
-    signatureScheme: EdDSA_X25519
-    senderMailioAddress: 0xabc # mailio address of the sender info@mail.io
-    senderEmailAddress: info@mail.io
+  domains:
+    - domain: example.io # e.g. example.com
+    - domain: example.com # e.g. otherdomain.com
 
 prometheus:
   enabled: true
@@ -75,21 +74,55 @@ prometheus:
 
 # currently only mailgun supported
 # check docs to implement: https://github.com/mailio/go-mailio-mailgun-smtp-handler
-mailwebhooks:
+smtpservers:
   - provider: mailgun
-    domain: sndmail.example.com
-    sendapikey: sendapikey
     webhookurl: /webhook/mailgun_mime
-    webhookkey: webhookkey
+    webhookkey: a55...
+    domains:
+    - domain: example.com
+      sendapikey: 78...
+    - domain: otherexample.com
+      sendapikey: 674...
 
 storage:
   type: s3
-  key: YOURKET
-  secret: YOURPASSWORD
-  bucket: my-bucket-name
+  key: ATR...
+  secret: D+...
+  bucket: mailio-bucket
+  region: us-east-1
+  
+diskusagehandlers:
+  - provider: aws
+    path: mailio-attachments/mailio-attachments/user-attachment-inventory
+
 ```
 3. `swag init --parseDependency=true` to re-create swagger documentation
 4. `go run environment.go main.go` to run the app
+
+
+### Mailio Server Configuration Explained
+
+Ensure all passwords, keys, and sensitive information are correctly set in a secure manner.
+
+For production, `change the scheme to https` and update the host and `serverDomain` to your actual domain.
+
+The **serverSubdomainQueryList** is a list of potential third-party subdomains that our server will search for when communicating using the DIDComm protocol. This setting ensures that communication remains functional even if your `serverDomain` is a subdomain rather than the root domain.
+
+For instance, if your `serverDomain` is `mio.example.com` instead of `example.com`, and people are sharing only their email addresses (as they commonly do), the communication will still work seamlessly.
+
+**Example scenario**
+
+- DID (Decentralized Identifier): did:web:mio.example.com:0x606d2...
+- Email Address: myemail@example.com
+
+In this example:
+
+- The DID uses the subdomain mio.example.com. This is our servers domain.
+- The email addresses, however, are associated with the root domain example.com.
+
+By including `mio.example.com` in the `serverSubdomainQueryList`, our server can correctly interpret and route communications, ensuring that messages sent to `myemail@example.com` can be processed using the DID `did:web:mio.example.com:0x606d2...`
+
+This setting is crucial for maintaining compatibility and functionality in scenarios where subdomains are used for DIDs, while emails are tied to the root domain.
 
 ## Adding SMTP handler implementation
 

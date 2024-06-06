@@ -32,33 +32,32 @@ import (
 // server assymetyic encryption key pairs by domain
 func loadServerEd25519Keys(conf global.Config) {
 
-	for _, confDomain := range conf.Mailio.MailioDomainConfig {
-		serverKeysBytes, err := os.ReadFile(confDomain.ServerKeysPath)
-		if err != nil {
-			panic(err)
-		}
-		var serverKeysJson types.ServerKeys
-		err = json.Unmarshal(serverKeysBytes, &serverKeysJson)
-		if err != nil {
-			panic(err)
-		}
-		decodedPrivBytes, err := base64.StdEncoding.DecodeString(serverKeysJson.PrivateKey)
-		if err != nil {
-			panic(fmt.Sprintf("Failed to decode servers private key %s", err.Error()))
-		}
-		// The public key is the last 32 bytes of the private key
-		publicKeyBytes := decodedPrivBytes[32:]
-
-		global.PublicKeyByDomain[confDomain.Domain] = ed25519.PublicKey(publicKeyBytes)
-		global.PrivateKeysByDomain[confDomain.Domain] = ed25519.PrivateKey(decodedPrivBytes)
-		global.MailioKeysCreatedByDomain[confDomain.Domain] = serverKeysJson.Created
-
-		mailioDid, didErr := util.CreateMailioDIDDocument(confDomain.Domain)
-		if didErr != nil {
-			panic(didErr.Error())
-		}
-		global.MailioDIDByDomain[confDomain.Domain] = &mailioDid.ID
+	serverKeysBytes, err := os.ReadFile(conf.Mailio.ServerKeysPath)
+	if err != nil {
+		panic(err)
 	}
+	var serverKeysJson types.ServerKeys
+	err = json.Unmarshal(serverKeysBytes, &serverKeysJson)
+	if err != nil {
+		panic(err)
+	}
+	decodedPrivBytes, err := base64.StdEncoding.DecodeString(serverKeysJson.PrivateKey)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to decode servers private key %s", err.Error()))
+	}
+	// The public key is the last 32 bytes of the private key
+	publicKeyBytes := decodedPrivBytes[32:]
+
+	global.PublicKey = ed25519.PublicKey(publicKeyBytes)
+	global.PrivateKey = ed25519.PrivateKey(decodedPrivBytes)
+	global.MailioKeysCreated = serverKeysJson.Created
+
+	mailioDid, didErr := util.CreateMailioDIDDocument()
+	if didErr != nil {
+		panic(didErr.Error())
+	}
+	global.MailioDID = &mailioDid.ID
+
 }
 
 func initRedisRateLimiter(conf global.Config) *redis.Client {

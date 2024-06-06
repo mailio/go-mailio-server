@@ -12,12 +12,12 @@ import (
 var Conf Config
 
 // Public and Private key of a server (loaded from serverKeysPath in conf.yaml)
-var PublicKeyByDomain = make(map[string]ed25519.PublicKey)
-var PrivateKeysByDomain = make(map[string]ed25519.PrivateKey)
+var PublicKey ed25519.PublicKey
+var PrivateKey ed25519.PrivateKey
 
 // var MailioDID *mailiodid.DID
-var MailioDIDByDomain = make(map[string]*mailiodid.DID)
-var MailioKeysCreatedByDomain = make(map[string]int64)
+var MailioDID *mailiodid.DID
+var MailioKeysCreated int64
 
 // Global rate limiter
 var RateLimiter *redis_rate.Limiter
@@ -43,19 +43,20 @@ type CouchDBConfig struct {
 }
 
 type MailioConfig struct {
-	DiskSpace          int64                `yaml:"diskSpace"`
-	MailioDomainConfig []MailioDomainConfig `yaml:"domains"`
-	AuthenticationPath string               `yaml:"authenticationPath"`
-	MessagingPath      string               `yaml:"messagingPath"`
-	EmailSaltHex       string               `yaml:"emailSaltHex"`
-}
-
-type MailioDomainConfig struct {
-	Domain             string                `yaml:"domain"`
+	DiskSpace          int64                 `yaml:"diskSpace"`
+	AuthenticationPath string                `yaml:"authenticationPath"`
+	MessagingPath      string                `yaml:"messagingPath"`
+	ServerDomain       string                `yaml:"serverDomain"`
+	EmailSaltHex       string                `yaml:"emailSaltHex"`
 	ServerKeysPath     string                `yaml:"serverKeysPath"`
 	RecaptchaV3SiteKey string                `yaml:"recaptchaV3SiteKey"`
 	ServerHanshake     ServerHandshakeConfig `yaml:"serverHandshake"`
 	ReadVsReceived     int                   `yaml:"readVsReceived"`
+	DomainConfig       []MailioDomainConfig  `yaml:"domains"`
+}
+
+type MailioDomainConfig struct {
+	Domain string `yaml:"domain"`
 }
 
 type PrometheusConfig struct {

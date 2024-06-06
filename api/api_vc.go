@@ -9,7 +9,6 @@ import (
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/services"
 	"github.com/mailio/go-mailio-server/types"
-	"github.com/mailio/go-mailio-server/util"
 )
 
 type VC struct {
@@ -77,7 +76,6 @@ func (vc *VC) VerifyVC(c *gin.Context) {
 		ApiErrorf(c, http.StatusBadRequest, "requestId is required")
 		return
 	}
-	domain := util.GetHostFromRequest(*c.Request)
 
 	var didVC did.VerifiableCredential
 	if err := c.ShouldBindJSON(&didVC); err != nil {
@@ -85,14 +83,7 @@ func (vc *VC) VerifyVC(c *gin.Context) {
 		return
 	}
 
-	// check if the public key exists
-	if _, ok := global.PublicKeyByDomain[domain]; !ok {
-		ApiErrorf(c, http.StatusInternalServerError, "error getting public key for domain", domain)
-		return
-	}
-	publicKey := global.PublicKeyByDomain[domain]
-
-	isValid, err := didVC.VerifyProof(publicKey)
+	isValid, err := didVC.VerifyProof(global.PublicKey)
 	if err != nil {
 		ApiErrorf(c, http.StatusBadRequest, "failed to validate proof")
 		return

@@ -1,7 +1,6 @@
 package services
 
 import (
-	"crypto/ed25519"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -103,16 +102,8 @@ func (mtp *MtpService) requestHandshakeFromRemoteServer(senderAddress string, ha
 		level.Error(global.Logger).Log("msg", "failed to cbor encode request", "err", cErr)
 		return nil, cErr
 	}
-	// get private key based on domain
-	var privateKey ed25519.PrivateKey
-	if p, ok := global.PrivateKeysByDomain[domain]; ok {
-		privateKey = p
-	} else {
-		level.Error(global.Logger).Log("msg", "private key not found for domain", "domain", domain)
-		return nil, types.ErrDomainNotFound
-	}
 
-	signature, sErr := util.Sign(cborPayload, privateKey)
+	signature, sErr := util.Sign(cborPayload, global.PrivateKey)
 	if sErr != nil {
 		level.Error(global.Logger).Log("msg", "failed to sign request", "err", sErr)
 		return nil, sErr

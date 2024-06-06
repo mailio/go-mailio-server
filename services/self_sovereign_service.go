@@ -130,25 +130,12 @@ func (ssi *SelfSovereignService) SaveVC(vc *did.VerifiableCredential) (*did.Veri
 }
 
 // Stores the users DID document and signs a VC with servers private key that proves ownership of the email address
-func (ssi *SelfSovereignService) StoreRegistrationSSI(mk *did.MailioKey, userDomain string) error {
+func (ssi *SelfSovereignService) StoreRegistrationSSI(mk *did.MailioKey) error {
 
-	authPath := userDomain + global.Conf.Mailio.AuthenticationPath
-	messagePath := userDomain + global.Conf.Mailio.MessagingPath
+	authPath := global.Conf.Mailio.ServerDomain + global.Conf.Mailio.AuthenticationPath
+	messagePath := global.Conf.Mailio.ServerDomain + global.Conf.Mailio.MessagingPath
 
-	// get domain public key
-	if _, ok := global.PublicKeyByDomain[userDomain]; !ok {
-		global.Logger.Log("public key not found", "missing public key for domain")
-		return types.ErrDomainNotFound
-	}
-	publicKey := global.PublicKeyByDomain[userDomain]
-	// get domain private key
-	if _, ok := global.PrivateKeysByDomain[userDomain]; !ok {
-		global.Logger.Log("private key not found", "missing private key for domain")
-		return types.ErrDomainNotFound
-	}
-	privateKey := global.PrivateKeysByDomain[userDomain]
-
-	userDIDDoc, didErr := did.NewMailioDIDDocument(mk, publicKey, authPath, messagePath)
+	userDIDDoc, didErr := did.NewMailioDIDDocument(mk, global.PublicKey, authPath, messagePath)
 	if didErr != nil {
 		return errors.New("failed to create DID document")
 	}
@@ -159,31 +146,25 @@ func (ssi *SelfSovereignService) StoreRegistrationSSI(mk *did.MailioKey, userDom
 	}
 
 	// proof that user owns the email address at this domain
-	// newCredId := uuid.New().String()
-	if _, ok := global.MailioDIDByDomain[userDomain]; !ok {
-		global.Logger.Log("mailio DID not found", "missing mailio DID for domain")
-		return types.ErrDomainNotFound
-	}
-	mailioDID := global.MailioDIDByDomain[userDomain]
-	ID := []byte(mk.DID() + mailioDID.String())
+	ID := []byte(mk.DID() + global.MailioDID.String())
 	newID := util.Sha256Hex(ID)
-	newVC := did.NewVerifiableCredential(mailioDID.String())
+	newVC := did.NewVerifiableCredential(global.MailioDID.String())
 	newVC.IssuanceDate = time.Now().UTC()
 	newVC.ID = newID
 	credentialSubject := did.CredentialSubject{
 		ID: mk.DID(),
 		AuthorizedApplication: &did.AuthorizedApplication{
 			ID:           mk.DID(),
-			Domains:      []string{userDomain},
+			Domains:      []string{global.Conf.Mailio.ServerDomain},
 			ApprovalDate: time.Now(),
 		},
 	}
 	newVC.CredentialSubject = credentialSubject
 	newVC.CredentialStatus = &did.CredentialStatus{
-		ID:   userDomain + "/api/v1/credentials/" + newID + "/status",
+		ID:   global.Conf.Mailio.ServerDomain + "/api/v1/credentials/" + newID,
 		Type: "CredentialStatusList2017",
 	}
-	vcpErr := newVC.CreateProof(privateKey)
+	vcpErr := newVC.CreateProof(global.PrivateKey)
 	if vcpErr != nil {
 		return errors.New("failed to create verifiable credential proof")
 	}

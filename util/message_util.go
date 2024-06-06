@@ -61,7 +61,7 @@ func ListSmtpDomains() []string {
 
 func ListMailioDomains() []string {
 	domains := []string{}
-	for _, domainConf := range global.Conf.Mailio.MailioDomainConfig {
+	for _, domainConf := range global.Conf.Mailio.DomainConfig {
 		domains = append(domains, domainConf.Domain)
 	}
 	return domains

@@ -3,27 +3,21 @@ package util
 import (
 	mailiodid "github.com/mailio/go-mailio-did/did"
 	"github.com/mailio/go-mailio-server/global"
-	"github.com/mailio/go-mailio-server/types"
 )
 
 // TODO! rename the CreateMailioDIDDocument (although it's functionality is ok, but the name is a bit misleading)
 // CreateMailioDIDDocument creates a new mailio DID document (server DID)
-func CreateMailioDIDDocument(domain string) (*mailiodid.Document, error) {
-
-	if _, ok := global.PublicKeyByDomain[domain]; !ok {
-		return nil, types.ErrDomainNotFound
-	}
-	publicKey := global.PublicKeyByDomain[domain]
+func CreateMailioDIDDocument() (*mailiodid.Document, error) {
 
 	mkMailio := &mailiodid.MailioKey{
 		MasterSignKey: &mailiodid.Key{
 			Type:      mailiodid.KeyTypeEd25519,
-			PublicKey: publicKey,
+			PublicKey: global.PublicKey,
 		},
 	}
 
-	messagingPath := domain + global.Conf.Mailio.MessagingPath
-	authPath := domain + global.Conf.Mailio.AuthenticationPath
-	didDoc, err := mailiodid.NewMailioDIDDocument(mkMailio, publicKey, authPath, messagingPath)
+	messagingPath := global.Conf.Mailio.ServerDomain + global.Conf.Mailio.MessagingPath
+	authPath := global.Conf.Mailio.ServerDomain + global.Conf.Mailio.AuthenticationPath
+	didDoc, err := mailiodid.NewMailioDIDDocument(mkMailio, global.PublicKey, authPath, messagingPath)
 	return didDoc, err
 }

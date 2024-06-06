@@ -77,15 +77,7 @@ func (hs *HandshakeMTPApi) GetLocalHandshakes(c *gin.Context) {
 		return
 	}
 
-	// based on the host determine which key to use to sign response
-	domain := util.GetHostFromRequest(*c.Request)
-	if _, ok := global.PrivateKeysByDomain[domain]; !ok {
-		ApiErrorf(c, http.StatusBadRequest, "invalid domain")
-		return
-	}
-	privateKey := global.PrivateKeysByDomain[domain]
-
-	signature, sErr := util.Sign(cbBytes, privateKey)
+	signature, sErr := util.Sign(cbBytes, global.PrivateKey)
 	if sErr != nil {
 		ApiErrorf(c, http.StatusBadRequest, "failed to sign response")
 		return

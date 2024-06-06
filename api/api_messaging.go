@@ -79,14 +79,8 @@ func (ma *MessagingApi) SendDIDMessage(c *gin.Context) {
 		return
 	}
 
-	profile, pErr := ma.userProfileService.Get(subjectAddress.(string))
-	if pErr != nil {
-		ApiErrorf(c, http.StatusNotFound, "user profile not found")
-		return
-	}
-
-	// force the from field to be the subject address
-	from := fmt.Sprintf("did:web:%s#%s", profile.Domain, subjectAddress.(string))
+	// Ensure the 'from' field is set to the subject address and it's coming from this server
+	from := fmt.Sprintf("did:web:%s#%s", global.Conf.Mailio.ServerDomain, subjectAddress.(string))
 	if input.From != from {
 		ApiErrorf(c, http.StatusUnauthorized, "unathorized")
 		return

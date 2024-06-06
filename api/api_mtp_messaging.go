@@ -61,14 +61,6 @@ func (ms *MessagingMTPApi) ReceiveMessage(c *gin.Context) {
 		return
 	}
 
-	domain := util.GetHostFromRequest(*c.Request)
-
-	if _, ok := global.PrivateKeysByDomain[domain]; !ok {
-		ApiErrorf(c, http.StatusNotFound, "private key for domain not found")
-		return
-	}
-	privateKey := global.PrivateKeysByDomain[domain]
-
 	// digitially sign response and send confirmation receipt
 	resp := &types.DIDCommSignedRequest{
 		DIDCommRequest: &types.DIDCommRequest{
@@ -86,7 +78,7 @@ func (ms *MessagingMTPApi) ReceiveMessage(c *gin.Context) {
 		ApiErrorf(c, http.StatusInternalServerError, "failed to cbor encode response")
 		return
 	}
-	signature, sErr := util.Sign(cbBytes, privateKey)
+	signature, sErr := util.Sign(cbBytes, global.PrivateKey)
 	if sErr != nil {
 		global.Logger.Log(sErr.Error(), "failed to sign response")
 		ApiErrorf(c, http.StatusInternalServerError, "failed to sign response")

@@ -1,11 +1,9 @@
 package queue
 
 import (
-	"crypto/ed25519"
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"net/url"
 	"strings"
 	"time"
 
@@ -124,23 +122,8 @@ func (msq *MessageQueue) httpSend(message *types.DIDCommMessage,
 		level.Error(global.Logger).Log("msg", "failed to cbor encode request", "err", cErr)
 		return nil, fmt.Errorf("failed to cbor encode request: %v, %w", cErr, asynq.SkipRetry)
 	}
-	// get the domain of the endpoint
-	parsedURL, pErr := url.Parse(endpoint)
-	if pErr != nil {
-		level.Error(global.Logger).Log("msg", "failed to parse url", "err", pErr)
-		return nil, fmt.Errorf("failed to parse url: %v, %w", pErr, asynq.SkipRetry)
-	}
-	// get the private for the domain
-	var privateKey ed25519.PrivateKey
-	if p, ok := global.PrivateKeysByDomain[parsedURL.Host]; ok {
-		privateKey = p
-	}
-	if privateKey == nil {
-		level.Error(global.Logger).Log("msg", "failed to get private key for domain", "err", pErr)
-		return nil, fmt.Errorf("failed to get private key for domain: %v, %w", pErr, asynq.SkipRetry)
-	}
 
-	signature, sErr := util.Sign(cborPayload, privateKey)
+	signature, sErr := util.Sign(cborPayload, global.PrivateKey)
 	if sErr != nil {
 		level.Error(global.Logger).Log("msg", "failed to sign request", "err", sErr)
 		return nil, fmt.Errorf("failed to sign request: %v, %w", sErr, asynq.SkipRetry)

@@ -374,23 +374,12 @@ func (msq *MessageQueue) getFolderByStats(mailioAddress, from string) string {
 		return types.MailioFolderInbox
 	}
 
-	userProfile, pErr := msq.userProfileService.Get(mailioAddress)
-	if pErr != nil {
-		global.Logger.Log("error retrieving user profile", pErr.Error())
-
-	}
-	readVsReceived := float64(30)
-	for _, domain := range global.Conf.Mailio.MailioDomainConfig {
-		if domain.Domain == userProfile.Domain {
-			readVsReceived = float64(domain.ReadVsReceived)
-			break
-		}
-	}
+	readVsReceived := global.Conf.Mailio.ReadVsReceived
 
 	// ratio of read messages vs all received messages
 	ratio := float64(receivedRead) / float64(receivedAll)
 	// if more than X% of the messages are read, then store in goodreads
-	ratioThreshold := readVsReceived / 100.0
+	ratioThreshold := float64(readVsReceived) / 100.0
 	if ratio >= ratioThreshold {
 		return types.MailioFolderGoodReads
 	}
