@@ -2,36 +2,20 @@
 
 Mailio Server implementation based on [Mailio MIRs](https://mirs.mail.io) specifications. 
 
-## Development
+## Install
 
-1. Clone this repository
-2. Create `conf.yaml` file with contents:
+### Configuration
+
+2. <a name="conf"></a>Create `conf.yaml` file with contents:
 
 ```yml
 version: 1.0
-port: 8080
-host: localhost # custom domain, for development leave localhost
 scheme: http # http or https
+port: 8080
 title: Mailio Server
 description: Mailio Server implementation based on mirs.mail.io specification
 swagger: true
 mode: release # "debug": or "release"
-
-couchdb:
-  host: localhost
-  port: 5984
-  scheme: http
-  username: admin
-  password: YOURPASSWORD
-
-redis:
-  host: localhost
-  port: 6379
-  username: default
-  password: YOURPASSWORD
-
-queue:
-  concurrency: 50
 
 mailio:
   diskSpace: 524288000 # initial maximum disk size in bytes (500 MB)
@@ -67,6 +51,22 @@ mailio:
     - domain: example.io # e.g. example.com
     - domain: example.com # e.g. otherdomain.com
 
+couchdb:
+  host: localhost
+  port: 5984
+  scheme: http
+  username: admin
+  password: YOURPASSWORD
+
+redis:
+  host: localhost
+  port: 6379
+  username: default
+  password: YOURPASSWORD
+
+queue:
+  concurrency: 50
+
 prometheus:
   enabled: true
   username: prometheus
@@ -96,9 +96,6 @@ diskusagehandlers:
     path: mailio-attachments/mailio-attachments/user-attachment-inventory
 
 ```
-3. `swag init --parseDependency=true` to re-create swagger documentation
-4. `go run environment.go main.go` to run the app
-
 
 ### Mailio Server Configuration Explained
 
@@ -120,17 +117,42 @@ In this example:
 - The DID uses the subdomain mio.example.com. This is our servers domain.
 - The email addresses, however, are associated with the root domain example.com.
 
-By including `mio.example.com` in the `serverSubdomainQueryList`, our server can correctly interpret and route communications, ensuring that messages sent to `myemail@example.com` can be processed using the DID `did:web:mio.example.com:0x606d2...`
+By including `mio.example.com` in the `serverSubdomainQueryList`, our server can correctly interpret and route communications, when requesting remote DID documents, ensuring that messages sent to `myemail@example.com` can be processed using the DID `did:web:mio.example.com:0x606d2...`
 
 This setting is crucial for maintaining compatibility and functionality in scenarios where subdomains are used for DIDs, while emails are tied to the root domain.
 
-## Adding SMTP handler implementation
+### Single node
 
-### Overview
+```
+git clone https://github.com/mailio/go-mailio-server.git
+```
+
+Create configuration file [`conf.yaml` in the root folder](#conf)
+
+```
+docker-compose up -d
+```
+
+### Multi-node
+
+TDB (Kubernetes) or Helm chart maybe
+
+
+## Development
+
+1. Clone this repository
+2. Create `conf.yaml` file
+3. `swag init --parseDependency=true` to re-create swagger documentation
+4. `go run environment.go main.go` to run the app
+
+
+### Adding SMTP handler implementation
+
+#### Overview
 
 The application supports the integration of multiple SMTP service providers through a plugin interface. This interface allows for the seamless addition of new email service providers as needed, without requiring significant changes to the application's core functionality. The current implementation includes support for Mailgun, with the architecture designed to easily accommodate additional providers.
 
-### Configuration
+#### Configuration
 
 The SMTP handler configuration is driven by the application's global configuration, typically defined in a configuration file (`cony.yaml`). Each SMTP provider's settings, such as API keys and domain information, are specified within this configuration file under the `MailWebhooks` section.
 
@@ -143,9 +165,9 @@ mailwebhooks:
     webhookkey: webhookkey
 ```
 
-### Adding a Custom SMTP Handler
+#### Adding a Custom SMTP Handler
 
-#### 1. Implement the SMTP Handler Interface
+##### 1. Implement the SMTP Handler Interface
 
 Implement the SMTP handler interface, ensuring that it satisfies any required methods:
 
@@ -200,7 +222,7 @@ for _, wh := range global.Conf.MailWebhooks {
 }
 ```
 
-#### 3. Update configuration
+##### 3. Update configuration
 
 Add your provider configuration under `conf.yaml` -> `mailwebhooks`:
 

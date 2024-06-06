@@ -316,7 +316,7 @@ func (msq *MessageQueue) ReceiveSMTPMessage(email *smtptypes.Mail, taskId string
 //   - code: The SMTP status code to include in the bounce email.
 //   - message: The message to include in the bounce email.
 func sendBounce(bounceFromEmail mail.Address, email *smtptypes.Mail, smtpHandler mailiosmtp.SmtpHandler, code, message string) error {
-	bounceMail, bErr := mailiosmtp.ToBounce(email.From, *email, code, message, global.Conf.Host)
+	bounceMail, bErr := mailiosmtp.ToBounce(email.From, *email, code, message, global.Conf.Mailio.ServerDomain)
 	if bErr != nil {
 		global.Logger.Log("error", bErr.Error())
 		return bErr

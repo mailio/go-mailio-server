@@ -206,7 +206,7 @@ func (msq *MessageQueue) handleReceivedDIDCommMessage(message *types.DIDCommMess
 		ID:              message.ID,
 		Intent:          types.DIDCommIntentDelivery,
 		Type:            "application/didcomm-signed+json",
-		From:            "did:web:" + global.Conf.Host + ":" + thisServerDIDDoc.ID.Value(), // this server DID
+		From:            "did:web:" + global.Conf.Mailio.ServerDomain + ":" + thisServerDIDDoc.ID.Value(), // this server DID
 		To:              []string{message.From},
 		PlainBodyBase64: base64.StdEncoding.EncodeToString(deliveryMsgStr),
 	}

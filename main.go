@@ -178,7 +178,7 @@ func main() {
 	docs.SwaggerInfo.Title = "Mailio Server"
 	docs.SwaggerInfo.Description = "Mailio Server implements the Mailio server based on https://mirs.mail.io/ specifications"
 	docs.SwaggerInfo.Version = "1.0"
-	docs.SwaggerInfo.Host = fmt.Sprintf("%s:%d", global.Conf.Host, global.Conf.Port)
+	docs.SwaggerInfo.Host = global.Conf.Mailio.ServerDomain
 	docs.SwaggerInfo.BasePath = "/"
 	docs.SwaggerInfo.Schemes = []string{global.Conf.Scheme}
 
@@ -230,7 +230,7 @@ func main() {
 		taskServer.Shutdown()
 	}()
 
-	global.Logger.Log("Server is ready to handle requests at", global.Conf.Port)
+	global.Logger.Log("Server is ready to handle requests on port", global.Conf.Port)
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		panic(fmt.Sprintf("%v\n", err))
 	}

@@ -1035,6 +1035,61 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/resolve/domain": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Identify if an email is a DIDcomm/Mailio or SMTP address, and resolve the DID if it’s from a Mailio server.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Messaging"
+                ],
+                "summary": "Resolve domain from email address (smtp or mailio)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "valid email address",
+                        "name": "email",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Domain"
+                        }
+                    },
+                    "400": {
+                        "description": "bad request",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "401": {
+                        "description": "invalid signature or unauthorized to send messages",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "429": {
+                        "description": "rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/smtp": {
             "post": {
                 "security": [
@@ -1839,6 +1894,37 @@ const docTemplate = `{
                 "signatureBase64": {
                     "description": "the signature of the payload, which is base64 encoded.",
                     "type": "string"
+                }
+            }
+        },
+        "types.Domain": {
+            "type": "object",
+            "properties": {
+                "_deleted": {
+                    "type": "boolean"
+                },
+                "_id": {
+                    "type": "string"
+                },
+                "_rev": {
+                    "description": "Rev is the revision number returned\n_Rev    string ` + "`" + `json:\"_rev,omitempty\"` + "`" + `",
+                    "type": "string"
+                },
+                "isMailioServer": {
+                    "type": "boolean"
+                },
+                "mailioPublicKey": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "ok": {
+                    "description": "_ID     string ` + "`" + `json:\"_id,omitempty\"` + "`" + `",
+                    "type": "boolean"
+                },
+                "timestamp": {
+                    "type": "integer"
                 }
             }
         },

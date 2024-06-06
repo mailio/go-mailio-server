@@ -252,20 +252,37 @@ func (ssi *SelfSovereignService) ListSubjectVCs(address string, limit int, bookm
 }
 
 // FetchRemoteDID parses the WEB did and fetched DID document from the remote server
+// FetchRemoteDID tries a list of subdomain queries to find the correct endpoint
 // Returns the DID document for the given web mailio address
 // - ErrInvalidFormat when DID address not valid
 // - ErrBadRequest when remote server returns code >= 400
 // - ErrConflict when rate limit of remote server exceeded
 // - ErrNotFound when DID address not found
 func (ssi *SelfSovereignService) FetchRemoteDID(remoteDid *did.DID) (*did.Document, error) {
-	url := remoteDid.Value()
-	if url == global.Conf.Host {
+	domain := remoteDid.Value()
+	if domain == global.Conf.Mailio.ServerDomain {
 		return nil, types.ErrBadRequest
 	}
 	protocol := "https"
-	if strings.Contains(url, "localhost") || strings.Contains(url, "127.0.0.1") {
+	if strings.Contains(domain, "localhost") || strings.Contains(domain, "127.0.0.1") {
 		protocol = "http"
 	}
+
+	// // find the right domain for the given did
+	// for i, query := range global.Conf.Mailio.ServerSubdomainQueryList {
+	// 	possibleUrl := query.Prefix + "." + domain
+	// 	parsedUrl, err := url.Parse(possibleUrl)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// 	domain, dErr := resolveDomain(domainRepoi, parsedUrl.Host, false)
+	// 	if dErr != nil {
+	// 		if i == len(global.Conf.Mailio.ServerSubdomainQueryList)-1 {
+	// 			return nil, dErr
+	// 		}
+
+	// 	}
+	// }
 
 	userAddress := remoteDid.Fragment()
 
@@ -273,16 +290,19 @@ func (ssi *SelfSovereignService) FetchRemoteDID(remoteDid *did.DID) (*did.Docume
 		return nil, types.ErrInvalidFormat
 	}
 
+	// finding a did document with the given user address checking all possible urls
 	var didDoc did.Document
-	response, rErr := ssi.restyClient.R().SetResult(&didDoc).Get(fmt.Sprintf("%s://%s/%s/did.json", protocol, url, userAddress))
+
+	response, rErr := ssi.restyClient.R().SetResult(&didDoc).Get(fmt.Sprintf("%s://%s/%s/did.json", protocol, domain, userAddress))
 	if rErr != nil {
-		global.Logger.Log(rErr.Error(), "failed to validate recipient")
-		return nil, rErr
+		global.Logger.Log(rErr.Error(), "failed to validate recipient for ", domain)
+		return nil, types.ErrBadRequest
 	}
 	if response.IsError() {
 		if response.StatusCode() == http.StatusNotFound {
-			global.Logger.Log("recipient not found", "failed to validate recipient")
-			return nil, types.ErrNotFound
+
+			global.Logger.Log("recipient not found", "failed to validate recipient for ", domain)
+			return nil, types.ErrBadRequest
 		}
 		if response.StatusCode() == http.StatusConflict {
 			global.Logger.Log(response.String(), "rate limit exceeded")
@@ -290,7 +310,7 @@ func (ssi *SelfSovereignService) FetchRemoteDID(remoteDid *did.DID) (*did.Docume
 		}
 		global.Logger.Log(response.String(), "failed to validate recipient")
 		return nil, types.ErrBadRequest
-
 	}
+
 	return &didDoc, nil
 }

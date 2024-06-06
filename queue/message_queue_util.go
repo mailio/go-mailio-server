@@ -54,10 +54,7 @@ func (msq *MessageQueue) validateRecipientDIDs(message *types.DIDCommMessage) (m
 
 		var result did.Document
 		// check if local server (don't query it over network due to "rate limits")
-		host := global.Conf.Host
-		if global.Conf.Port != 0 {
-			host += ":" + fmt.Sprintf("%d", global.Conf.Port)
-		}
+		host := global.Conf.Mailio.ServerDomain
 		if rec.Value() == host {
 			r, rErr := msq.ssiService.GetDIDDocument(rec.Fragment())
 			if rErr != nil {
@@ -133,7 +130,7 @@ func (msq *MessageQueue) httpSend(message *types.DIDCommMessage,
 		DIDCommRequest:    request,
 		CborPayloadBase64: base64.StdEncoding.EncodeToString(cborPayload),
 		SignatureBase64:   base64.StdEncoding.EncodeToString(signature),
-		SenderDomain:      global.Conf.Host,
+		SenderDomain:      global.Conf.Mailio.ServerDomain,
 	}
 
 	var responseResult types.DIDCommSignedRequest

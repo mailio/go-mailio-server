@@ -70,7 +70,7 @@ func (ms *MessagingMTPApi) ReceiveMessage(c *gin.Context) {
 			SignatureScheme: types.Signature_Scheme_EdDSA_X25519,
 			Timestamp:       time.Now().UnixMilli(),
 		},
-		SenderDomain: global.Conf.Host,
+		SenderDomain: global.Conf.Mailio.ServerDomain,
 	}
 	cbBytes, cbErr := util.CborEncode(resp.DIDCommRequest)
 	if cbErr != nil {

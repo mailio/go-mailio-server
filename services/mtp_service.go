@@ -85,7 +85,7 @@ func (mtp *MtpService) requestHandshakeFromRemoteServer(senderAddress string, ha
 	}
 	// create handshake request objects signed by this server and request handshake from the domain
 	request := &types.HandshakeSignedRequest{
-		SenderDomain: global.Conf.Host,
+		SenderDomain: global.Conf.Mailio.ServerDomain,
 		HandshakeRequest: types.HandshakeRequest{
 			SenderAddress:                senderAddress,
 			ReturnDefaultServerHandshake: true,

@@ -43,20 +43,25 @@ type CouchDBConfig struct {
 }
 
 type MailioConfig struct {
-	DiskSpace          int64                 `yaml:"diskSpace"`
-	AuthenticationPath string                `yaml:"authenticationPath"`
-	MessagingPath      string                `yaml:"messagingPath"`
-	ServerDomain       string                `yaml:"serverDomain"`
-	EmailSaltHex       string                `yaml:"emailSaltHex"`
-	ServerKeysPath     string                `yaml:"serverKeysPath"`
-	RecaptchaV3SiteKey string                `yaml:"recaptchaV3SiteKey"`
-	ServerHanshake     ServerHandshakeConfig `yaml:"serverHandshake"`
-	ReadVsReceived     int                   `yaml:"readVsReceived"`
-	DomainConfig       []MailioDomainConfig  `yaml:"domains"`
+	DiskSpace                int64                         `yaml:"diskSpace"`
+	AuthenticationPath       string                        `yaml:"authenticationPath"`
+	MessagingPath            string                        `yaml:"messagingPath"`
+	ServerDomain             string                        `yaml:"serverDomain"`
+	ServerSubdomainQueryList []*MailioServerSubdomainQuery `yaml:"serverSubdomainQueryList"`
+	EmailSaltHex             string                        `yaml:"emailSaltHex"`
+	ServerKeysPath           string                        `yaml:"serverKeysPath"`
+	RecaptchaV3SiteKey       string                        `yaml:"recaptchaV3SiteKey"`
+	ServerHanshake           ServerHandshakeConfig         `yaml:"serverHandshake"`
+	ReadVsReceived           int                           `yaml:"readVsReceived"`
+	DomainConfig             []MailioDomainConfig          `yaml:"domains"`
 }
 
 type MailioDomainConfig struct {
 	Domain string `yaml:"domain"`
+}
+
+type MailioServerSubdomainQuery struct {
+	Prefix string `yaml:"prefix"`
 }
 
 type PrometheusConfig struct {
