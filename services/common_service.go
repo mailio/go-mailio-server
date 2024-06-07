@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/go-kit/log/level"
+	"github.com/go-resty/resty/v2"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/repository"
 	"github.com/mailio/go-mailio-server/types"
@@ -189,11 +190,15 @@ func resolveDomain(domainRepo repository.Repository, domain string, forceDiscove
 	}
 
 	var domainObj types.Domain
-	if response != nil && !forceDiscovery {
-		// domain found in database
+	// if found map to domainObj
+	resp := response.(*resty.Response)
+	if response != nil && resp.StatusCode() == 200 {
 		if err := repository.MapToObject(response, &domainObj); err != nil {
 			return nil, err
 		}
+	}
+	if response != nil && !forceDiscovery {
+		// domain found in database
 
 		shouldSave := false
 		ageInMillis := time.Now().UTC().UnixMilli() - domainObj.Timestamp
@@ -227,6 +232,10 @@ func resolveDomain(domainRepo repository.Repository, domain string, forceDiscove
 		SupportsMailio:         false,
 		SupportsStandardEmails: false,
 		Timestamp:              time.Now().UnixMilli(),
+	}
+	if domainObj.ID != "" {
+		newDomainObj.Rev = domainObj.Rev
+		newDomainObj.ID = domainObj.ID
 	}
 	uErr := updateDomain(newDomainObj, domain)
 	if uErr != nil {
