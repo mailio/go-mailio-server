@@ -449,14 +449,21 @@ definitions:
           Rev is the revision number returned
           _Rev    string `json:"_rev,omitempty"`
         type: string
-      isMailioServer:
-        type: boolean
+      mailioDIDDomain:
+        description: mailio domain (if supportsMailio)
+        type: string
       mailioPublicKey:
         type: string
       name:
         type: string
       ok:
         description: _ID     string `json:"_id,omitempty"`
+        type: boolean
+      supportsMailio:
+        description: domain can be both (mailio and smtp)
+        type: boolean
+      supportsStandardEmail:
+        description: domain can be both (mailio and smtp)
         type: boolean
       timestamp:
         type: integer
@@ -1607,6 +1614,11 @@ paths:
         name: email
         required: true
         type: string
+      - default: false
+        description: force DNS update
+        in: query
+        name: force
+        type: boolean
       produces:
       - application/json
       responses:

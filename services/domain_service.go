@@ -51,9 +51,8 @@ func (ds *DomainService) GetDomain(domain string) (*types.Domain, error) {
 	return &domainObj, nil
 }
 
-func (ds *DomainService) ResolveDomain(domain string) (*types.Domain, error) {
-	//TODO! chanfge to false (so it doesn't force it)
-	resolvedDomain, rdErr := resolveDomain(ds.domainRepo, domain, true)
+func (ds *DomainService) ResolveDomain(domain string, forceUpdate bool) (*types.Domain, error) {
+	resolvedDomain, rdErr := resolveDomain(ds.domainRepo, domain, forceUpdate)
 	if rdErr != nil {
 		return nil, rdErr
 	}

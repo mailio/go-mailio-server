@@ -1060,6 +1060,13 @@ const docTemplate = `{
                         "name": "email",
                         "in": "query",
                         "required": true
+                    },
+                    {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "force DNS update",
+                        "name": "force",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -1910,8 +1917,9 @@ const docTemplate = `{
                     "description": "Rev is the revision number returned\n_Rev    string ` + "`" + `json:\"_rev,omitempty\"` + "`" + `",
                     "type": "string"
                 },
-                "isMailioServer": {
-                    "type": "boolean"
+                "mailioDIDDomain": {
+                    "description": "mailio domain (if supportsMailio)",
+                    "type": "string"
                 },
                 "mailioPublicKey": {
                     "type": "string"
@@ -1921,6 +1929,14 @@ const docTemplate = `{
                 },
                 "ok": {
                     "description": "_ID     string ` + "`" + `json:\"_id,omitempty\"` + "`" + `",
+                    "type": "boolean"
+                },
+                "supportsMailio": {
+                    "description": "domain can be both (mailio and smtp)",
+                    "type": "boolean"
+                },
+                "supportsStandardEmail": {
+                    "description": "domain can be both (mailio and smtp)",
                     "type": "boolean"
                 },
                 "timestamp": {

@@ -59,6 +59,7 @@ func (da *DomainApi) List(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param email query string true "valid email address"
+// @Param force query boolean false "force DNS update" default(false)
 // @Success 200 {object} types.Domain
 // @Failure 400 {object} api.ApiError "bad request"
 // @Failure 401 {object} api.ApiError "invalid signature or unauthorized to send messages"
@@ -70,6 +71,13 @@ func (ma *DomainApi) ResolveDomainForEmail(c *gin.Context) {
 		ApiErrorf(c, http.StatusBadRequest, "email address is required")
 		return
 	}
+	// optional parameters (default if false)
+	forceUpdateParam := c.Query("force")
+	forceUpdate := false
+	if forceUpdateParam == "true" {
+		forceUpdate = true
+	}
+
 	parsedEmail, pErr := mail.ParseAddress(email)
 	if pErr != nil {
 		ApiErrorf(c, http.StatusBadRequest, "invalid email address")
@@ -77,7 +85,7 @@ func (ma *DomainApi) ResolveDomainForEmail(c *gin.Context) {
 	}
 	domain := strings.Split(parsedEmail.Address, "@")[1]
 	// check if there is already a record of this domain
-	domainObj, err := ma.domainService.ResolveDomain(domain)
+	domainObj, err := ma.domainService.ResolveDomain(domain, forceUpdate)
 	if err != nil {
 		ApiErrorf(c, http.StatusServiceUnavailable, "error resolving domain. try again later")
 		return
