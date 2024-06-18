@@ -208,6 +208,9 @@ func main() {
 	defer taskClient.Close()
 	env.TaskClient = taskClient
 
+	// configure WebAuthN
+	ConfigWebAuthN(&global.Conf, env)
+
 	// configure routes
 	router = apiroutes.ConfigRoutes(router, dbSelector.(*repository.CouchDBSelector), taskServer, env)
 

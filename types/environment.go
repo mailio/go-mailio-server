@@ -2,6 +2,7 @@ package types
 
 import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/hibiken/asynq"
 	"github.com/redis/go-redis/v9"
 	"github.com/robfig/cron/v3"
@@ -13,6 +14,7 @@ type Environment struct {
 	Cron         *cron.Cron
 	S3Uploader   *s3manager.Uploader
 	S3Downloader *s3manager.Downloader
+	WebAuthN     *webauthn.WebAuthn
 }
 
 func NewEnvironment(redisClient *redis.Client) *Environment {
