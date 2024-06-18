@@ -29,7 +29,9 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+// server assymetyic encryption key pairs by domain
 func loadServerEd25519Keys(conf global.Config) {
+
 	serverKeysBytes, err := os.ReadFile(conf.Mailio.ServerKeysPath)
 	if err != nil {
 		panic(err)
@@ -55,6 +57,7 @@ func loadServerEd25519Keys(conf global.Config) {
 		panic(didErr.Error())
 	}
 	global.MailioDID = &mailioDid.ID
+
 }
 
 func initRedisRateLimiter(conf global.Config) *redis.Client {
@@ -160,7 +163,7 @@ func main() {
 	err := cfg.NewYamlConfig(configFile, &global.Conf)
 	if err != nil {
 		global.Logger.Log(err, "conf.yaml failed to load")
-		panic("Failed to load conf.yaml")
+		panic(fmt.Sprintf("%s: %v", "Failed to load conf.yaml", err.Error()))
 	}
 
 	// loads server keys into global variables for signing and signature validation
@@ -175,7 +178,7 @@ func main() {
 	docs.SwaggerInfo.Title = "Mailio Server"
 	docs.SwaggerInfo.Description = "Mailio Server implements the Mailio server based on https://mirs.mail.io/ specifications"
 	docs.SwaggerInfo.Version = "1.0"
-	docs.SwaggerInfo.Host = fmt.Sprintf("%s:%d", global.Conf.Host, global.Conf.Port)
+	docs.SwaggerInfo.Host = global.Conf.Mailio.ServerDomain
 	docs.SwaggerInfo.BasePath = "/"
 	docs.SwaggerInfo.Schemes = []string{global.Conf.Scheme}
 
@@ -205,6 +208,9 @@ func main() {
 	defer taskClient.Close()
 	env.TaskClient = taskClient
 
+	// configure WebAuthN
+	ConfigWebAuthN(&global.Conf, env)
+
 	// configure routes
 	router = apiroutes.ConfigRoutes(router, dbSelector.(*repository.CouchDBSelector), taskServer, env)
 
@@ -227,7 +233,7 @@ func main() {
 		taskServer.Shutdown()
 	}()
 
-	global.Logger.Log("Server is ready to handle requests at", global.Conf.Port)
+	global.Logger.Log("Server is ready to handle requests on port", global.Conf.Port)
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		panic(fmt.Sprintf("%v\n", err))
 	}

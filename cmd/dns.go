@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/ed25519"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -38,15 +39,24 @@ var dnsCmd = &cobra.Command{
 		if publicKey == "" {
 			content, err := os.ReadFile(keyFile)
 			check(err)
-			var keys map[string]string
+			var keys map[string]interface{}
 			err = json.Unmarshal(content, &keys)
 			check(err)
 			if keys["type"] != "mailio_server_keys_ed25519" {
 				fmt.Printf("Invalid key file: %s\n", keyFile)
 				os.Exit(1)
 			}
-			if val, ok := keys["publicKey"]; ok {
-				publicKey = val
+			//TODO: overly complicated, refactor and just take 32 bytes from the private key
+			if val, ok := keys["privateKey"]; ok {
+				pk := val.(string)
+				privateKeyBytes, pkErr := base64.StdEncoding.DecodeString(pk)
+				check(pkErr)
+				if len(privateKeyBytes) != 64 {
+					fmt.Printf("Invalid lenght of private key (must be 64 but is %d): %s\n", len(privateKeyBytes), keyFile)
+					os.Exit(1)
+				}
+				privateKey := ed25519.PrivateKey(privateKeyBytes)
+				publicKey = base64.StdEncoding.EncodeToString(privateKey.Public().(ed25519.PublicKey))
 			} else {
 				fmt.Printf("Invalid key file: %s\n", keyFile)
 				os.Exit(1)

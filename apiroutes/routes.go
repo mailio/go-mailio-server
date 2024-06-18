@@ -34,14 +34,15 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 	handshakeService := services.NewHandshakeService(dbSelector)
 	mtpService := services.NewMtpService(dbSelector)
 	userProfileService := services.NewUserProfileService(dbSelector, environment)
+	domainService := services.NewDomainService(dbSelector)
 
 	// API definitions
-	handshakeApi := api.NewHandshakeApi(handshakeService, nonceService, mtpService)
+	handshakeApi := api.NewHandshakeApi(handshakeService, nonceService, mtpService, userProfileService)
 	accountApi := api.NewUserAccountApi(userService, userProfileService, nonceService, ssiService)
 	didApi := api.NewDIDApi(ssiService)
 	vcApi := api.NewVCApi(ssiService)
 	messageApi := api.NewMessagingApi(ssiService, userService, userProfileService, environment)
-	domainApi := api.NewDomainApi()
+	domainApi := api.NewDomainApi(domainService)
 
 	// WEBHOOK API definitions
 	webhookApi := api.NewMailReceiveWebhook(handshakeService, userService, userProfileService, environment)
@@ -90,6 +91,9 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 		// user account
 		rootApi.GET("/v1/user/me", accountApi.GetUserAddress)
 		rootApi.DELETE("/v1/nonce/:id", accountApi.DeleteNonce)
+
+		// resolve domain
+		rootApi.GET("/v1/resolve/domain", domainApi.ResolveDomainForEmail)
 	}
 
 	// server-to-server communication (aka MTP - Mailio Transfer Protocol)

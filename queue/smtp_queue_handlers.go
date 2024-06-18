@@ -47,7 +47,7 @@ func (msq *MessageQueue) SendSMTPMessage(fromMailioAddress string, email *smtpty
 
 	// support multiple domains (based on the FROM domain use the handler for instance)
 	domain := strings.Split(email.From.Address, "@")[1]
-	if !util.IsSupportedDomain(domain) {
+	if !util.IsSupportedSmtpDomain(domain) {
 		global.Logger.Log("unsupported domain", domain)
 		return fmt.Errorf("unsupported domain: %w", asynq.SkipRetry)
 	}
@@ -316,7 +316,7 @@ func (msq *MessageQueue) ReceiveSMTPMessage(email *smtptypes.Mail, taskId string
 //   - code: The SMTP status code to include in the bounce email.
 //   - message: The message to include in the bounce email.
 func sendBounce(bounceFromEmail mail.Address, email *smtptypes.Mail, smtpHandler mailiosmtp.SmtpHandler, code, message string) error {
-	bounceMail, bErr := mailiosmtp.ToBounce(email.From, *email, code, message, global.Conf.Host)
+	bounceMail, bErr := mailiosmtp.ToBounce(email.From, *email, code, message, global.Conf.Mailio.ServerDomain)
 	if bErr != nil {
 		global.Logger.Log("error", bErr.Error())
 		return bErr
@@ -373,10 +373,13 @@ func (msq *MessageQueue) getFolderByStats(mailioAddress, from string) string {
 	if receivedAll == 0 {
 		return types.MailioFolderInbox
 	}
+
+	readVsReceived := global.Conf.Mailio.ReadVsReceived
+
 	// ratio of read messages vs all received messages
-	ratio := float32(receivedRead) / float32(receivedAll)
+	ratio := float64(receivedRead) / float64(receivedAll)
 	// if more than X% of the messages are read, then store in goodreads
-	ratioThreshold := float32(global.Conf.Mailio.ReadVsReceived) / 100.0
+	ratioThreshold := float64(readVsReceived) / 100.0
 	if ratio >= ratioThreshold {
 		return types.MailioFolderGoodReads
 	}

@@ -160,7 +160,7 @@ func (m *MailReceiveWebhook) ReceiveMail(c *gin.Context) {
 
 // sendBounce sends a bounce email to the sender of the email
 func sendBounce(email *smtptypes.Mail, c *gin.Context, smtpHandler smtpmodule.SmtpHandler, code, message string) {
-	bounceMail, bErr := smtpmodule.ToBounce(email.From, *email, code, message, global.Conf.Host)
+	bounceMail, bErr := smtpmodule.ToBounce(email.From, *email, code, message, global.Conf.Mailio.ServerDomain)
 	if bErr != nil {
 		global.Logger.Log("error", bErr.Error())
 		ApiErrorf(c, 500, fmt.Sprintf("error creating bounce email: %s", bErr.Error()))

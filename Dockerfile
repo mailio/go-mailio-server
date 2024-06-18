@@ -1,5 +1,13 @@
 # Use the official Golang image to build the Go app
 FROM golang:1.22 as builder
+# Set up environment variables
+ENV GO111MODULE=on
+ENV GOPRIVATE=github.com/mailio
+ARG GITHUB_TOKEN
+
+# Create .netrc file with GitHub token for private repo access
+RUN mkdir -p /root && echo "machine github.com login $GITHUB_TOKEN password $GITHUB_TOKEN" > /root/.netrc
+
 WORKDIR /app
 COPY . .
 RUN go mod tidy

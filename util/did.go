@@ -8,6 +8,7 @@ import (
 // TODO! rename the CreateMailioDIDDocument (although it's functionality is ok, but the name is a bit misleading)
 // CreateMailioDIDDocument creates a new mailio DID document (server DID)
 func CreateMailioDIDDocument() (*mailiodid.Document, error) {
+
 	mkMailio := &mailiodid.MailioKey{
 		MasterSignKey: &mailiodid.Key{
 			Type:      mailiodid.KeyTypeEd25519,
@@ -15,8 +16,8 @@ func CreateMailioDIDDocument() (*mailiodid.Document, error) {
 		},
 	}
 
-	messagingPath := global.Conf.Mailio.Domain + global.Conf.Mailio.MessagingPath
-	authPath := global.Conf.Mailio.Domain + global.Conf.Mailio.AuthenticationPath
+	messagingPath := global.Conf.Mailio.ServerDomain + global.Conf.Mailio.MessagingPath
+	authPath := global.Conf.Mailio.ServerDomain + global.Conf.Mailio.AuthenticationPath
 	didDoc, err := mailiodid.NewMailioDIDDocument(mkMailio, global.PublicKey, authPath, messagingPath)
 	return didDoc, err
 }

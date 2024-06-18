@@ -79,8 +79,8 @@ func (ma *MessagingApi) SendDIDMessage(c *gin.Context) {
 		return
 	}
 
-	// force the from field to be the subject address
-	from := fmt.Sprintf("did:web:%s#%s", global.Conf.Mailio.Domain, subjectAddress.(string))
+	// Ensure the 'from' field is set to the subject address and it's coming from this server
+	from := fmt.Sprintf("did:web:%s#%s", global.Conf.Mailio.ServerDomain, subjectAddress.(string))
 	if input.From != from {
 		ApiErrorf(c, http.StatusUnauthorized, "unathorized")
 		return

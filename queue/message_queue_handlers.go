@@ -70,10 +70,13 @@ func (msq *MessageQueue) selectMailFolder(fromDID did.DID, recipientAddress stri
 		return types.MailioFolderOther, nil
 	}
 
+	// find domain specific setttings
+	readVsReceivedPercent := global.Conf.Mailio.ReadVsReceived
+
 	// read := collectFoldersExceptSent(totalMessagesRead)
 	read := util.SumUpItemsFromFolderCountResponse([]string{types.MailioFolderInbox, types.MailioFolderArchive, types.MailioFolderGoodReads, types.MailioFolderOther, types.MailioFolderTrash}, totalMessagesRead)
 	readPercent := math.Ceil(float64(float32(read) / float32(total) * 100))
-	if readPercent >= float64(global.Conf.Mailio.ReadVsReceived) {
+	if readPercent >= float64(readVsReceivedPercent) {
 		return types.MailioFolderInbox, nil
 	}
 	return types.MailioFolderOther, nil
@@ -129,18 +132,17 @@ func (msq *MessageQueue) handleReceivedDIDCommMessage(message *types.DIDCommMess
 			continue
 		}
 
-		if parsedDid.Value() == global.Conf.Mailio.Domain {
+		// collects only recipients that might be on this server based on the DIDs
+		// since message may contain messages to recipients on multiple different servers
+		if parsedDid.Value() == global.Conf.Mailio.ServerDomain {
 			if _, ok := addedMap[parsedDid.Fragment()]; !ok { // if not yet added
-				// avoiding duplicates
-				// if msq.hasAlreadyReceivedMessage(uniqueID, parsedDid) {
-				// 	continue
-				// }
 				localRecipientsAddresses = append(localRecipientsAddresses, parsedDid.Fragment())
 				addedMap[parsedDid.Fragment()] = parsedDid.Fragment()
 			}
 		}
 	}
 
+	// collect delivery status codes (possible than more than 1)
 	deliveryStatuses := []*types.MTPStatusCode{}
 	if len(localRecipientsAddresses) == 0 {
 		// Handles the case when there are no local recipients.
@@ -204,7 +206,7 @@ func (msq *MessageQueue) handleReceivedDIDCommMessage(message *types.DIDCommMess
 		ID:              message.ID,
 		Intent:          types.DIDCommIntentDelivery,
 		Type:            "application/didcomm-signed+json",
-		From:            "did:web:" + global.Conf.Host + ":" + thisServerDIDDoc.ID.Value(), // this server DID
+		From:            "did:web:" + global.Conf.Mailio.ServerDomain + ":" + thisServerDIDDoc.ID.Value(), // this server DID
 		To:              []string{message.From},
 		PlainBodyBase64: base64.StdEncoding.EncodeToString(deliveryMsgStr),
 	}

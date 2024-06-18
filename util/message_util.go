@@ -49,7 +49,7 @@ func SmtpMailToUniqueID(email *smtptypes.Mail, optionalSuffix string) (string, e
 	return hex, nil
 }
 
-func ListDomains() []string {
+func ListSmtpDomains() []string {
 	domains := []string{}
 	for _, srv := range global.Conf.SmtpServers {
 		for _, domain := range srv.Domains {
@@ -59,9 +59,27 @@ func ListDomains() []string {
 	return domains
 }
 
+func ListMailioDomains() []string {
+	domains := []string{}
+	for _, domainConf := range global.Conf.Mailio.DomainConfig {
+		domains = append(domains, domainConf.Domain)
+	}
+	return domains
+}
+
+func IsSupportedMailioDomain(domain string) bool {
+	for _, d := range ListMailioDomains() {
+		if d == domain {
+			return true
+		}
+	}
+	return false
+
+}
+
 // IsSupportedDomain checks if the domain is in the list of smtp server domains or mailio domains
-func IsSupportedDomain(domain string) bool {
-	for _, d := range ListDomains() {
+func IsSupportedSmtpDomain(domain string) bool {
+	for _, d := range ListSmtpDomains() {
 		if d == domain {
 			return true
 		}

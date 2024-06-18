@@ -76,6 +76,7 @@ func (hs *HandshakeMTPApi) GetLocalHandshakes(c *gin.Context) {
 		ApiErrorf(c, http.StatusBadRequest, "failed to cbor encode response")
 		return
 	}
+
 	signature, sErr := util.Sign(cbBytes, global.PrivateKey)
 	if sErr != nil {
 		ApiErrorf(c, http.StatusBadRequest, "failed to sign response")

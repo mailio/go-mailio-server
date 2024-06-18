@@ -322,6 +322,15 @@ const docTemplate = `{
                 ],
                 "summary": "List all domains",
                 "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/types.UserDomain"
+                            }
+                        }
+                    },
                     "429": {
                         "description": "rate limit exceeded",
                         "schema": {
@@ -1019,6 +1028,68 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/resolve/domain": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Identify if an email is a DIDcomm/Mailio or SMTP address, and resolve the DID if it’s from a Mailio server.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Messaging"
+                ],
+                "summary": "Resolve domain from email address (smtp or mailio)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "valid email address",
+                        "name": "email",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "force DNS update",
+                        "name": "force",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Domain"
+                        }
+                    },
+                    "400": {
+                        "description": "bad request",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "401": {
+                        "description": "invalid signature or unauthorized to send messages",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "429": {
+                        "description": "rate limit exceeded",
                         "schema": {
                             "$ref": "#/definitions/api.ApiError"
                         }
@@ -1833,6 +1904,46 @@ const docTemplate = `{
                 }
             }
         },
+        "types.Domain": {
+            "type": "object",
+            "properties": {
+                "_deleted": {
+                    "type": "boolean"
+                },
+                "_id": {
+                    "type": "string"
+                },
+                "_rev": {
+                    "description": "Rev is the revision number returned\n_Rev    string ` + "`" + `json:\"_rev,omitempty\"` + "`" + `",
+                    "type": "string"
+                },
+                "mailioDIDDomain": {
+                    "description": "mailio domain (if supportsMailio)",
+                    "type": "string"
+                },
+                "mailioPublicKey": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "ok": {
+                    "description": "_ID     string ` + "`" + `json:\"_id,omitempty\"` + "`" + `",
+                    "type": "boolean"
+                },
+                "supportsMailio": {
+                    "description": "domain can be both (mailio and smtp)",
+                    "type": "boolean"
+                },
+                "supportsStandardEmail": {
+                    "description": "domain can be both (mailio and smtp)",
+                    "type": "boolean"
+                },
+                "timestamp": {
+                    "type": "integer"
+                }
+            }
+        },
         "types.EncryptedAttachment": {
             "type": "object",
             "required": [
@@ -2439,6 +2550,17 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "signature": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.UserDomain": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "type": {
                     "type": "string"
                 }
             }

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -71,7 +72,7 @@ func (da *DIDApi) CreateServerDIDConfiguration(c *gin.Context) {
 	vc.Type = []string{"VerifiableCredential", "DomainLinkageCredential"}
 	vc.CredentialSubject = did.CredentialSubject{
 		ID:     global.MailioDID.String(),
-		Origin: "https://mail.io",
+		Origin: fmt.Sprintf("https://%s", global.Conf.Mailio.ServerDomain),
 	}
 
 	// JWT version of the above proof as an alternative format

@@ -39,6 +39,8 @@ var (
 	ErrInvalidPrivateKey = errors.New("invalid private key")
 	// ErrContinue defines something went wrong but code exection should continue
 	ErrContinue = errors.New("continue")
+	// ErrDomainNotFound - domain not found
+	ErrDomainNotFound = errors.New("domain not found")
 
 	// HANDSHAKE ERRORS
 	// If handshake has been revoked

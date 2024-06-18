@@ -2,12 +2,14 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/go-webauthn/webauthn/webauthn"
 	diskusagehandler "github.com/mailio/go-mailio-diskusage-handler"
 	mailgunhandler "github.com/mailio/go-mailio-mailgun-smtp-handler"
 	"github.com/mailio/go-mailio-server/diskusage"
@@ -58,10 +60,13 @@ func ConfigDBSelector() repository.DBSelector {
 	domainRepo, dErr := repository.NewCouchDBRepository(repoUrl, repository.Domain, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
 	messageDeliveryRepo, mdErr := repository.NewCouchDBRepository(repoUrl, repository.MessageDelivery, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
 	userProfileRepo, upErr := repository.NewCouchDBRepository(repoUrl, repository.UserProfile, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
-	attachmentSize, asErr := repository.NewCouchDBRepository(repoUrl, repository.AttachmentSize, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
 
-	repoErr := errors.Join(handshakeRepoErr, nonceRepoErr, userRepoErr, mappingRepoErr, didRErr, vscrErr, dErr, mdErr, upErr, asErr)
+	// ensure _users exist
+	users_Err := repository.CreateUsers_IfNotExists(userRepo, repoUrl)
+
+	repoErr := errors.Join(handshakeRepoErr, nonceRepoErr, userRepoErr, mappingRepoErr, didRErr, vscrErr, dErr, mdErr, upErr, users_Err)
 	if repoErr != nil {
+		global.Logger.Log("error", "Failed to create repositories", "error", repoErr.Error())
 		panic(repoErr)
 	}
 
@@ -76,7 +81,6 @@ func ConfigDBSelector() repository.DBSelector {
 	dbSelector.AddDB(domainRepo)
 	dbSelector.AddDB(messageDeliveryRepo)
 	dbSelector.AddDB(userProfileRepo)
-	dbSelector.AddDB(attachmentSize)
 
 	return dbSelector
 }
@@ -94,7 +98,6 @@ func ConfigDBIndexing(dbSelector *repository.CouchDBSelector, environment *types
 
 	icVcsErr := repository.CreateVcsCredentialSubjectIDIndex(vcsRepo)
 	hiErr := repository.CreateHandshakeIndex(handshakeRepo)
-	// aErr := repository.CreateHandshakeAddressIndex(handshakeRepo)
 	iErr := errors.Join(icVcsErr, hiErr)
 	if iErr != nil {
 		panic(iErr)
@@ -120,4 +123,20 @@ func ConfigS3Storage(conf *global.Config, env *types.Environment) {
 	downloader := s3manager.NewDownloader(session)
 	env.AddS3Uploader(uploader)
 	env.AddS3Downloader(downloader)
+}
+
+func ConfigWebAuthN(conf *global.Config, env *types.Environment) {
+	// configure WebAuthN
+	wconfig := &webauthn.Config{
+		RPDisplayName: conf.Mailio.ServerDomain,
+		RPID:          conf.Mailio.ServerDomain,
+		RPOrigins:     []string{conf.Mailio.ServerDomain, "localhost:8080"},
+	}
+	webAuthn, err := webauthn.New(wconfig)
+	if err != nil {
+		fmt.Printf("failed to create webauthn: %v", err)
+		panic(err)
+	}
+
+	env.WebAuthN = webAuthn
 }

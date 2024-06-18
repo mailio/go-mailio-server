@@ -14,8 +14,10 @@ var Conf Config
 // Public and Private key of a server (loaded from serverKeysPath in conf.yaml)
 var PublicKey ed25519.PublicKey
 var PrivateKey ed25519.PrivateKey
-var MailioKeysCreated int64
+
+// var MailioDID *mailiodid.DID
 var MailioDID *mailiodid.DID
+var MailioKeysCreated int64
 
 // Global rate limiter
 var RateLimiter *redis_rate.Limiter
@@ -41,15 +43,25 @@ type CouchDBConfig struct {
 }
 
 type MailioConfig struct {
-	Domain             string                `yaml:"domain"`
-	ServerKeysPath     string                `yaml:"serverKeysPath"`
-	EmailSaltHex       string                `yaml:"emailSaltHex"`
-	DiskSpace          int64                 `yaml:"diskSpace"`
-	RecaptchaV3SiteKey string                `yaml:"recaptchaV3SiteKey"`
-	ServerHanshake     ServerHandshakeConfig `yaml:"serverHandshake"`
-	AuthenticationPath string                `yaml:"authenticationPath"`
-	MessagingPath      string                `yaml:"messagingPath"`
-	ReadVsReceived     int                   `yaml:"readVsReceived"`
+	DiskSpace                int64                         `yaml:"diskSpace"`
+	AuthenticationPath       string                        `yaml:"authenticationPath"`
+	MessagingPath            string                        `yaml:"messagingPath"`
+	ServerDomain             string                        `yaml:"serverDomain"`
+	ServerSubdomainQueryList []*MailioServerSubdomainQuery `yaml:"serverSubdomainQueryList"`
+	EmailSaltHex             string                        `yaml:"emailSaltHex"`
+	ServerKeysPath           string                        `yaml:"serverKeysPath"`
+	RecaptchaV3SiteKey       string                        `yaml:"recaptchaV3SiteKey"`
+	ServerHanshake           ServerHandshakeConfig         `yaml:"serverHandshake"`
+	ReadVsReceived           int                           `yaml:"readVsReceived"`
+	DomainConfig             []MailioDomainConfig          `yaml:"domains"`
+}
+
+type MailioDomainConfig struct {
+	Domain string `yaml:"domain"`
+}
+
+type MailioServerSubdomainQuery struct {
+	Prefix string `yaml:"prefix"`
 }
 
 type PrometheusConfig struct {
@@ -59,14 +71,11 @@ type PrometheusConfig struct {
 }
 
 type ServerHandshakeConfig struct {
-	ID                  string                         `yaml:"id"`
-	OriginServer        string                         `yaml:"originServer"`
-	Type                int                            `yaml:"type"`
-	MinimumLevel        int                            `yaml:"minimumLevel"`
-	SignatureScheme     string                         `yaml:"signatureScheme"`
-	SenderMailioAddress string                         `yaml:"senderMailioAddress"`
-	SenderEmailAddress  string                         `yaml:"senderEmailAddress"`
-	Subtypes            []ServerHandshakeSubtypeConfig `yaml:"subtypes"`
+	ID           string                         `yaml:"id"`
+	OriginServer string                         `yaml:"originServer"`
+	Type         int                            `yaml:"type"`
+	MinimumLevel int                            `yaml:"minimumLevel"`
+	Subtypes     []ServerHandshakeSubtypeConfig `yaml:"subtypes"`
 }
 
 type ServerHandshakeSubtypeConfig struct {

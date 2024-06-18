@@ -36,27 +36,6 @@ func (msq *MessageQueue) extractDIDMessageEndpoint(didDoc *did.Document) string 
 	return endpoint
 }
 
-// validates senders DID Docxument (if it matches the From field)
-// func (msq *MessageQueue) validateSenderDID(message *types.DIDCommMessage, userAddress string) (*did.DID, error) {
-// 	senderDid, sdidErr := msq.ssiService.GetDIDDocument(userAddress)
-// 	if sdidErr != nil {
-// 		global.Logger.Log(sdidErr.Error(), "failed to retrieve did document", userAddress)
-// 		return nil, fmt.Errorf("failed to retrieve DID document: %v: %w", sdidErr, asynq.SkipRetry)
-// 	}
-
-// 	fromDID, didErr := did.ParseDID(message.From)
-// 	if didErr != nil {
-// 		global.Logger.Log(didErr.Error(), "sender verification failed")
-// 		return nil, fmt.Errorf("failed to retrieve DID document: %v: %w", didErr, asynq.SkipRetry)
-// 	}
-
-// 	// addresses from and logged in users must match
-// 	if fromDID.Fragment() != senderDid.ID.Value() {
-// 		return nil, fmt.Errorf("from field invalid: %v: %w", sdidErr, asynq.SkipRetry)
-// 	}
-// 	return &fromDID, nil
-// }
-
 // validateRecipientDid validates the recipient DIDs and collect valid DIDs in a recipientDidMap
 // invalid recipients are added to MailioMessage as MTPStatusCodes
 func (msq *MessageQueue) validateRecipientDIDs(message *types.DIDCommMessage) (map[string]did.Document, []*types.MTPStatusCode) {
@@ -75,10 +54,7 @@ func (msq *MessageQueue) validateRecipientDIDs(message *types.DIDCommMessage) (m
 
 		var result did.Document
 		// check if local server (don't query it over network due to "rate limits")
-		host := global.Conf.Host
-		if global.Conf.Port != 0 {
-			host += ":" + fmt.Sprintf("%d", global.Conf.Port)
-		}
+		host := global.Conf.Mailio.ServerDomain
 		if rec.Value() == host {
 			r, rErr := msq.ssiService.GetDIDDocument(rec.Fragment())
 			if rErr != nil {
@@ -143,6 +119,7 @@ func (msq *MessageQueue) httpSend(message *types.DIDCommMessage,
 		level.Error(global.Logger).Log("msg", "failed to cbor encode request", "err", cErr)
 		return nil, fmt.Errorf("failed to cbor encode request: %v, %w", cErr, asynq.SkipRetry)
 	}
+
 	signature, sErr := util.Sign(cborPayload, global.PrivateKey)
 	if sErr != nil {
 		level.Error(global.Logger).Log("msg", "failed to sign request", "err", sErr)
@@ -153,7 +130,7 @@ func (msq *MessageQueue) httpSend(message *types.DIDCommMessage,
 		DIDCommRequest:    request,
 		CborPayloadBase64: base64.StdEncoding.EncodeToString(cborPayload),
 		SignatureBase64:   base64.StdEncoding.EncodeToString(signature),
-		SenderDomain:      global.Conf.Host,
+		SenderDomain:      global.Conf.Mailio.ServerDomain,
 	}
 
 	var responseResult types.DIDCommSignedRequest

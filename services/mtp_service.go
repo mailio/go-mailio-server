@@ -85,7 +85,7 @@ func (mtp *MtpService) requestHandshakeFromRemoteServer(senderAddress string, ha
 	}
 	// create handshake request objects signed by this server and request handshake from the domain
 	request := &types.HandshakeSignedRequest{
-		SenderDomain: global.Conf.Host,
+		SenderDomain: global.Conf.Mailio.ServerDomain,
 		HandshakeRequest: types.HandshakeRequest{
 			SenderAddress:                senderAddress,
 			ReturnDefaultServerHandshake: true,
@@ -102,6 +102,7 @@ func (mtp *MtpService) requestHandshakeFromRemoteServer(senderAddress string, ha
 		level.Error(global.Logger).Log("msg", "failed to cbor encode request", "err", cErr)
 		return nil, cErr
 	}
+
 	signature, sErr := util.Sign(cborPayload, global.PrivateKey)
 	if sErr != nil {
 		level.Error(global.Logger).Log("msg", "failed to sign request", "err", sErr)

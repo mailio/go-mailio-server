@@ -438,6 +438,36 @@ definitions:
     - senderDomain
     - signatureBase64
     type: object
+  types.Domain:
+    properties:
+      _deleted:
+        type: boolean
+      _id:
+        type: string
+      _rev:
+        description: |-
+          Rev is the revision number returned
+          _Rev    string `json:"_rev,omitempty"`
+        type: string
+      mailioDIDDomain:
+        description: mailio domain (if supportsMailio)
+        type: string
+      mailioPublicKey:
+        type: string
+      name:
+        type: string
+      ok:
+        description: _ID     string `json:"_id,omitempty"`
+        type: boolean
+      supportsMailio:
+        description: domain can be both (mailio and smtp)
+        type: boolean
+      supportsStandardEmail:
+        description: domain can be both (mailio and smtp)
+        type: boolean
+      timestamp:
+        type: integer
+    type: object
   types.EncryptedAttachment:
     properties:
       data:
@@ -860,6 +890,13 @@ definitions:
       signature:
         type: string
     type: object
+  types.UserDomain:
+    properties:
+      name:
+        type: string
+      type:
+        type: string
+    type: object
   types.VCValidationResponse:
     properties:
       requestId:
@@ -1102,6 +1139,12 @@ paths:
       produces:
       - application/json
       responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/types.UserDomain'
+            type: array
         "429":
           description: rate limit exceeded
           schema:
@@ -1559,6 +1602,47 @@ paths:
       summary: Register user
       tags:
       - User Account
+  /api/v1/resolve/domain:
+    get:
+      consumes:
+      - application/json
+      description: Identify if an email is a DIDcomm/Mailio or SMTP address, and resolve
+        the DID if it’s from a Mailio server.
+      parameters:
+      - description: valid email address
+        in: query
+        name: email
+        required: true
+        type: string
+      - default: false
+        description: force DNS update
+        in: query
+        name: force
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.Domain'
+        "400":
+          description: bad request
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "401":
+          description: invalid signature or unauthorized to send messages
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "429":
+          description: rate limit exceeded
+          schema:
+            $ref: '#/definitions/api.ApiError'
+      security:
+      - Bearer: []
+      summary: Resolve domain from email address (smtp or mailio)
+      tags:
+      - Messaging
   /api/v1/smtp:
     post:
       consumes:

@@ -76,11 +76,13 @@ func (vc *VC) VerifyVC(c *gin.Context) {
 		ApiErrorf(c, http.StatusBadRequest, "requestId is required")
 		return
 	}
+
 	var didVC did.VerifiableCredential
 	if err := c.ShouldBindJSON(&didVC); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
 	isValid, err := didVC.VerifyProof(global.PublicKey)
 	if err != nil {
 		ApiErrorf(c, http.StatusBadRequest, "failed to validate proof")

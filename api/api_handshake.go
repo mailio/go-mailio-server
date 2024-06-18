@@ -6,25 +6,26 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
-	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/services"
 	"github.com/mailio/go-mailio-server/types"
 	"github.com/mailio/go-mailio-server/util"
 )
 
 type HandshakeApi struct {
-	handshakeService *services.HandshakeService
-	nonceService     *services.NonceService
-	mtpService       *services.MtpService
-	validate         *validator.Validate
+	handshakeService   *services.HandshakeService
+	nonceService       *services.NonceService
+	mtpService         *services.MtpService
+	userProfileService *services.UserProfileService
+	validate           *validator.Validate
 }
 
-func NewHandshakeApi(handshakeService *services.HandshakeService, nonceService *services.NonceService, mtpService *services.MtpService) *HandshakeApi {
+func NewHandshakeApi(handshakeService *services.HandshakeService, nonceService *services.NonceService, mtpService *services.MtpService, userProfileService *services.UserProfileService) *HandshakeApi {
 	return &HandshakeApi{
-		handshakeService: handshakeService,
-		nonceService:     nonceService,
-		mtpService:       mtpService,
-		validate:         validator.New(),
+		handshakeService:   handshakeService,
+		nonceService:       nonceService,
+		mtpService:         mtpService,
+		userProfileService: userProfileService,
+		validate:           validator.New(),
 	}
 }
 
@@ -232,7 +233,13 @@ func (ha *HandshakeApi) PersonalHandshakeLink(c *gin.Context) {
 		return
 	}
 	// create a personal handshake link
-	domain := global.Conf.Mailio.Domain
+	profile, pErr := ha.userProfileService.Get(address.(string))
+	if pErr != nil {
+		ApiErrorf(c, http.StatusNotFound, "user profile not found")
+		return
+	}
+
+	// domain := global.Conf.Mailio.Domain
 	// nonces are typically deleted within 5 minutes. That should be enough time to use the link
 	nonce, nErr := ha.nonceService.CreateCustomNonce(16)
 	if nErr != nil {
@@ -243,7 +250,7 @@ func (ha *HandshakeApi) PersonalHandshakeLink(c *gin.Context) {
 	// create a link with the nonce
 	// format: nonce:web:domain:address
 	link := types.HandshakeLink{
-		Link: nonce.Nonce + ":web:" + domain + ":" + address.(string),
+		Link: nonce.Nonce + ":web:" + profile.Domain + ":" + address.(string),
 	}
 	c.JSON(http.StatusOK, link)
 }
