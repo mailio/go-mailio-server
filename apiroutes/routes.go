@@ -1,6 +1,9 @@
 package apiroutes
 
 import (
+	"time"
+
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/hibiken/asynq"
 	"github.com/mailio/go-mailio-server/api"
@@ -27,6 +30,16 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 		authorized.GET("", gin.WrapH(promhttp.Handler()))
 	}
 
+	corsConfig := cors.Config{
+		AllowOrigins:     []string{"*"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}
+	router.Use(cors.New(corsConfig))
+
 	// SERVICE definitions
 	userService := services.NewUserService(dbSelector, environment)
 	nonceService := services.NewNonceService(dbSelector)
@@ -35,6 +48,8 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 	mtpService := services.NewMtpService(dbSelector)
 	userProfileService := services.NewUserProfileService(dbSelector, environment)
 	domainService := services.NewDomainService(dbSelector)
+	webAuthnService := services.NewWebAuthnService(dbSelector, environment)
+	rotationKeyService := services.NewRotationKeyService(dbSelector)
 
 	// API definitions
 	handshakeApi := api.NewHandshakeApi(handshakeService, nonceService, mtpService, userProfileService)
@@ -43,6 +58,7 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 	vcApi := api.NewVCApi(ssiService)
 	messageApi := api.NewMessagingApi(ssiService, userService, userProfileService, environment)
 	domainApi := api.NewDomainApi(domainService)
+	webauthnApi := api.NewWebAuthnApi(nonceService, webAuthnService, userService, rotationKeyService, environment)
 
 	// WEBHOOK API definitions
 	webhookApi := api.NewMailReceiveWebhook(handshakeService, userService, userProfileService, environment)
@@ -62,11 +78,16 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 	// PUBLIC API
 	publicApi := router.Group("/api", restinterceptors.RateLimitMiddleware(), metrics.MetricsMiddleware())
 	{
+		// regular login
 		publicApi.POST("/v1/register", accountApi.Register)
 		publicApi.POST("/v1/login", accountApi.Login)
 		publicApi.GET("/v1/nonce", accountApi.ChallengeNonce)
 		publicApi.GET("/v1/findaddress", accountApi.FindUsersAddressByEmail)
 		publicApi.GET("/v1/domains", domainApi.List)
+
+		// webauthn login
+		publicApi.GET("/v1/webauthn/registration_options", webauthnApi.RegistrationOptions)
+		publicApi.POST("/v1/webauthn/registration_verify", webauthnApi.VerifyRegistration)
 	}
 
 	rootApi := router.Group("/api", metrics.MetricsMiddleware(), restinterceptors.RateLimitMiddleware(), restinterceptors.JWSMiddleware(userProfileService))

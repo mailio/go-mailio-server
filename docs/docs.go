@@ -1188,6 +1188,50 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/webauthn/registration_options": {
+            "get": {
+                "description": "Registration options for a new WebAuthn device",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "WebAuthn"
+                ],
+                "summary": "Registration options for a new WebAuthn device",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Email address to register",
+                        "name": "email",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.WebauthnRegistrationOptionsJSON"
+                        }
+                    },
+                    "400": {
+                        "description": "invalid email address",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "429": {
+                        "description": "rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    }
+                }
+            }
+        },
         "/webhook/mailgun_mime": {
             "post": {
                 "description": "Receive a new SMTP email",
@@ -2573,6 +2617,69 @@ const docTemplate = `{
                 },
                 "valid": {
                     "type": "boolean"
+                }
+            }
+        },
+        "types.WebAuthnRegistrationCredential": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "transports": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.WebauthnAuthenticatorSelection": {
+            "type": "object",
+            "properties": {
+                "residentKey": {
+                    "type": "string"
+                },
+                "userVerification": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.WebauthnRegistrationOptionsJSON": {
+            "type": "object",
+            "properties": {
+                "attestationType": {
+                    "type": "string"
+                },
+                "authenticatorSelection": {
+                    "$ref": "#/definitions/types.WebauthnAuthenticatorSelection"
+                },
+                "excludeCredentials": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.WebAuthnRegistrationCredential"
+                    }
+                },
+                "rpID": {
+                    "type": "string"
+                },
+                "rpName": {
+                    "type": "string"
+                },
+                "supportedAlgorithmIDs": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "timeout": {
+                    "type": "integer"
+                },
+                "userName": {
+                    "type": "string"
                 }
             }
         }

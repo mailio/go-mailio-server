@@ -904,6 +904,47 @@ definitions:
       valid:
         type: boolean
     type: object
+  types.WebAuthnRegistrationCredential:
+    properties:
+      id:
+        type: string
+      transports:
+        items:
+          type: string
+        type: array
+      type:
+        type: string
+    type: object
+  types.WebauthnAuthenticatorSelection:
+    properties:
+      residentKey:
+        type: string
+      userVerification:
+        type: string
+    type: object
+  types.WebauthnRegistrationOptionsJSON:
+    properties:
+      attestationType:
+        type: string
+      authenticatorSelection:
+        $ref: '#/definitions/types.WebauthnAuthenticatorSelection'
+      excludeCredentials:
+        items:
+          $ref: '#/definitions/types.WebAuthnRegistrationCredential'
+        type: array
+      rpID:
+        type: string
+      rpName:
+        type: string
+      supportedAlgorithmIDs:
+        items:
+          type: integer
+        type: array
+      timeout:
+        type: integer
+      userName:
+        type: string
+    type: object
 info:
   contact: {}
   description: Implements the Mailio server based on https://mirs.mail.io/ specifications
@@ -1700,6 +1741,35 @@ paths:
       summary: Get logged inusers basic information
       tags:
       - User Account
+  /api/v1/webauthn/registration_options:
+    get:
+      consumes:
+      - application/json
+      description: Registration options for a new WebAuthn device
+      parameters:
+      - description: Email address to register
+        in: query
+        name: email
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.WebauthnRegistrationOptionsJSON'
+        "400":
+          description: invalid email address
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "429":
+          description: rate limit exceeded
+          schema:
+            $ref: '#/definitions/api.ApiError'
+      summary: Registration options for a new WebAuthn device
+      tags:
+      - WebAuthn
   /webhook/mailgun_mime:
     post:
       consumes:

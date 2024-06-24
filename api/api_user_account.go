@@ -3,10 +3,8 @@ package api
 import (
 	"crypto/ed25519"
 	"encoding/base64"
-	"errors"
 	"net/http"
 	"net/mail"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -37,37 +35,6 @@ func NewUserAccountApi(userService *services.UserService, userProfileService *se
 		userProfileService: userProfileService,
 		validate:           validator.New(),
 	}
-}
-
-// Validate signature from the input data
-func (us *UserAccountApi) validateSignature(loginInput *types.InputLogin) (bool, error) {
-	foundNonce, fnErr := us.nonceService.GetNonce(loginInput.Nonce)
-	if fnErr != nil {
-		return false, fnErr
-	}
-
-	millisecondsNow := time.Now().UTC().UnixMilli() - int64(5*60*1000) // 5 mintes ago
-	if foundNonce.Created < millisecondsNow {
-		return false, errors.New("nonce expired")
-	}
-
-	if !util.IsEd25519PublicKey(loginInput.Ed25519SigningPublicKeyBase64) {
-		return false, types.ErrInvalidPublicKey
-	}
-	signingKeyBytes, _ := base64.StdEncoding.DecodeString(loginInput.Ed25519SigningPublicKeyBase64)
-
-	signatureBytes, sErr := base64.StdEncoding.DecodeString(loginInput.SignatureBase64)
-	if sErr != nil {
-		return false, types.ErrSignatureInvalid
-	}
-
-	// verify signature
-	isValid := ed25519.Verify(signingKeyBytes, []byte(foundNonce.Nonce), signatureBytes)
-
-	// delete nonce from database (don't fail if nonce not found)
-	us.nonceService.DeleteNonce(foundNonce.Nonce)
-
-	return isValid, nil
 }
 
 // Login and Registration challenge nonce
@@ -164,7 +131,20 @@ func (ua *UserAccountApi) Login(c *gin.Context) {
 		},
 	}
 
-	isValid, validErr := ua.validateSignature(&inputLogin)
+	// check if nonce exists and is not expired
+	foundNonce, fnErr := ua.nonceService.GetNonce(inputLogin.Nonce)
+	if fnErr != nil {
+		ApiErrorf(c, http.StatusUnauthorized, "nonce not found")
+		return
+	}
+
+	millisecondsNow := time.Now().UTC().UnixMilli() - int64(5*60*1000) // 5 mintes ago
+	if foundNonce.Created < millisecondsNow {
+		ApiErrorf(c, http.StatusUnauthorized, "nonce expired")
+		return
+	}
+
+	validErr := validateMailioKeys(inputLogin.MailioAddress, inputLogin.Ed25519SigningPublicKeyBase64, foundNonce.Nonce, inputLogin.MailioAddress)
 	if validErr != nil {
 		if validErr == types.ErrSignatureInvalid {
 			ApiErrorf(c, http.StatusUnauthorized, "invalid signature")
@@ -179,10 +159,8 @@ func (ua *UserAccountApi) Login(c *gin.Context) {
 		ApiErrorf(c, http.StatusInternalServerError, "failed to validate signature")
 		return
 	}
-	if !isValid {
-		ApiErrorf(c, http.StatusBadRequest, "invalid signature")
-		return
-	}
+	// delete nonce from database (don't fail if nonce not found)
+	ua.nonceService.DeleteNonce(foundNonce.Nonce)
 
 	// retrieve appropriate mailio DID by domain
 	userProfile, upErr := ua.userProfileService.Get(inputLogin.MailioAddress)
@@ -254,71 +232,43 @@ func (ua *UserAccountApi) Register(c *gin.Context) {
 		return
 	}
 
-	// validation methods (email, signature, public key)
-	emailAddr, err := mail.ParseAddress(inputRegister.Email)
-	if err != nil {
-		ApiErrorf(c, http.StatusBadRequest, "invalid email address")
+	// check if nonce exists and is not expired
+	foundNonce, fnErr := ua.nonceService.GetNonce(inputRegister.Nonce)
+	if fnErr != nil {
+		ApiErrorf(c, http.StatusUnauthorized, "nonce not found")
 		return
 	}
-	if !util.IsEd25519PublicKey(inputRegister.X25519PublicKeyBase64) {
-		ApiErrorf(c, http.StatusBadRequest, "invalid encryption public key")
-		return
-	}
-	signingKeyBytes, skBytesErr := base64.StdEncoding.DecodeString(inputRegister.Ed25519SigningPublicKeyBase64)
-	if skBytesErr != nil {
-		ApiErrorf(c, http.StatusBadRequest, "invalid signing public key")
-		return
-	}
-	signingKey := ed25519.PublicKey(signingKeyBytes)
-	encryptionKeyBytes, ekBytesErr := base64.StdEncoding.DecodeString(inputRegister.X25519PublicKeyBase64)
-	if ekBytesErr != nil {
-		ApiErrorf(c, http.StatusBadRequest, "invalid encryption public key")
-		return
-	}
-	encryptionPublicKey := ed25519.PublicKey(encryptionKeyBytes)
 
-	// validate siganture
-	isValid, validErr := ua.validateSignature(&inputRegister.InputLogin)
+	millisecondsNow := time.Now().UTC().UnixMilli() - int64(5*60*1000) // 5 mintes ago
+	if foundNonce.Created < millisecondsNow {
+		ApiErrorf(c, http.StatusUnauthorized, "nonce expired")
+		return
+	}
+
+	validErr := validateMailioKeys(inputRegister.Email, inputRegister.Ed25519SigningPublicKeyBase64, foundNonce.Nonce, inputRegister.MailioAddress)
 	if validErr != nil {
 		if validErr == types.ErrSignatureInvalid {
-			ApiErrorf(c, http.StatusBadRequest, "invalid signature")
+			ApiErrorf(c, http.StatusUnauthorized, "invalid signature")
 			return
 		} else if validErr == types.ErrInvalidPublicKey {
-			ApiErrorf(c, http.StatusBadRequest, "invalid public key")
+			ApiErrorf(c, http.StatusUnauthorized, "invalid public key")
 			return
 		} else if validErr == types.ErrNotFound {
-			ApiErrorf(c, http.StatusBadRequest, "nonce not found")
+			ApiErrorf(c, http.StatusUnauthorized, "nonce not found")
+			return
+		} else if validErr == types.ErrInvalidMailioAddress {
+			ApiErrorf(c, http.StatusUnauthorized, "invalid mailio address")
 			return
 		}
 		ApiErrorf(c, http.StatusInternalServerError, "failed to validate signature")
 		return
 	}
-	if !isValid {
-		ApiErrorf(c, http.StatusBadRequest, "invalid signature")
-		return
-	}
-
-	pubKeyFRomBase, err := base64.StdEncoding.DecodeString(inputRegister.Ed25519SigningPublicKeyBase64)
-	mailioAddress, err := util.PublicKeyToMailioAddress(pubKeyFRomBase)
-	if err != nil {
-		ApiErrorf(c, http.StatusInternalServerError, "failed to generate mailio address")
-		return
-	}
-	// validate mailio address format
-	if inputRegister.MailioAddress != mailioAddress {
-		ApiErrorf(c, http.StatusBadRequest, "invalid mailio address")
-		return
-	}
-
-	// validate if the domain is supported
-	userDomain := strings.Split(emailAddr.Address, "@")[1]
-	if !util.IsSupportedMailioDomain(userDomain) {
-		ApiErrorf(c, http.StatusBadRequest, "mailio domain not supported")
-		return
-	}
+	// delete nonce from database (don't fail if nonce not found)
+	ua.nonceService.DeleteNonce(foundNonce.Nonce)
 
 	// if everything checks out, create users database, DID document and Verifiable Credential of owning the email address
 	// then store all to database
+	emailAddr, _ := mail.ParseAddress(inputRegister.Email)
 	scryptedEmail, sErr := util.ScryptEmail(emailAddr.Address)
 	if sErr != nil {
 		ApiErrorf(c, http.StatusInternalServerError, "Failed to scrypt email")
@@ -331,8 +281,17 @@ func (ua *UserAccountApi) Register(c *gin.Context) {
 		MailioAddress:  inputRegister.MailioAddress,
 		Created:        util.GetTimestamp(),
 	}
+	mk, mkErr := CreateDIDKey(inputRegister.Ed25519SigningPublicKeyBase64, inputRegister.X25519PublicKeyBase64)
+	if mkErr != nil {
+		if mkErr == types.ErrInvalidPublicKey {
+			ApiErrorf(c, http.StatusUnauthorized, "invalid public key")
+			return
+		}
+		ApiErrorf(c, http.StatusInternalServerError, "Failed to create DID key")
+		return
+	}
 	// create user database
-	_, errCU := ua.userService.CreateUser(user, inputRegister.DatabasePassword)
+	_, errCU := ua.userService.CreateUser(user, mk, inputRegister.DatabasePassword)
 	if errCU != nil {
 		if errCU == types.ErrUserExists {
 			ApiErrorf(c, http.StatusConflict, "user already exists")
@@ -342,47 +301,11 @@ func (ua *UserAccountApi) Register(c *gin.Context) {
 			ApiErrorf(c, http.StatusConflict, "user already exists")
 			return
 		}
-		ApiErrorf(c, http.StatusBadRequest, errCU.Error())
-		return
-	}
-
-	// map sacrypt (encrryped email) address to mailio address
-	_, errMu := ua.userService.MapEmailToMailioAddress(user)
-	if errMu != nil {
-		if errMu == types.ErrUserExists {
-			ApiErrorf(c, http.StatusBadRequest, "user already exists")
+		if errCU == types.ErrDomainNotFound {
+			ApiErrorf(c, http.StatusConflict, "domain not supported")
 			return
 		}
-		ApiErrorf(c, http.StatusInternalServerError, "failed to create user to address mapping")
-		return
-	}
-
-	_, upErr := ua.userProfileService.Save(user.MailioAddress, &types.UserProfile{
-		Enabled:   true,
-		DiskSpace: global.Conf.Mailio.DiskSpace,
-		Domain:    userDomain,
-		Created:   time.Now().UTC().UnixMilli(),
-		Modified:  time.Now().UTC().UnixMilli(),
-	})
-	if upErr != nil {
-		ApiErrorf(c, http.StatusInternalServerError, "failed to create user profile")
-		return
-	}
-
-	// create DID ID and DID document and store it in database!
-	mk := &did.MailioKey{
-		MasterSignKey: &did.Key{
-			Type:      did.KeyTypeEd25519,
-			PublicKey: signingKey,
-		},
-		MasterAgreementKey: &did.Key{
-			Type:      did.KeyTypeX25519KeyAgreement,
-			PublicKey: encryptionPublicKey,
-		},
-	}
-	ssiErr := ua.ssiService.StoreRegistrationSSI(mk)
-	if ssiErr != nil {
-		ApiErrorf(c, http.StatusInternalServerError, "failed to store self-sovereign identity")
+		ApiErrorf(c, http.StatusBadRequest, errCU.Error())
 		return
 	}
 

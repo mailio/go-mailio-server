@@ -45,4 +45,8 @@ var (
 	// HANDSHAKE ERRORS
 	// If handshake has been revoked
 	ErrHandshakeRevoked = errors.New("handshake revoked")
+
+	// Mailio Errors
+	// ErrInvalidMailioAddress - invalid mailio address`
+	ErrInvalidMailioAddress = errors.New("invalid mailio address")
 )

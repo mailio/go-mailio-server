@@ -15,6 +15,8 @@ const (
 	VCS             = "vcs"              // verifiable credentials
 	MessageDelivery = "message_delivery" // message delivery statuses
 	UserProfile     = "user_profile"     // user profile (for system use only)
+	WebAuthnUser    = "webauthn_user"    // webauthn user
+	RotationKeys    = "rotation_keys"    // keys register
 )
 
 type CouchDBSelector struct {

@@ -3,12 +3,15 @@ package main
 import (
 	"errors"
 	"fmt"
+	"net"
 	"strconv"
+	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
 	diskusagehandler "github.com/mailio/go-mailio-diskusage-handler"
 	mailgunhandler "github.com/mailio/go-mailio-mailgun-smtp-handler"
@@ -60,11 +63,13 @@ func ConfigDBSelector() repository.DBSelector {
 	domainRepo, dErr := repository.NewCouchDBRepository(repoUrl, repository.Domain, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
 	messageDeliveryRepo, mdErr := repository.NewCouchDBRepository(repoUrl, repository.MessageDelivery, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
 	userProfileRepo, upErr := repository.NewCouchDBRepository(repoUrl, repository.UserProfile, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
+	webauthnUser, wErr := repository.NewCouchDBRepository(repoUrl, repository.WebAuthnUser, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
+	rotationKeys, ekErr := repository.NewCouchDBRepository(repoUrl, repository.RotationKeys, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
 
 	// ensure _users exist
 	users_Err := repository.CreateUsers_IfNotExists(userRepo, repoUrl)
 
-	repoErr := errors.Join(handshakeRepoErr, nonceRepoErr, userRepoErr, mappingRepoErr, didRErr, vscrErr, dErr, mdErr, upErr, users_Err)
+	repoErr := errors.Join(handshakeRepoErr, nonceRepoErr, userRepoErr, mappingRepoErr, didRErr, vscrErr, dErr, mdErr, upErr, users_Err, wErr, ekErr)
 	if repoErr != nil {
 		global.Logger.Log("error", "Failed to create repositories", "error", repoErr.Error())
 		panic(repoErr)
@@ -81,6 +86,8 @@ func ConfigDBSelector() repository.DBSelector {
 	dbSelector.AddDB(domainRepo)
 	dbSelector.AddDB(messageDeliveryRepo)
 	dbSelector.AddDB(userProfileRepo)
+	dbSelector.AddDB(webauthnUser)
+	dbSelector.AddDB(rotationKeys)
 
 	return dbSelector
 }
@@ -127,10 +134,26 @@ func ConfigS3Storage(conf *global.Config, env *types.Environment) {
 
 func ConfigWebAuthN(conf *global.Config, env *types.Environment) {
 	// configure WebAuthN
+	host, _, err := net.SplitHostPort(global.Conf.Mailio.ServerDomain)
+	if err != nil {
+		if strings.Contains(err.Error(), "missing port in address") {
+			host = global.Conf.Mailio.ServerDomain
+		} else {
+			fmt.Printf("failed to parse server domain: %v", err)
+			panic(err)
+		}
+	}
+	requireResidentKey := true
 	wconfig := &webauthn.Config{
 		RPDisplayName: conf.Mailio.ServerDomain,
-		RPID:          conf.Mailio.ServerDomain,
-		RPOrigins:     []string{conf.Mailio.ServerDomain, "localhost:8080"},
+		RPID:          host,
+		RPOrigins:     []string{conf.Mailio.ServerDomain, "localhost"},
+		Debug:         true,
+		AuthenticatorSelection: protocol.AuthenticatorSelection{
+			UserVerification:        protocol.VerificationRequired,
+			RequireResidentKey:      &requireResidentKey,
+			AuthenticatorAttachment: protocol.Platform,
+		},
 	}
 	webAuthn, err := webauthn.New(wconfig)
 	if err != nil {
