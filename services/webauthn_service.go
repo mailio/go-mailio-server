@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/go-resty/resty/v2"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/repository"
 	"github.com/mailio/go-mailio-server/types"
@@ -67,9 +68,9 @@ func (s *WebAuthnService) SaveUser(user *types.WebAuhnUser) error {
 		}
 	}
 
-	if uErr != nil { // notFoundError
+	if uErr != nil && resp != nil { // notFoundError
 		var existing types.WebAuthnUserDB
-		mErr := repository.MapToObject(resp, &existing)
+		mErr := repository.MapToObject(resp.(*resty.Response), &existing)
 		if mErr != nil {
 			global.Logger.Log("msg", "failed to map object", "error", mErr)
 			return mErr

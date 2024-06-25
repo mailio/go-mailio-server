@@ -39,6 +39,7 @@ func NewWebAuthnApi(nonceService *services.NonceService, webAuthnService *servic
 		env:                env,
 		webauthnService:    webAuthnService,
 		rotationKeyService: rotationKeyService,
+		userService:        userService,
 	}
 }
 
@@ -68,6 +69,21 @@ func (a *WebAuthnApi) RegistrationOptions(c *gin.Context) {
 	pe, err := mail.ParseAddress(email)
 	if err != nil {
 		ApiErrorf(c, 400, "invalid email address: %s", err)
+		return
+	}
+
+	scryptedEmail, sErr := util.ScryptEmail(pe.Address)
+	if sErr != nil {
+		ApiErrorf(c, http.StatusInternalServerError, "Failed to scrypt email")
+		return
+	}
+	// check if email already exists
+	_, fuErr := a.userService.FindUserByScryptEmail(base64.URLEncoding.EncodeToString(scryptedEmail))
+	if fuErr == nil {
+		ApiErrorf(c, http.StatusConflict, "email already exists")
+		return
+	} else if fuErr != types.ErrNotFound {
+		ApiErrorf(c, http.StatusInternalServerError, "failed to search for email")
 		return
 	}
 
@@ -101,13 +117,13 @@ func (a *WebAuthnApi) RegistrationOptions(c *gin.Context) {
 		ApiErrorf(c, http.StatusInternalServerError, "failed to store session")
 		return
 	}
-	// store webauthn user too (why?)
-	uErr := a.webauthnService.SaveUser(user)
-	if uErr != nil {
-		global.Logger.Log("error", fmt.Sprintf("failed to save user: %s", uErr))
-		ApiErrorf(c, http.StatusInternalServerError, "failed to save user")
-		return
-	}
+	// // store webauthn user too (why?)
+	// uErr := a.webauthnService.SaveUser(user)
+	// if uErr != nil {
+	// 	global.Logger.Log("error", fmt.Sprintf("failed to save user: %s", uErr))
+	// 	ApiErrorf(c, http.StatusInternalServerError, "failed to save user")
+	// 	return
+	// }
 
 	c.JSON(http.StatusOK, options.Response)
 }
@@ -139,6 +155,7 @@ func (a *WebAuthnApi) VerifyRegistration(c *gin.Context) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+
 	redisSesskey := "webauthn_user_sess_" + strings.Replace(req.SmartKeyPayload.Address, "0x", "", -1)
 	sessBytes, err := a.env.RedisClient.Get(ctx, redisSesskey).Result()
 	if err != nil {
@@ -164,6 +181,21 @@ func (a *WebAuthnApi) VerifyRegistration(c *gin.Context) {
 		pe.Name = strings.Split(pe.Address, "@")[0]
 	}
 
+	scryptedEmail, sErr := util.ScryptEmail(req.SmartKeyPayload.Email)
+	if sErr != nil {
+		ApiErrorf(c, http.StatusInternalServerError, "Failed to scrypt email")
+		return
+	}
+	// check if email already exists
+	_, fuErr := a.userService.FindUserByScryptEmail(base64.URLEncoding.EncodeToString(scryptedEmail))
+	if fuErr == nil {
+		ApiErrorf(c, http.StatusConflict, "email already exists")
+		return
+	} else if fuErr != types.ErrNotFound {
+		ApiErrorf(c, http.StatusInternalServerError, "failed to search for email")
+		return
+	}
+
 	user := &types.WebAuhnUser{
 		ID:          []byte(req.SmartKeyPayload.Address),
 		Name:        pe.Address,
@@ -187,11 +219,9 @@ func (a *WebAuthnApi) VerifyRegistration(c *gin.Context) {
 	credential, cErr := a.env.WebAuthN.CreateCredential(user, session, pcc)
 	if cErr != nil {
 		global.Logger.Log("error", fmt.Sprintf("failed to create credential: %s", cErr))
-		ApiErrorf(c, http.StatusForbidden, "failed to finish registration")
+		ApiErrorf(c, http.StatusInternalServerError, "Failed to finish registration. Please contact support.")
 		return
 	}
-
-	fmt.Printf("credential: %+v\n", credential)
 	// store the credential within the user object
 	if user.Credentials == nil {
 		user.Credentials = make([]webauthn.Credential, 0)
@@ -207,9 +237,9 @@ func (a *WebAuthnApi) VerifyRegistration(c *gin.Context) {
 		user.Credentials = append(user.Credentials, *credential)
 	}
 
-	sErr := a.webauthnService.SaveUser(user)
-	if sErr != nil {
-		global.Logger.Log("error", fmt.Sprintf("failed to save user: %s", sErr))
+	suErr := a.webauthnService.SaveUser(user)
+	if suErr != nil {
+		global.Logger.Log("error", fmt.Sprintf("failed to save user: %s", suErr))
 		ApiErrorf(c, http.StatusInternalServerError, "failed to save user")
 		return
 	}
@@ -219,12 +249,7 @@ func (a *WebAuthnApi) VerifyRegistration(c *gin.Context) {
 		global.Logger.Log("error", fmt.Sprintf("failed to delete session: %s", delErr))
 	}
 
-	//TODO: move a lot of logic from API to service.
-	scryptedEmail, sErr := util.ScryptEmail(req.SmartKeyPayload.Email)
-	if sErr != nil {
-		ApiErrorf(c, http.StatusInternalServerError, "Failed to scrypt email")
-		return
-	}
+	// create the uses database, indexes, mapping, Verifiable Credentials (proof that is Mailio user) and public DID
 	nonWebauthnUser := &types.User{
 		MailioAddress:  req.SmartKeyPayload.Address,
 		Email:          req.SmartKeyPayload.Email,

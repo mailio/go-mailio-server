@@ -193,6 +193,7 @@ func (us *UserService) MapEmailToMailioAddress(user *types.User) (*types.EmailTo
 func (us *UserService) FindUserByScryptEmail(scryptEmail string) (*types.EmailToMailioMapping, error) {
 	repo, err := us.repoSelector.ChooseDB(repository.MailioMapping)
 	if err != nil {
+		global.Logger.Log(err, "failed to choose repository")
 		return nil, err
 	}
 	return getUserByScryptEmail(repo, scryptEmail)

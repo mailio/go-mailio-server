@@ -147,7 +147,7 @@ func ConfigWebAuthN(conf *global.Config, env *types.Environment) {
 	wconfig := &webauthn.Config{
 		RPDisplayName: conf.Mailio.ServerDomain,
 		RPID:          host,
-		RPOrigins:     []string{conf.Mailio.ServerDomain, "localhost"},
+		RPOrigins:     []string{"https://" + conf.Mailio.ServerDomain, "localhost", "http://localhost:4200"},
 		Debug:         true,
 		AuthenticatorSelection: protocol.AuthenticatorSelection{
 			UserVerification:        protocol.VerificationRequired,

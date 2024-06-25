@@ -26,11 +26,15 @@ func getUserByScryptEmail(repo repository.Repository, hashedEmail string) (*type
 	defer cancel()
 	response, eErr := repo.GetByID(ctx, hashedEmail)
 	if eErr != nil {
+		if eErr != types.ErrNotFound {
+			global.Logger.Log("msg", "error while getting user by email", "err", eErr)
+		}
 		return nil, eErr
 	}
 	var userMapping types.EmailToMailioMapping
 	mErr := repository.MapToObject(response, &userMapping)
 	if mErr != nil {
+		global.Logger.Log("msg", "error while mapping object", "err", mErr)
 		return nil, mErr
 	}
 	return &userMapping, nil
@@ -44,6 +48,7 @@ func resolveDomain(domainRepo repository.Repository, domain string, forceDiscove
 	// check local database
 	response, err := domainRepo.GetByID(ctx, domain)
 	if err != nil && err != types.ErrNotFound {
+		global.Logger.Log("msg", "error while getting domain", "err", err)
 		return nil, err
 	}
 
@@ -52,6 +57,7 @@ func resolveDomain(domainRepo repository.Repository, domain string, forceDiscove
 	resp := response.(*resty.Response)
 	if response != nil && resp.StatusCode() == 200 {
 		if err := repository.MapToObject(response, &domainObj); err != nil {
+			global.Logger.Log("msg", "error while mapping object", "err", err)
 			return nil, err
 		}
 	}
