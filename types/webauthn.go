@@ -10,7 +10,8 @@ type WebauthRegistrationVerify struct {
 }
 
 type SmartKeyPayload struct {
-	PreRotatedMailioKey     string `json:"preRotatedMailioKey" validate:"required"`     // encypted with Shamir secret sharing
+	SmartKeyEncrypted       string `json:"smartKeyEncrypted" validate:"required"`       // encrypted pre-Shamir secret sharing
+	PreRotatedMailioKey     string `json:"preRotatedMailioKey" validate:"required"`     // encypted pre-Shamir secret sharing
 	Address                 string `json:"address" validate:"required"`                 // mailio address
 	PasswordShare           string `json:"passwordShare" validate:"required"`           // a single share of a Shamir secret (2 out of 3 required for decryption)
 	DatabasePassword        string `json:"databasePassword" validate:"required"`        // CoachDB password
@@ -18,6 +19,7 @@ type SmartKeyPayload struct {
 	PrimaryEd25519PublicKey string `json:"primaryEd25519PublicKey" validate:"required"` // primary Ed25519 public key (associated with address)
 	PrimaryX25519PublicKey  string `json:"primaryX25519PublicKey" validate:"required"`  // primary X25519 public key (associated with address)
 	ChallengeSignature      string `json:"challengeSignature" validate:"required"`      // signature of the challenge with the primary private key (held by client only)
+	Challenge               string `json:"challenge" validate:"required"`               // challenge
 }
 
 // WebauthnAttestationResponseJSON is the JSON response from the Webauthn API

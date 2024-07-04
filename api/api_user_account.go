@@ -12,6 +12,7 @@ import (
 	"github.com/mailio/go-mailio-did/did"
 	diskusagehandlers "github.com/mailio/go-mailio-diskusage-handler"
 	"github.com/mailio/go-mailio-server/api/interceptors"
+	apiutil "github.com/mailio/go-mailio-server/api/util"
 	"github.com/mailio/go-mailio-server/diskusage"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/services"
@@ -144,7 +145,7 @@ func (ua *UserAccountApi) Login(c *gin.Context) {
 		return
 	}
 
-	validErr := validateMailioKeys(inputLogin.MailioAddress, inputLogin.Ed25519SigningPublicKeyBase64, foundNonce.Nonce, inputLogin.MailioAddress)
+	validErr := apiutil.ValidateMailioKeys(inputLogin.MailioAddress, inputLogin.Ed25519SigningPublicKeyBase64, foundNonce.Nonce, inputLogin.MailioAddress)
 	if validErr != nil {
 		if validErr == types.ErrSignatureInvalid {
 			ApiErrorf(c, http.StatusUnauthorized, "invalid signature")
@@ -245,7 +246,7 @@ func (ua *UserAccountApi) Register(c *gin.Context) {
 		return
 	}
 
-	validErr := validateMailioKeys(inputRegister.Email, inputRegister.Ed25519SigningPublicKeyBase64, foundNonce.Nonce, inputRegister.MailioAddress)
+	validErr := apiutil.ValidateMailioKeys(inputRegister.Email, inputRegister.Ed25519SigningPublicKeyBase64, foundNonce.Nonce, inputRegister.MailioAddress)
 	if validErr != nil {
 		if validErr == types.ErrSignatureInvalid {
 			ApiErrorf(c, http.StatusUnauthorized, "invalid signature")
@@ -281,7 +282,7 @@ func (ua *UserAccountApi) Register(c *gin.Context) {
 		MailioAddress:  inputRegister.MailioAddress,
 		Created:        util.GetTimestamp(),
 	}
-	mk, mkErr := CreateDIDKey(inputRegister.Ed25519SigningPublicKeyBase64, inputRegister.X25519PublicKeyBase64)
+	mk, mkErr := apiutil.CreateDIDKey(inputRegister.Ed25519SigningPublicKeyBase64, inputRegister.X25519PublicKeyBase64)
 	if mkErr != nil {
 		if mkErr == types.ErrInvalidPublicKey {
 			ApiErrorf(c, http.StatusUnauthorized, "invalid public key")

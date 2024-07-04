@@ -12,6 +12,7 @@ import (
 	"github.com/cespare/xxhash/v2"
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis_rate/v10"
+	apiutil "github.com/mailio/go-mailio-server/api/util"
 	"github.com/mailio/go-mailio-server/global"
 )
 
@@ -22,7 +23,7 @@ const (
 
 func RateLimitMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ip, ipErr := getIP(c)
+		ip, ipErr := apiutil.GetIPFromContext(c)
 		if ipErr != nil {
 			// ignore for now
 		}

@@ -31,9 +31,9 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 	}
 
 	corsConfig := cors.Config{
-		AllowOrigins:     []string{"*"},
+		AllowOrigins:     []string{"http://localhost:4200", "https://" + global.Conf.Host, "https://" + global.Conf.Mailio.ServerDomain},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Content-Length", "Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
@@ -49,7 +49,7 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 	userProfileService := services.NewUserProfileService(dbSelector, environment)
 	domainService := services.NewDomainService(dbSelector)
 	webAuthnService := services.NewWebAuthnService(dbSelector, environment)
-	rotationKeyService := services.NewRotationKeyService(dbSelector)
+	smartKeyService := services.NewSmartKeyService(dbSelector)
 
 	// API definitions
 	handshakeApi := api.NewHandshakeApi(handshakeService, nonceService, mtpService, userProfileService)
@@ -58,7 +58,7 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 	vcApi := api.NewVCApi(ssiService)
 	messageApi := api.NewMessagingApi(ssiService, userService, userProfileService, environment)
 	domainApi := api.NewDomainApi(domainService)
-	webauthnApi := api.NewWebAuthnApi(nonceService, webAuthnService, userService, rotationKeyService, environment)
+	webauthnApi := api.NewWebAuthnApi(nonceService, webAuthnService, userService, userProfileService, smartKeyService, ssiService, environment)
 
 	// WEBHOOK API definitions
 	webhookApi := api.NewMailReceiveWebhook(handshakeService, userService, userProfileService, environment)
@@ -88,6 +88,8 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 		// webauthn login
 		publicApi.GET("/v1/webauthn/registration_options", webauthnApi.RegistrationOptions)
 		publicApi.POST("/v1/webauthn/registration_verify", webauthnApi.VerifyRegistration)
+		publicApi.GET("/v1/webauthn/login_options", webauthnApi.LoginOptions)
+		publicApi.POST("/v1/webauthn/login_verify", webauthnApi.LoginVerify)
 	}
 
 	rootApi := router.Group("/api", metrics.MetricsMiddleware(), restinterceptors.RateLimitMiddleware(), restinterceptors.JWSMiddleware(userProfileService))

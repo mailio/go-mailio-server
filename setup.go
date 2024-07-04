@@ -64,12 +64,12 @@ func ConfigDBSelector() repository.DBSelector {
 	messageDeliveryRepo, mdErr := repository.NewCouchDBRepository(repoUrl, repository.MessageDelivery, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
 	userProfileRepo, upErr := repository.NewCouchDBRepository(repoUrl, repository.UserProfile, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
 	webauthnUser, wErr := repository.NewCouchDBRepository(repoUrl, repository.WebAuthnUser, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
-	rotationKeys, ekErr := repository.NewCouchDBRepository(repoUrl, repository.RotationKeys, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
+	smartKey, smrtkErr := repository.NewCouchDBRepository(repoUrl, repository.SmartKey, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
 
 	// ensure _users exist
 	users_Err := repository.CreateUsers_IfNotExists(userRepo, repoUrl)
 
-	repoErr := errors.Join(handshakeRepoErr, nonceRepoErr, userRepoErr, mappingRepoErr, didRErr, vscrErr, dErr, mdErr, upErr, users_Err, wErr, ekErr)
+	repoErr := errors.Join(handshakeRepoErr, nonceRepoErr, userRepoErr, mappingRepoErr, didRErr, vscrErr, dErr, mdErr, upErr, users_Err, wErr, smrtkErr)
 	if repoErr != nil {
 		global.Logger.Log("error", "Failed to create repositories", "error", repoErr.Error())
 		panic(repoErr)
@@ -87,7 +87,7 @@ func ConfigDBSelector() repository.DBSelector {
 	dbSelector.AddDB(messageDeliveryRepo)
 	dbSelector.AddDB(userProfileRepo)
 	dbSelector.AddDB(webauthnUser)
-	dbSelector.AddDB(rotationKeys)
+	dbSelector.AddDB(smartKey)
 
 	return dbSelector
 }
