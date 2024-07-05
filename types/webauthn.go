@@ -102,3 +102,10 @@ func (u *WebAuhnUser) WebAuthnCredentials() []webauthn.Credential {
 func (u *WebAuhnUser) WebAuthnIcon() string {
 	return u.Icon
 }
+
+type JwsTokenWithSmartKey struct {
+	JwsToken                string `json:"jwsToken" validate:"required"`
+	EncryptedSmartKeyBase64 string `json:"encryptedSmartKeyBase64" validate:"required"`
+	SmartKeyPasswordPart    string `json:"smartKeyPasswordPart" validate:"required"`
+	Email                   string `json:"email" validate:"required"`
+}

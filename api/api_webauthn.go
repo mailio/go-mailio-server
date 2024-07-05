@@ -18,7 +18,6 @@ import (
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/mailio/go-mailio-did/did"
-	"github.com/mailio/go-mailio-server/api/interceptors"
 	apiutil "github.com/mailio/go-mailio-server/api/util"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/services"
@@ -58,7 +57,7 @@ func NewWebAuthnApi(nonceService *services.NonceService, webAuthnService *servic
 // @Accept json
 // @Produce json
 // @Param email query string true "Email address to register"
-// @Success 200 {object} types.WebauthnRegistrationOptionsJSON
+// @Success 200 {object} protocol.PublicKeyCredentialCreationOptions
 // @Failure 400 {object} api.ApiError "invalid email address"
 // @Failure 429 {object} api.ApiError "rate limit exceeded"
 // @Router /api/v1/webauthn/registration_options [get]
@@ -136,7 +135,7 @@ func (a *WebAuthnApi) RegistrationOptions(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param body body types.WebauthRegistrationVerify true "Attestation object + Encrypted SmartKey payload"
-// @Success 200 {object} types.WebAuthnRegistrationVerifyResponse
+// @Success 200 {object} string "JWS"
 // @Failure 400 {object} api.ApiError "invalid input parameters"
 // @Failure 429 {object} api.ApiError "rate limit exceeded"
 // @Router /api/v1/webauthn/registration_verify [post]
@@ -317,7 +316,7 @@ func (a *WebAuthnApi) VerifyRegistration(c *gin.Context) {
 		return
 	}
 
-	token, tErr := a.setCookieAndGenerateToken(c, mk, session.Challenge, req.SmartKeyPayload.PrimaryEd25519PublicKey)
+	token, tErr := setCookieAndGenerateToken(c, mk, session.Challenge, req.SmartKeyPayload.PrimaryEd25519PublicKey)
 	if tErr != nil {
 		ApiErrorf(c, http.StatusInternalServerError, "failed to generate jws token")
 		return
@@ -367,7 +366,7 @@ func (a *WebAuthnApi) LoginOptions(c *gin.Context) {
 // @Tags WebAuthn
 // @Accept json
 // @Produce json
-// @Param body protocol.ParsedCredentialAssertionData true "Credential Assertion Data"
+// @Param body body protocol.ParsedCredentialAssertionData true "Credential Assertion Data"
 // @Success 200 {object} protocol.PublicKeyCredentialRequestOptions
 // @Failure 400 {object} api.ApiError "invalid input parameters"
 // @Failure 429 {object} api.ApiError "rate limit exceeded"
@@ -477,12 +476,27 @@ func (a *WebAuthnApi) LoginVerify(c *gin.Context) {
 
 	encodedPublicKey := base64.StdEncoding.EncodeToString(cpk)
 
-	jwsToken, jwsErr := a.setCookieAndGenerateToken(c, mk, challenge, encodedPublicKey)
+	jwsToken, jwsErr := setCookieAndGenerateToken(c, mk, challenge, encodedPublicKey)
 	if jwsErr != nil {
 		ApiErrorf(c, http.StatusInternalServerError, "failed to generate jws token")
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"token": jwsToken})
+
+	// get the encrypted smartkey
+	smartKey, skErr := a.smartKetService.GetSmartKey(userMailioAddress)
+	if skErr != nil {
+		ApiErrorf(c, http.StatusForbidden, "smartkey not found")
+		return
+	}
+	// create response
+	output := types.JwsTokenWithSmartKey{
+		EncryptedSmartKeyBase64: smartKey.SmartKeyEncrypted,
+		JwsToken:                jwsToken,
+		SmartKeyPasswordPart:    smartKey.PasswordShare,
+		Email:                   smartKey.Email,
+	}
+
+	c.JSON(http.StatusOK, output)
 }
 
 func (a *WebAuthnApi) WebauthnUserHandler(rawID, userHandle []byte) (webauthn.User, error) {
@@ -493,29 +507,4 @@ func (a *WebAuthnApi) WebauthnUserHandler(rawID, userHandle []byte) (webauthn.Us
 	}
 
 	return webauthUser, nil
-}
-
-// set cookie in the response (httpOnly)
-func (a *WebAuthnApi) setCookieAndGenerateToken(c *gin.Context, userDID *did.MailioKey, challenge string, usersPrimaryEd25519PublicKey string) (string, error) {
-	token, tErr := interceptors.GenerateJWSToken(global.PrivateKey, userDID.DID(), global.MailioDID, challenge, usersPrimaryEd25519PublicKey)
-	if tErr != nil {
-		return "", tErr
-	}
-
-	domain, dErr := apiutil.GetIPFromContext(c)
-	if dErr != nil {
-		d := "localhost"
-		domain = &d
-	}
-	secure := true
-	httpOnly := true
-	if strings.Contains(*domain, "localhost") || strings.Contains(*domain, "::1") || strings.Contains(*domain, "127.0.0.1") {
-		secure = false
-		d := "localhost"
-		domain = &d
-	}
-
-	c.SetCookie("token", token, 60*60*24, "/", *domain, secure, httpOnly) // 1 day // httpOnly: true
-
-	return token, nil
 }

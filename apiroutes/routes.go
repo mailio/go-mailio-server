@@ -31,10 +31,16 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 	}
 
 	corsConfig := cors.Config{
-		AllowOrigins:     []string{"http://localhost:4200", "https://" + global.Conf.Host, "https://" + global.Conf.Mailio.ServerDomain},
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Content-Length", "Authorization"},
-		ExposeHeaders:    []string{"Content-Length"},
+		AllowAllOrigins:     false,
+		AllowOrigins:        []string{"http://127.0.0.1:4200", "https://" + global.Conf.Host, "https://" + global.Conf.Mailio.ServerDomain, "http://localhost:8080"},
+		AllowMethods:        []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"},
+		AllowWildcard:       true,
+		AllowPrivateNetwork: true,
+		// exposedHeaders: ['set-cookie','ajax_redirect'],
+		// preflightContinue: true,
+		// AllowHeaders:     []string{"Origin", "Content-Type", "Content-Length", "Authorization"},
+		AllowHeaders:     []string{"*"},
+		ExposeHeaders:    []string{"Content-Length", "Set-Cookie"},
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 	}
@@ -53,7 +59,7 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 
 	// API definitions
 	handshakeApi := api.NewHandshakeApi(handshakeService, nonceService, mtpService, userProfileService)
-	accountApi := api.NewUserAccountApi(userService, userProfileService, nonceService, ssiService)
+	accountApi := api.NewUserAccountApi(userService, userProfileService, nonceService, ssiService, smartKeyService)
 	didApi := api.NewDIDApi(ssiService)
 	vcApi := api.NewVCApi(ssiService)
 	messageApi := api.NewMessagingApi(ssiService, userService, userProfileService, environment)
@@ -117,6 +123,10 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 
 		// resolve domain
 		rootApi.GET("/v1/resolve/domain", domainApi.ResolveDomainForEmail)
+
+		// cookie validator
+		// return smartkey based on cookie (checkin if user logged in, to skip login if cookie value)
+		rootApi.GET("/v1/verify_cookie", accountApi.VerifyCookie)
 	}
 
 	// server-to-server communication (aka MTP - Mailio Transfer Protocol)

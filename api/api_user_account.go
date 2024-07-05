@@ -25,15 +25,17 @@ type UserAccountApi struct {
 	nonceService       *services.NonceService
 	ssiService         *services.SelfSovereignService
 	userProfileService *services.UserProfileService
+	smartKeyService    *services.SmartKeyService
 	validate           *validator.Validate
 }
 
-func NewUserAccountApi(userService *services.UserService, userProfileService *services.UserProfileService, nonceService *services.NonceService, ssiService *services.SelfSovereignService) *UserAccountApi {
+func NewUserAccountApi(userService *services.UserService, userProfileService *services.UserProfileService, nonceService *services.NonceService, ssiService *services.SelfSovereignService, smartKeyService *services.SmartKeyService) *UserAccountApi {
 	return &UserAccountApi{
 		userService:        userService,
 		nonceService:       nonceService,
 		ssiService:         ssiService,
 		userProfileService: userProfileService,
+		smartKeyService:    smartKeyService,
 		validate:           validator.New(),
 	}
 }
@@ -310,7 +312,7 @@ func (ua *UserAccountApi) Register(c *gin.Context) {
 		return
 	}
 
-	token, tErr := interceptors.GenerateJWSToken(global.PrivateKey, mk.DID(), global.MailioDID, inputRegister.Nonce, inputRegister.X25519PublicKeyBase64)
+	token, tErr := setCookieAndGenerateToken(c, mk, inputRegister.Nonce, inputRegister.Ed25519SigningPublicKeyBase64)
 	if tErr != nil {
 		ApiErrorf(c, http.StatusInternalServerError, "Failed to sign token")
 		return
@@ -390,5 +392,39 @@ func (ua *UserAccountApi) GetUserAddress(c *gin.Context) {
 		UsedDisk:  totalDiskUsageFromHandlers + stats.ActiveSize,
 		Created:   up.Created,
 	}
+	c.JSON(http.StatusOK, output)
+}
+
+// Get logged in users smartkey based on a JWS token
+// @Security Bearer
+// @Summary Get logged in users smartkey based on a JWS token
+// @Description Get logged in users smartkey based on a JWS token
+// @Tags User Account
+// @Success 200 {object} types.OutputBasicUserInfo
+// @Failure 429 {object} api.ApiError "rate limit exceeded"
+// @Accept json
+// @Produce json
+// @Router /api/v1/user/me [get]
+func (ua *UserAccountApi) VerifyCookie(c *gin.Context) {
+	// check if user is logged in
+	address := c.GetString("subjectAddress")
+	if address == "" {
+		ApiErrorf(c, http.StatusUnauthorized, "address not found")
+		return
+	}
+	// get the encrypted smartkey
+	smartKey, skErr := ua.smartKeyService.GetSmartKey(address)
+	if skErr != nil {
+		ApiErrorf(c, http.StatusForbidden, "smartkey not found")
+		return
+	}
+	// create response
+	output := types.JwsTokenWithSmartKey{
+		EncryptedSmartKeyBase64: smartKey.SmartKeyEncrypted,
+		JwsToken:                "",
+		SmartKeyPasswordPart:    smartKey.PasswordShare,
+		Email:                   smartKey.Email,
+	}
+
 	c.JSON(http.StatusOK, output)
 }

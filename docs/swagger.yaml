@@ -317,6 +317,423 @@ definitions:
     required:
     - status
     type: object
+  protocol.AttestedCredentialData:
+    properties:
+      aaguid:
+        items:
+          type: integer
+        type: array
+      credential_id:
+        items:
+          type: integer
+        type: array
+      public_key:
+        description: The raw credential public key bytes received from the attestation
+          data.
+        items:
+          type: integer
+        type: array
+    type: object
+  protocol.AuthenticationExtensions:
+    additionalProperties: true
+    type: object
+  protocol.AuthenticationExtensionsClientOutputs:
+    additionalProperties: true
+    type: object
+  protocol.AuthenticatorAssertionResponse:
+    properties:
+      authenticatorData:
+        items:
+          type: integer
+        type: array
+      clientDataJSON:
+        description: |-
+          From the spec https://www.w3.org/TR/webauthn/#dom-authenticatorresponse-clientdatajson
+          This attribute contains a JSON serialization of the client data passed to the authenticator
+          by the client in its call to either create() or get().
+        items:
+          type: integer
+        type: array
+      signature:
+        items:
+          type: integer
+        type: array
+      userHandle:
+        items:
+          type: integer
+        type: array
+    type: object
+  protocol.AuthenticatorAttachment:
+    enum:
+    - platform
+    - cross-platform
+    type: string
+    x-enum-varnames:
+    - Platform
+    - CrossPlatform
+  protocol.AuthenticatorData:
+    properties:
+      att_data:
+        $ref: '#/definitions/protocol.AttestedCredentialData'
+      ext_data:
+        items:
+          type: integer
+        type: array
+      flags:
+        $ref: '#/definitions/protocol.AuthenticatorFlags'
+      rpid:
+        items:
+          type: integer
+        type: array
+      sign_count:
+        type: integer
+    type: object
+  protocol.AuthenticatorFlags:
+    enum:
+    - 1
+    - 2
+    - 4
+    - 8
+    - 16
+    - 32
+    - 64
+    - 128
+    type: integer
+    x-enum-comments:
+      FlagBackupEligible: Referred to as BE
+      FlagUserPresent: Referred to as UP
+    x-enum-varnames:
+    - FlagUserPresent
+    - FlagRFU1
+    - FlagUserVerified
+    - FlagBackupEligible
+    - FlagBackupState
+    - FlagRFU2
+    - FlagAttestedCredentialData
+    - FlagHasExtensions
+  protocol.AuthenticatorSelection:
+    properties:
+      authenticatorAttachment:
+        allOf:
+        - $ref: '#/definitions/protocol.AuthenticatorAttachment'
+        description: |-
+          AuthenticatorAttachment If this member is present, eligible authenticators are filtered to only
+          authenticators attached with the specified AuthenticatorAttachment enum.
+      requireResidentKey:
+        description: |-
+          RequireResidentKey this member describes the Relying Party's requirements regarding resident
+          credentials. If the parameter is set to true, the authenticator MUST create a client-side-resident
+          public key credential source when creating a public key credential.
+        type: boolean
+      residentKey:
+        allOf:
+        - $ref: '#/definitions/protocol.ResidentKeyRequirement'
+        description: |-
+          ResidentKey this member describes the Relying Party's requirements regarding resident
+          credentials per Webauthn Level 2.
+      userVerification:
+        allOf:
+        - $ref: '#/definitions/protocol.UserVerificationRequirement'
+        description: |-
+          UserVerification This member describes the Relying Party's requirements regarding user verification for
+          the create() operation. Eligible authenticators are filtered to only those capable of satisfying this
+          requirement.
+    type: object
+  protocol.AuthenticatorTransport:
+    enum:
+    - usb
+    - nfc
+    - ble
+    - hybrid
+    - internal
+    type: string
+    x-enum-varnames:
+    - USB
+    - NFC
+    - BLE
+    - Hybrid
+    - Internal
+  protocol.CeremonyType:
+    enum:
+    - webauthn.create
+    - webauthn.get
+    type: string
+    x-enum-varnames:
+    - CreateCeremony
+    - AssertCeremony
+  protocol.CollectedClientData:
+    properties:
+      challenge:
+        type: string
+      new_keys_may_be_added_here:
+        description: Chromium (Chrome) returns a hint sometimes about how to handle
+          clientDataJSON in a safe manner.
+        type: string
+      origin:
+        type: string
+      tokenBinding:
+        $ref: '#/definitions/protocol.TokenBinding'
+      type:
+        allOf:
+        - $ref: '#/definitions/protocol.CeremonyType'
+        description: |-
+          Type the string "webauthn.create" when creating new credentials,
+          and "webauthn.get" when getting an assertion from an existing credential. The
+          purpose of this member is to prevent certain types of signature confusion attacks
+          (where an attacker substitutes one legitimate signature for another).
+    type: object
+  protocol.ConveyancePreference:
+    enum:
+    - none
+    - indirect
+    - direct
+    - enterprise
+    type: string
+    x-enum-varnames:
+    - PreferNoAttestation
+    - PreferIndirectAttestation
+    - PreferDirectAttestation
+    - PreferEnterpriseAttestation
+  protocol.CredentialAssertionResponse:
+    properties:
+      authenticatorAttachment:
+        type: string
+      clientExtensionResults:
+        $ref: '#/definitions/protocol.AuthenticationExtensionsClientOutputs'
+      id:
+        description: |-
+          ID is The credential’s identifier. The requirements for the
+          identifier are distinct for each type of credential. It might
+          represent a username for username/password tuples, for example.
+        type: string
+      rawId:
+        items:
+          type: integer
+        type: array
+      response:
+        $ref: '#/definitions/protocol.AuthenticatorAssertionResponse'
+      type:
+        description: |-
+          Type is the value of the object’s interface object's [[type]] slot,
+          which specifies the credential type represented by this object.
+          This should be type "public-key" for Webauthn credentials.
+        type: string
+    type: object
+  protocol.CredentialDescriptor:
+    properties:
+      id:
+        description: CredentialID The ID of a credential to allow/disallow.
+        items:
+          type: integer
+        type: array
+      transports:
+        description: The authenticator transports that can be used.
+        items:
+          $ref: '#/definitions/protocol.AuthenticatorTransport'
+        type: array
+      type:
+        allOf:
+        - $ref: '#/definitions/protocol.CredentialType'
+        description: The valid credential types.
+    type: object
+  protocol.CredentialParameter:
+    properties:
+      alg:
+        $ref: '#/definitions/webauthncose.COSEAlgorithmIdentifier'
+      type:
+        $ref: '#/definitions/protocol.CredentialType'
+    type: object
+  protocol.CredentialType:
+    enum:
+    - public-key
+    type: string
+    x-enum-varnames:
+    - PublicKeyCredentialType
+  protocol.ParsedAssertionResponse:
+    properties:
+      authenticatorData:
+        $ref: '#/definitions/protocol.AuthenticatorData'
+      collectedClientData:
+        $ref: '#/definitions/protocol.CollectedClientData'
+      signature:
+        items:
+          type: integer
+        type: array
+      userHandle:
+        items:
+          type: integer
+        type: array
+    type: object
+  protocol.ParsedCredentialAssertionData:
+    properties:
+      authenticatorAttachment:
+        $ref: '#/definitions/protocol.AuthenticatorAttachment'
+      clientExtensionResults:
+        $ref: '#/definitions/protocol.AuthenticationExtensionsClientOutputs'
+      id:
+        type: string
+      raw:
+        $ref: '#/definitions/protocol.CredentialAssertionResponse'
+      rawId:
+        items:
+          type: integer
+        type: array
+      response:
+        $ref: '#/definitions/protocol.ParsedAssertionResponse'
+      type:
+        type: string
+    type: object
+  protocol.PublicKeyCredentialCreationOptions:
+    properties:
+      attestation:
+        $ref: '#/definitions/protocol.ConveyancePreference'
+      authenticatorSelection:
+        $ref: '#/definitions/protocol.AuthenticatorSelection'
+      challenge:
+        items:
+          type: integer
+        type: array
+      excludeCredentials:
+        items:
+          $ref: '#/definitions/protocol.CredentialDescriptor'
+        type: array
+      extensions:
+        $ref: '#/definitions/protocol.AuthenticationExtensions'
+      pubKeyCredParams:
+        items:
+          $ref: '#/definitions/protocol.CredentialParameter'
+        type: array
+      rp:
+        $ref: '#/definitions/protocol.RelyingPartyEntity'
+      timeout:
+        type: integer
+      user:
+        $ref: '#/definitions/protocol.UserEntity'
+    type: object
+  protocol.PublicKeyCredentialRequestOptions:
+    properties:
+      allowCredentials:
+        items:
+          $ref: '#/definitions/protocol.CredentialDescriptor'
+        type: array
+      challenge:
+        items:
+          type: integer
+        type: array
+      extensions:
+        $ref: '#/definitions/protocol.AuthenticationExtensions'
+      rpId:
+        type: string
+      timeout:
+        type: integer
+      userVerification:
+        $ref: '#/definitions/protocol.UserVerificationRequirement'
+    type: object
+  protocol.RelyingPartyEntity:
+    properties:
+      icon:
+        description: |-
+          A serialized URL which resolves to an image associated with the entity. For example,
+          this could be a user’s avatar or a Relying Party's logo. This URL MUST be an a priori
+          authenticated URL. Authenticators MUST accept and store a 128-byte minimum length for
+          an icon member’s value. Authenticators MAY ignore an icon member’s value if its length
+          is greater than 128 bytes. The URL’s scheme MAY be "data" to avoid fetches of the URL,
+          at the cost of needing more storage.
+
+          Deprecated: this has been removed from the specification recommendations.
+        type: string
+      id:
+        description: A unique identifier for the Relying Party entity, which sets
+          the RP ID.
+        type: string
+      name:
+        description: |-
+          A human-palatable name for the entity. Its function depends on what the PublicKeyCredentialEntity represents:
+
+          When inherited by PublicKeyCredentialRpEntity it is a human-palatable identifier for the Relying Party,
+          intended only for display. For example, "ACME Corporation", "Wonderful Widgets, Inc." or "ОАО Примертех".
+
+          When inherited by PublicKeyCredentialUserEntity, it is a human-palatable identifier for a user account. It is
+          intended only for display, i.e., aiding the user in determining the difference between user accounts with similar
+          displayNames. For example, "alexm", "alex.p.mueller@example.com" or "+14255551234".
+        type: string
+    type: object
+  protocol.ResidentKeyRequirement:
+    enum:
+    - discouraged
+    - preferred
+    - required
+    type: string
+    x-enum-varnames:
+    - ResidentKeyRequirementDiscouraged
+    - ResidentKeyRequirementPreferred
+    - ResidentKeyRequirementRequired
+  protocol.TokenBinding:
+    properties:
+      id:
+        type: string
+      status:
+        $ref: '#/definitions/protocol.TokenBindingStatus'
+    type: object
+  protocol.TokenBindingStatus:
+    enum:
+    - present
+    - supported
+    - not-supported
+    type: string
+    x-enum-varnames:
+    - Present
+    - Supported
+    - NotSupported
+  protocol.UserEntity:
+    properties:
+      displayName:
+        description: |-
+          A human-palatable name for the user account, intended only for display.
+          For example, "Alex P. Müller" or "田中 倫". The Relying Party SHOULD let
+          the user choose this, and SHOULD NOT restrict the choice more than necessary.
+        type: string
+      icon:
+        description: |-
+          A serialized URL which resolves to an image associated with the entity. For example,
+          this could be a user’s avatar or a Relying Party's logo. This URL MUST be an a priori
+          authenticated URL. Authenticators MUST accept and store a 128-byte minimum length for
+          an icon member’s value. Authenticators MAY ignore an icon member’s value if its length
+          is greater than 128 bytes. The URL’s scheme MAY be "data" to avoid fetches of the URL,
+          at the cost of needing more storage.
+
+          Deprecated: this has been removed from the specification recommendations.
+        type: string
+      id:
+        description: |-
+          ID is the user handle of the user account entity. To ensure secure operation,
+          authentication and authorization decisions MUST be made on the basis of this id
+          member, not the displayName nor name members. See Section 6.1 of
+          [RFC8266](https://www.w3.org/TR/webauthn/#biblio-rfc8266).
+      name:
+        description: |-
+          A human-palatable name for the entity. Its function depends on what the PublicKeyCredentialEntity represents:
+
+          When inherited by PublicKeyCredentialRpEntity it is a human-palatable identifier for the Relying Party,
+          intended only for display. For example, "ACME Corporation", "Wonderful Widgets, Inc." or "ОАО Примертех".
+
+          When inherited by PublicKeyCredentialUserEntity, it is a human-palatable identifier for a user account. It is
+          intended only for display, i.e., aiding the user in determining the difference between user accounts with similar
+          displayNames. For example, "alexm", "alex.p.mueller@example.com" or "+14255551234".
+        type: string
+    type: object
+  protocol.UserVerificationRequirement:
+    enum:
+    - required
+    - preferred
+    - discouraged
+    type: string
+    x-enum-comments:
+      VerificationPreferred: This is the default
+    x-enum-varnames:
+    - VerificationRequired
+    - VerificationPreferred
+    - VerificationDiscouraged
   types.DIDCommApiResponse:
     properties:
       id:
@@ -890,6 +1307,51 @@ definitions:
       signature:
         type: string
     type: object
+  types.SmartKeyPayload:
+    properties:
+      address:
+        description: mailio address
+        type: string
+      challenge:
+        description: challenge
+        type: string
+      challengeSignature:
+        description: signature of the challenge with the primary private key (held
+          by client only)
+        type: string
+      databasePassword:
+        description: CoachDB password
+        type: string
+      email:
+        description: email address
+        type: string
+      passwordShare:
+        description: a single share of a Shamir secret (2 out of 3 required for decryption)
+        type: string
+      preRotatedMailioKey:
+        description: encypted pre-Shamir secret sharing
+        type: string
+      primaryEd25519PublicKey:
+        description: primary Ed25519 public key (associated with address)
+        type: string
+      primaryX25519PublicKey:
+        description: primary X25519 public key (associated with address)
+        type: string
+      smartKeyEncrypted:
+        description: encrypted pre-Shamir secret sharing
+        type: string
+    required:
+    - address
+    - challenge
+    - challengeSignature
+    - databasePassword
+    - email
+    - passwordShare
+    - preRotatedMailioKey
+    - primaryEd25519PublicKey
+    - primaryX25519PublicKey
+    - smartKeyEncrypted
+    type: object
   types.UserDomain:
     properties:
       name:
@@ -904,47 +1366,77 @@ definitions:
       valid:
         type: boolean
     type: object
-  types.WebAuthnRegistrationCredential:
+  types.WebauthRegistrationVerify:
     properties:
-      id:
+      attestationResponse:
+        $ref: '#/definitions/types.WebauthnAttestationResponseJSON'
+      smartKeyPayload:
+        $ref: '#/definitions/types.SmartKeyPayload'
+    required:
+    - attestationResponse
+    - smartKeyPayload
+    type: object
+  types.WebauthnAttestationResponse:
+    properties:
+      attestationObject:
         type: string
+      authenticatorData:
+        type: string
+      clientDataJSON:
+        type: string
+      publicKey:
+        type: string
+      publicKeyAlgorithm:
+        type: integer
       transports:
         items:
           type: string
         type: array
+    type: object
+  types.WebauthnAttestationResponseJSON:
+    properties:
+      authenticatorAttachment:
+        type: string
+      clientExtensionResults:
+        additionalProperties: true
+        type: object
+      id:
+        type: string
+      rawId:
+        type: string
+      response:
+        $ref: '#/definitions/types.WebauthnAttestationResponse'
       type:
         type: string
     type: object
-  types.WebauthnAuthenticatorSelection:
-    properties:
-      residentKey:
-        type: string
-      userVerification:
-        type: string
-    type: object
-  types.WebauthnRegistrationOptionsJSON:
-    properties:
-      attestationType:
-        type: string
-      authenticatorSelection:
-        $ref: '#/definitions/types.WebauthnAuthenticatorSelection'
-      excludeCredentials:
-        items:
-          $ref: '#/definitions/types.WebAuthnRegistrationCredential'
-        type: array
-      rpID:
-        type: string
-      rpName:
-        type: string
-      supportedAlgorithmIDs:
-        items:
-          type: integer
-        type: array
-      timeout:
-        type: integer
-      userName:
-        type: string
-    type: object
+  webauthncose.COSEAlgorithmIdentifier:
+    enum:
+    - -7
+    - -35
+    - -36
+    - -65535
+    - -257
+    - -258
+    - -259
+    - -37
+    - -38
+    - -39
+    - -8
+    - -47
+    type: integer
+    x-enum-varnames:
+    - AlgES256
+    - AlgES384
+    - AlgES512
+    - AlgRS1
+    - AlgRS256
+    - AlgRS384
+    - AlgRS512
+    - AlgPS256
+    - AlgPS384
+    - AlgPS512
+    - AlgEdDSA
+    - AlgES256K
 info:
   contact: {}
   description: Implements the Mailio server based on https://mirs.mail.io/ specifications
@@ -1724,7 +2216,7 @@ paths:
     get:
       consumes:
       - application/json
-      description: Get logged in users basic information
+      description: Get logged in users smartkey based on a JWS token
       produces:
       - application/json
       responses:
@@ -1738,9 +2230,62 @@ paths:
             $ref: '#/definitions/api.ApiError'
       security:
       - Bearer: []
-      summary: Get logged inusers basic information
+      summary: Get logged in users smartkey based on a JWS token
       tags:
       - User Account
+  /api/v1/webauthn/login_options:
+    get:
+      consumes:
+      - application/json
+      description: LoginOptions return WebAuthN login options
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/protocol.PublicKeyCredentialRequestOptions'
+        "400":
+          description: invalid input parameters
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "429":
+          description: rate limit exceeded
+          schema:
+            $ref: '#/definitions/api.ApiError'
+      summary: LoginOptions return login options
+      tags:
+      - WebAuthn
+  /api/v1/webauthn/login_verify:
+    post:
+      consumes:
+      - application/json
+      description: LoginOptions return WebAuthN login options
+      parameters:
+      - description: Credential Assertion Data
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/protocol.ParsedCredentialAssertionData'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/protocol.PublicKeyCredentialRequestOptions'
+        "400":
+          description: invalid input parameters
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "429":
+          description: rate limit exceeded
+          schema:
+            $ref: '#/definitions/api.ApiError'
+      summary: LoginOptions return login options
+      tags:
+      - WebAuthn
   /api/v1/webauthn/registration_options:
     get:
       consumes:
@@ -1758,7 +2303,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/types.WebauthnRegistrationOptionsJSON'
+            $ref: '#/definitions/protocol.PublicKeyCredentialCreationOptions'
         "400":
           description: invalid email address
           schema:
@@ -1768,6 +2313,36 @@ paths:
           schema:
             $ref: '#/definitions/api.ApiError'
       summary: Registration options for a new WebAuthn device
+      tags:
+      - WebAuthn
+  /api/v1/webauthn/registration_verify:
+    post:
+      consumes:
+      - application/json
+      description: WebAuthnVerifyRegistration check the signed digital challenge
+      parameters:
+      - description: Attestation object + Encrypted SmartKey payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/types.WebauthRegistrationVerify'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: JWS
+          schema:
+            type: string
+        "400":
+          description: invalid input parameters
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "429":
+          description: rate limit exceeded
+          schema:
+            $ref: '#/definitions/api.ApiError'
+      summary: WebAuthnVerifyRegistration check the validity of the registration
       tags:
       - WebAuthn
   /webhook/mailgun_mime:

@@ -22,8 +22,15 @@ func JWSMiddleware(userProfileService *services.UserProfileService) gin.HandlerF
 	return func(c *gin.Context) {
 		auth := c.GetHeader("Authorization")
 		if auth == "" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Authorization header is missing"})
-			return
+			// check cookies for __mailio-jws-token
+			cookie, err := c.Request.Cookie("__mailio-jws-token")
+			if err == nil {
+				auth = cookie.Value
+			}
+			if auth == "" {
+				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Authorization header is missing"})
+				return
+			}
 		}
 
 		// Parse JWS message
