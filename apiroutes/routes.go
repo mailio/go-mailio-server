@@ -32,17 +32,14 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 
 	corsConfig := cors.Config{
 		AllowAllOrigins:     false,
-		AllowOrigins:        []string{"http://127.0.0.1:4200", "https://" + global.Conf.Host, "https://" + global.Conf.Mailio.ServerDomain, "http://localhost:8080"},
+		AllowOrigins:        []string{"http://localhost:4200", "https://" + global.Conf.Host, "https://" + global.Conf.Mailio.ServerDomain, "http://localhost:8080"},
 		AllowMethods:        []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"},
 		AllowWildcard:       true,
 		AllowPrivateNetwork: true,
-		// exposedHeaders: ['set-cookie','ajax_redirect'],
-		// preflightContinue: true,
-		// AllowHeaders:     []string{"Origin", "Content-Type", "Content-Length", "Authorization"},
-		AllowHeaders:     []string{"*"},
-		ExposeHeaders:    []string{"Content-Length", "Set-Cookie"},
-		AllowCredentials: true,
-		MaxAge:           12 * time.Hour,
+		AllowHeaders:        []string{"Origin", "Content-Type", "Content-Length", "Authorization", " Access-Control-Allow-Headers"},
+		ExposeHeaders:       []string{"Content-Length", "Set-Cookie"},
+		AllowCredentials:    true,
+		MaxAge:              24 * time.Hour * 30, // 30 days is max
 	}
 	router.Use(cors.New(corsConfig))
 
@@ -127,6 +124,7 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 		// cookie validator
 		// return smartkey based on cookie (checkin if user logged in, to skip login if cookie value)
 		rootApi.GET("/v1/verify_cookie", accountApi.VerifyCookie)
+		rootApi.GET("/v1/logout", accountApi.Logout)
 	}
 
 	// server-to-server communication (aka MTP - Mailio Transfer Protocol)

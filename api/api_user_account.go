@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"net/http"
 	"net/mail"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -400,11 +401,11 @@ func (ua *UserAccountApi) GetUserAddress(c *gin.Context) {
 // @Summary Get logged in users smartkey based on a JWS token
 // @Description Get logged in users smartkey based on a JWS token
 // @Tags User Account
-// @Success 200 {object} types.OutputBasicUserInfo
+// @Success 200 {object} types.JwsTokenWithSmartKey
 // @Failure 429 {object} api.ApiError "rate limit exceeded"
 // @Accept json
 // @Produce json
-// @Router /api/v1/user/me [get]
+// @Router /api/v1/verify_cookie [get]
 func (ua *UserAccountApi) VerifyCookie(c *gin.Context) {
 	// check if user is logged in
 	address := c.GetString("subjectAddress")
@@ -427,4 +428,42 @@ func (ua *UserAccountApi) VerifyCookie(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, output)
+}
+
+// Logout user by removing httpOnly cookie
+// @Security Bearer
+// @Summary Logout user
+// @Description Logout user
+// @Tags User Account
+// @Failure 429 {object} api.ApiError "rate limit exceeded"
+// @Accept json
+// @Produce json
+// @Router /api/v1/logout [get]
+func (ua *UserAccountApi) Logout(c *gin.Context) {
+	// delete httpOnly cookie
+	domain, dErr := apiutil.GetIPFromContext(c)
+	if dErr != nil {
+		d := "localhost"
+		domain = &d
+	}
+	secure := true
+	if strings.Contains(*domain, "localhost") || strings.Contains(*domain, "::1") || strings.Contains(*domain, "127.0.0.1") {
+		secure = false
+		d := "localhost"
+		domain = &d
+	}
+
+	cookie := http.Cookie{
+		Name:     "__mailio-jws-token",
+		Value:    "",
+		Expires:  time.Now().Add(-1 * time.Hour), // an hour ago
+		Path:     "/",
+		Domain:   *domain,
+		Secure:   secure,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+	}
+
+	http.SetCookie(c.Writer, &cookie)
+	c.JSON(http.StatusOK, gin.H{"message": "logged out"})
 }

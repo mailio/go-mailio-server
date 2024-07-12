@@ -1206,6 +1206,22 @@ definitions:
       token:
         type: string
     type: object
+  types.JwsTokenWithSmartKey:
+    properties:
+      email:
+        type: string
+      encryptedSmartKeyBase64:
+        type: string
+      jwsToken:
+        type: string
+      smartKeyPasswordPart:
+        type: string
+    required:
+    - email
+    - encryptedSmartKeyBase64
+    - jwsToken
+    - smartKeyPasswordPart
+    type: object
   types.MTPStatusCode:
     properties:
       address:
@@ -1968,6 +1984,23 @@ paths:
       summary: Login with username and password
       tags:
       - User Account
+  /api/v1/logout:
+    get:
+      consumes:
+      - application/json
+      description: Logout user
+      produces:
+      - application/json
+      responses:
+        "429":
+          description: rate limit exceeded
+          schema:
+            $ref: '#/definitions/api.ApiError'
+      security:
+      - Bearer: []
+      summary: Logout user
+      tags:
+      - User Account
   /api/v1/mtp/handshake:
     post:
       consumes:
@@ -2216,7 +2249,7 @@ paths:
     get:
       consumes:
       - application/json
-      description: Get logged in users smartkey based on a JWS token
+      description: Get logged in users basic information
       produces:
       - application/json
       responses:
@@ -2224,6 +2257,27 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/types.OutputBasicUserInfo'
+        "429":
+          description: rate limit exceeded
+          schema:
+            $ref: '#/definitions/api.ApiError'
+      security:
+      - Bearer: []
+      summary: Get logged inusers basic information
+      tags:
+      - User Account
+  /api/v1/verify_cookie:
+    get:
+      consumes:
+      - application/json
+      description: Get logged in users smartkey based on a JWS token
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.JwsTokenWithSmartKey'
         "429":
           description: rate limit exceeded
           schema:

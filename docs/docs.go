@@ -782,6 +782,34 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/logout": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Logout user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "User Account"
+                ],
+                "summary": "Logout user",
+                "responses": {
+                    "429": {
+                        "description": "rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/mtp/handshake": {
             "post": {
                 "description": "Request handshake from this server (must be digitally signed)",
@@ -1161,6 +1189,40 @@ const docTemplate = `{
                         "Bearer": []
                     }
                 ],
+                "description": "Get logged in users basic information",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "User Account"
+                ],
+                "summary": "Get logged inusers basic information",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.OutputBasicUserInfo"
+                        }
+                    },
+                    "429": {
+                        "description": "rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/verify_cookie": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
                 "description": "Get logged in users smartkey based on a JWS token",
                 "consumes": [
                     "application/json"
@@ -1176,7 +1238,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/types.OutputBasicUserInfo"
+                            "$ref": "#/definitions/types.JwsTokenWithSmartKey"
                         }
                     },
                     "429": {
@@ -3090,6 +3152,29 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "token": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.JwsTokenWithSmartKey": {
+            "type": "object",
+            "required": [
+                "email",
+                "encryptedSmartKeyBase64",
+                "jwsToken",
+                "smartKeyPasswordPart"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "encryptedSmartKeyBase64": {
+                    "type": "string"
+                },
+                "jwsToken": {
+                    "type": "string"
+                },
+                "smartKeyPasswordPart": {
                     "type": "string"
                 }
             }

@@ -34,9 +34,9 @@ func setCookieAndGenerateToken(c *gin.Context, userDID *did.MailioKey, challenge
 	cookie := http.Cookie{
 		Name:     "__mailio-jws-token",
 		Value:    token,
-		Expires:  time.Now().Add(24 * 60 * time.Hour), // 60 days
+		Expires:  time.Now().Add(24 * 29 * time.Hour), // 29 days
 		Path:     "/",
-		Domain:   "localhost",
+		Domain:   *domain,
 		Secure:   secure,
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
