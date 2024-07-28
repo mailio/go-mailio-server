@@ -442,7 +442,7 @@ func (msq *MessageQueue) processAttachments(email *smtptypes.Mail, mailioAddress
 				global.Logger.Log(aErr.Error(), "failed to create attachment ID")
 			}
 			attPath := fmt.Sprintf("/%s/%s", mailioAddress, attachmentID)
-			url, s3Err := msq.userService.UploadAttachment(global.Conf.Storage.Bucket, attPath, email.Attachments[i].Content)
+			url, s3Err := msq.s3Service.UploadAttachment(global.Conf.Storage.Bucket, attPath, email.Attachments[i].Content)
 			if s3Err != nil {
 				global.Logger.Log(s3Err.Error(), "failed to upload attachment")
 				return fmt.Errorf("failed uploading attachment: %v: %w", s3Err, asynq.SkipRetry)

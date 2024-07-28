@@ -1281,6 +1281,11 @@ definitions:
         items: {}
         type: array
     type: object
+  types.PresignedUrl:
+    properties:
+      url:
+        type: string
+    type: object
   types.Recipient:
     properties:
       encrypted_key:
@@ -2209,6 +2214,78 @@ paths:
       summary: Resolve domain from email address (smtp or mailio)
       tags:
       - Messaging
+  /api/v1/s3:
+    delete:
+      consumes:
+      - application/json
+      description: Delete object from s3 bucket (only in logged in users folder)
+      parameters:
+      - description: objectKey
+        in: query
+        name: objectKey
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.PresignedUrl'
+        "400":
+          description: invalid api call
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "429":
+          description: rate limit exceeded
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "500":
+          description: error deletin object
+          schema:
+            $ref: '#/definitions/api.ApiError'
+      summary: Delete object from s3 bucket
+      tags:
+      - S3
+  /api/v1/s3presign:
+    get:
+      consumes:
+      - application/json
+      description: The presigned request is valid for the specified number of seconds.
+      parameters:
+      - description: objectKey
+        in: query
+        name: objectKey
+        required: true
+        type: string
+      - description: method
+        in: query
+        name: method
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.PresignedUrl'
+        "400":
+          description: invalid api call
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "429":
+          description: rate limit exceeded
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "500":
+          description: error creating presigned url
+          schema:
+            $ref: '#/definitions/api.ApiError'
+      summary: GetObject makes a presigned request that can be used to get an object
+        from a bucket.
+      tags:
+      - S3
   /api/v1/smtp:
     post:
       consumes:

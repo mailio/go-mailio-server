@@ -1125,6 +1125,113 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/s3": {
+            "delete": {
+                "description": "Delete object from s3 bucket (only in logged in users folder)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "S3"
+                ],
+                "summary": "Delete object from s3 bucket",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "objectKey",
+                        "name": "objectKey",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.PresignedUrl"
+                        }
+                    },
+                    "400": {
+                        "description": "invalid api call",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "429": {
+                        "description": "rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "500": {
+                        "description": "error deletin object",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/s3presign": {
+            "get": {
+                "description": "The presigned request is valid for the specified number of seconds.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "S3"
+                ],
+                "summary": "GetObject makes a presigned request that can be used to get an object from a bucket.",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "objectKey",
+                        "name": "objectKey",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "method",
+                        "name": "method",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.PresignedUrl"
+                        }
+                    },
+                    "400": {
+                        "description": "invalid api call",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "429": {
+                        "description": "rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "500": {
+                        "description": "error creating presigned url",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/smtp": {
             "post": {
                 "security": [
@@ -3261,6 +3368,14 @@ const docTemplate = `{
                 "docs": {
                     "type": "array",
                     "items": {}
+                }
+            }
+        },
+        "types.PresignedUrl": {
+            "type": "object",
+            "properties": {
+                "url": {
+                    "type": "string"
                 }
             }
         },

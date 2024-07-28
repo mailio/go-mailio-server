@@ -1,7 +1,8 @@
 package types
 
 import (
-	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/hibiken/asynq"
 	"github.com/redis/go-redis/v9"
@@ -9,12 +10,14 @@ import (
 )
 
 type Environment struct {
-	RedisClient  *redis.Client
-	TaskClient   *asynq.Client
-	Cron         *cron.Cron
-	S3Uploader   *s3manager.Uploader
-	S3Downloader *s3manager.Downloader
-	WebAuthN     *webauthn.WebAuthn
+	RedisClient     *redis.Client
+	TaskClient      *asynq.Client
+	Cron            *cron.Cron
+	S3Uploader      *manager.Uploader
+	S3Downloader    *manager.Downloader
+	S3PresignClient *s3.PresignClient
+	S3Client        *s3.Client
+	WebAuthN        *webauthn.WebAuthn
 }
 
 func NewEnvironment(redisClient *redis.Client) *Environment {
@@ -26,11 +29,11 @@ func NewEnvironment(redisClient *redis.Client) *Environment {
 	}
 }
 
-func (env *Environment) AddS3Uploader(uploader *s3manager.Uploader) {
+func (env *Environment) AddS3Uploader(uploader *manager.Uploader) {
 	env.S3Uploader = uploader
 }
 
-func (env *Environment) AddS3Downloader(downloader *s3manager.Downloader) {
+func (env *Environment) AddS3Downloader(downloader *manager.Downloader) {
 	env.S3Downloader = downloader
 }
 

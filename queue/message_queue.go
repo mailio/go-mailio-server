@@ -21,6 +21,7 @@ type MessageQueue struct {
 	mtpService         *services.MtpService
 	handshakeService   *services.HandshakeService
 	deliveryService    *services.MessageDeliveryService
+	s3Service          *services.S3Service
 	restyClient        *resty.Client
 	env                *types.Environment
 }
@@ -34,8 +35,19 @@ func NewMessageQueue(dbSelector *repository.CouchDBSelector, env *types.Environm
 	handshakeService := services.NewHandshakeService(dbSelector)
 	deliveryService := services.NewMessageDeliveryService(dbSelector)
 	userProfileService := services.NewUserProfileService(dbSelector, env)
+	s3Service := services.NewS3Service(env)
 
-	return &MessageQueue{ssiService: ssiService, userService: userService, mtpService: mtpService, handshakeService: handshakeService, deliveryService: deliveryService, restyClient: rcClient, env: env, userProfileService: userProfileService}
+	return &MessageQueue{
+		ssiService:         ssiService,
+		userService:        userService,
+		mtpService:         mtpService,
+		handshakeService:   handshakeService,
+		deliveryService:    deliveryService,
+		restyClient:        rcClient,
+		env:                env,
+		userProfileService: userProfileService,
+		s3Service:          s3Service,
+	}
 }
 
 // Processing of SMTP tasks

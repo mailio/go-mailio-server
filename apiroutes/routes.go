@@ -53,6 +53,7 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 	domainService := services.NewDomainService(dbSelector)
 	webAuthnService := services.NewWebAuthnService(dbSelector, environment)
 	smartKeyService := services.NewSmartKeyService(dbSelector)
+	s3Service := services.NewS3Service(environment)
 
 	// API definitions
 	handshakeApi := api.NewHandshakeApi(handshakeService, nonceService, mtpService, userProfileService)
@@ -62,6 +63,7 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 	messageApi := api.NewMessagingApi(ssiService, userService, userProfileService, environment)
 	domainApi := api.NewDomainApi(domainService)
 	webauthnApi := api.NewWebAuthnApi(nonceService, webAuthnService, userService, userProfileService, smartKeyService, ssiService, environment)
+	s3Api := api.NewS3Api(s3Service, environment)
 
 	// WEBHOOK API definitions
 	webhookApi := api.NewMailReceiveWebhook(handshakeService, userService, userProfileService, environment)
@@ -125,6 +127,10 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 		// return smartkey based on cookie (checkin if user logged in, to skip login if cookie value)
 		rootApi.GET("/v1/verify_cookie", accountApi.VerifyCookie)
 		rootApi.GET("/v1/logout", accountApi.Logout)
+
+		// s3
+		rootApi.GET("/v1/s3presign", s3Api.GetPresignedUrlPut)
+		rootApi.DELETE("/v1/s3", s3Api.DeleteObject)
 	}
 
 	// server-to-server communication (aka MTP - Mailio Transfer Protocol)

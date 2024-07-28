@@ -1,7 +1,6 @@
 package services
 
 import (
-	"bytes"
 	"context"
 	"encoding/hex"
 	"errors"
@@ -12,8 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/go-resty/resty/v2"
 	"github.com/mailio/go-mailio-did/did"
 	"github.com/mailio/go-mailio-server/global"
@@ -331,41 +328,3 @@ func (us *UserService) CountNumberOfMessages(address string, from string, folder
 	}
 	return &response, nil
 }
-
-// upload attachment to s3
-func (us *UserService) UploadAttachment(bucket, path string, content []byte) (string, error) {
-	if len(content) == 0 {
-		return "", types.ErrBadRequest
-	}
-	ioReader := bytes.NewReader(content)
-	_, uErr := us.env.S3Uploader.Upload(&s3manager.UploadInput{
-		Bucket: aws.String(bucket),
-		Key:    aws.String(path),
-		Body:   ioReader,
-	})
-	if uErr != nil {
-		global.Logger.Log(uErr.Error(), "failed to upload attachment", path)
-		return "", uErr
-	}
-	return fmt.Sprintf("s3://%s%s", global.Conf.Storage.Bucket, path), nil
-}
-
-// download attachment from s3
-// func (us *UserService) DownloadAttachment(attachmentUrl string) ([]byte, error) {
-// 	if attachmentUrl == "" {
-// 		return nil, types.ErrBadRequest
-// 	}
-// 	splitted := strings.Split(attachmentUrl, "s3://"+global.Conf.Storage.Bucket+"/")
-// 	if len(splitted) != 2 {
-// 		return nil, types.ErrBadRequest
-// 	}
-// 	buf := aws.NewWriteAtBuffer([]byte{})
-// 	_, err := us.env.S3Downloader.Download(buf, &s3manager.DownloadInput{
-// 		Bucket: aws.String(global.Conf.Storage.Bucket),
-// 		Key:    aws.String(attachmentUrl),
-// 	})
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	return buf.Bytes(), nil
-// }

@@ -1,16 +1,18 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
 	"strconv"
 	"strings"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
 	diskusagehandler "github.com/mailio/go-mailio-diskusage-handler"
@@ -122,14 +124,19 @@ func ConfigDBIndexing(dbSelector *repository.CouchDBSelector, environment *types
 
 func ConfigS3Storage(conf *global.Config, env *types.Environment) {
 	// configure S3 storage
-	session := session.Must(session.NewSession(&aws.Config{
-		Region:      aws.String(conf.Storage.Region),
-		Credentials: credentials.NewStaticCredentials(conf.Storage.Key, conf.Storage.Secret, ""),
-	}))
-	uploader := s3manager.NewUploader(session)
-	downloader := s3manager.NewDownloader(session)
+	credentials := aws.NewCredentialsCache(credentials.NewStaticCredentialsProvider(conf.Storage.Key, conf.Storage.Secret, ""))
+	awsConf, err := config.LoadDefaultConfig(context.TODO(), config.WithCredentialsProvider(credentials), config.WithRegion(conf.Storage.Region))
+	if err != nil {
+		panic(err)
+	}
+	s3Client := s3.NewFromConfig(awsConf)
+	uploader := manager.NewUploader(s3Client)
+	downloader := manager.NewDownloader(s3Client)
 	env.AddS3Uploader(uploader)
 	env.AddS3Downloader(downloader)
+
+	env.S3Client = s3Client
+	env.S3PresignClient = s3.NewPresignClient(s3Client)
 }
 
 func ConfigWebAuthN(conf *global.Config, env *types.Environment) {
