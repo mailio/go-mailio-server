@@ -60,6 +60,10 @@ func JWSMiddleware(userProfileService *services.UserProfileService) gin.HandlerF
 		if upErr != nil {
 			global.Logger.Log("JWSMiddleware", "failed to find user profile", upErr.Error())
 		}
+		if userProfile == nil {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "User account not found"})
+			return
+		}
 		// check if user is enabled
 		if !userProfile.Enabled {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "User account is disabled"})

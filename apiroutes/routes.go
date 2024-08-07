@@ -58,7 +58,7 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 	// API definitions
 	handshakeApi := api.NewHandshakeApi(handshakeService, nonceService, mtpService, userProfileService)
 	accountApi := api.NewUserAccountApi(userService, userProfileService, nonceService, ssiService, smartKeyService)
-	didApi := api.NewDIDApi(ssiService)
+	didApi := api.NewDIDApi(ssiService, mtpService)
 	vcApi := api.NewVCApi(ssiService)
 	messageApi := api.NewMessagingApi(ssiService, userService, userProfileService, environment)
 	domainApi := api.NewDomainApi(domainService)
@@ -71,6 +71,7 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 	// MTP API definitions
 	handshakeMTPApi := api.NewHandshakeMTPApi(handshakeService, mtpService, environment)
 	messageMTPApi := api.NewMessagingMTPApi(handshakeService, mtpService, environment)
+	didMtpApi := api.NewDIDMtpApi(handshakeService, mtpService, environment)
 
 	// PUBLIC ROOT API
 	rootPublicApi := router.Group("/", restinterceptors.RateLimitMiddleware(), metrics.MetricsMiddleware())
@@ -131,6 +132,9 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 		// s3
 		rootApi.GET("/v1/s3presign", s3Api.GetPresignedUrlPut)
 		rootApi.DELETE("/v1/s3", s3Api.DeleteObject)
+
+		// did documents
+		rootApi.POST("/v1/resolve/did", didApi.FetchDIDDocuments)
 	}
 
 	// server-to-server communication (aka MTP - Mailio Transfer Protocol)
@@ -139,6 +143,7 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 		// Handshakes MTP
 		mtpRootApi.POST("/v1/mtp/handshake", handshakeMTPApi.GetLocalHandshakes)
 		mtpRootApi.POST("/v1/mtp/message", messageMTPApi.ReceiveMessage)
+		mtpRootApi.POST("/v1/mtp/did", didMtpApi.GetLocalDIDDocuments)
 	}
 
 	// SMTP email receiving (multiple providers possible)

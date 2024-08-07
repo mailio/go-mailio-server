@@ -263,7 +263,7 @@ func (ha *HandshakeApi) PersonalHandshakeLink(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param handshake body types.InputHandshakeLookup true "InputHandshakeLookup"
-// @Success 200 {array} types.HandshakeContent
+// @Success 200 {object} types.HandshakeLookupResponse
 // @Failure 401 {object} api.ApiError "invalid signature"
 // @Failure 400 {object} api.ApiError "bad request"
 // @Failure 429 {object} api.ApiError "rate limit exceeded"
@@ -289,12 +289,17 @@ func (hs *HandshakeApi) HandshakeFetch(c *gin.Context) {
 		return
 	}
 
-	handshakes, hErr := hs.mtpService.LookupHandshakes(address.(string), handshakeLookup.Lookups)
+	foundHandshakes, notFoundLookups, hErr := hs.mtpService.LookupHandshakes(address.(string), handshakeLookup.Lookups)
 	if hErr != nil {
 		ApiErrorf(c, http.StatusBadRequest, "failed to request handshake")
 		return
 	}
-	//TODO: save handshakes
+	//TODO: save handshakes (for caching)
 
-	c.JSON(http.StatusOK, handshakes)
+	lookupResponse := types.HandshakeLookupResponse{
+		Found:    foundHandshakes,
+		NotFound: notFoundLookups,
+	}
+
+	c.JSON(http.StatusOK, lookupResponse)
 }

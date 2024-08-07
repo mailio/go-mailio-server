@@ -193,8 +193,7 @@ func (msq *MessageQueue) ReceiveSMTPMessage(email *smtptypes.Mail, taskId string
 		if err != nil {
 			sendBounce(to, email, smtpHandler, "4.3.0", fmt.Sprintf("Recipient not found: %s", to.Address))
 		}
-		scryptedBaseUrl64 := base64.URLEncoding.EncodeToString(scryptedMail)
-		userMapping, umErr := msq.userService.FindUserByScryptEmail(scryptedBaseUrl64)
+		userMapping, umErr := msq.userService.FindUserByScryptEmail(scryptedMail)
 		if umErr != nil {
 			if umErr == types.ErrNotFound {
 				global.Logger.Log("error, find user by scrypt not found", to.Address, umErr.Error())

@@ -9,16 +9,15 @@ import (
 )
 
 func TestScryptEmail(t *testing.T) {
-	global.Conf.Mailio = global.MailioConfig{
-		EmailSaltHex: "1234567890",
-	}
-	scrypted, err := ScryptEmail("test@test.com")
+	global.Conf.Mailio = global.MailioConfig{}
+	scrypted, err := ScryptEmail("test@mail.io")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(scrypted) != 32 {
 		t.Fatal("scrypted email is not 32 bytes long")
 	}
+	assert.Equal(t, "FHKrlVeIovkfMAf/e8D7NCxiI3i4EAJjObE1VhBcank=", scrypted)
 }
 
 func TestGenerateKeyPair(t *testing.T) {

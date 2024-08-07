@@ -85,7 +85,7 @@ func (a *WebAuthnApi) RegistrationOptions(c *gin.Context) {
 		return
 	}
 	// check if email already exists
-	_, fuErr := a.userService.FindUserByScryptEmail(base64.URLEncoding.EncodeToString(scryptedEmail))
+	_, fuErr := a.userService.FindUserByScryptEmail(scryptedEmail)
 	if fuErr == nil {
 		ApiErrorf(c, http.StatusConflict, "email already exists")
 		return
@@ -204,7 +204,7 @@ func (a *WebAuthnApi) VerifyRegistration(c *gin.Context) {
 		return
 	}
 	// check if email already exists
-	_, fuErr := a.userService.FindUserByScryptEmail(base64.URLEncoding.EncodeToString(scryptedEmail))
+	_, fuErr := a.userService.FindUserByScryptEmail(scryptedEmail)
 	if fuErr == nil {
 		ApiErrorf(c, http.StatusConflict, "email already exists")
 		return
@@ -270,7 +270,7 @@ func (a *WebAuthnApi) VerifyRegistration(c *gin.Context) {
 	nonWebauthnUser := &types.User{
 		MailioAddress:  req.SmartKeyPayload.Address,
 		Email:          req.SmartKeyPayload.Email,
-		EncryptedEmail: base64.URLEncoding.EncodeToString(scryptedEmail),
+		EncryptedEmail: scryptedEmail,
 		Created:        time.Now().UTC().UnixMilli(),
 	}
 	// create JWT key

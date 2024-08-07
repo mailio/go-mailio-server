@@ -9,6 +9,8 @@ type Domain struct {
 	SupportsStandardEmails bool   `json:"supportsStandardEmail"`     // domain can be both (mailio and smtp)
 	MailioPublicKey        string `json:"mailioPublicKey,omitempty"`
 	Timestamp              int64  `json:"timestamp"`
+	MxCheckError           string `json:"mxCheckError,omitempty"`
+	MailioCheckError       string `json:"mailioCheckError,omitempty"`
 }
 
 // user domain (which domain user is associated with)

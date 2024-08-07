@@ -657,10 +657,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/types.HandshakeContent"
-                            }
+                            "$ref": "#/definitions/types.HandshakeLookupResponse"
                         }
                     },
                     "400": {
@@ -810,9 +807,9 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/mtp/handshake": {
+        "/api/v1/mtp/did": {
             "post": {
-                "description": "Request handshake from this server (must be digitally signed)",
+                "description": "Request did documents from this server by email hash (must be digitally signed bny senders Mailio server)",
                 "consumes": [
                     "application/json"
                 ],
@@ -822,7 +819,59 @@ const docTemplate = `{
                 "tags": [
                     "Mailio Transfer Protocol"
                 ],
-                "summary": "Request handshake from this server (must be digitally signed)",
+                "summary": "Request did docouments from this server (must be digitally signed by senders Mailio server)",
+                "parameters": [
+                    {
+                        "description": "DIDDocumentSignedRequest",
+                        "name": "handshake",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.DIDDocumentSignedRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.DIDDocumentSignedResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "bad request",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "401": {
+                        "description": "invalid signature",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "429": {
+                        "description": "rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/mtp/handshake": {
+            "post": {
+                "description": "Request handshake from this server (must be digitally signed by senders Mailio server)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Mailio Transfer Protocol"
+                ],
+                "summary": "Request handshake from this server (must be digitally signed by senders Mailio server)",
                 "parameters": [
                     {
                         "description": "HandshakeSignedRequest",
@@ -1056,6 +1105,63 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/resolve/did": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Fetch all DID documents (local and remote)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Messaging"
+                ],
+                "summary": "Fetch all DID documents (local and remote)",
+                "parameters": [
+                    {
+                        "description": "InputDIDLookup",
+                        "name": "lookups",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.InputDIDLookup"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.OutputDIDLookup"
+                        }
+                    },
+                    "400": {
+                        "description": "invalid email address",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "429": {
+                        "description": "rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "500": {
+                        "description": "error fetching did documents",
                         "schema": {
                             "$ref": "#/definitions/api.ApiError"
                         }
@@ -2759,6 +2865,115 @@ const docTemplate = `{
                 }
             }
         },
+        "types.DIDDocumentSignedRequest": {
+            "type": "object",
+            "required": [
+                "cborPayloadBase64",
+                "didLookupRequest",
+                "senderDomain",
+                "signatureBase64"
+            ],
+            "properties": {
+                "cborPayloadBase64": {
+                    "type": "string"
+                },
+                "didLookupRequest": {
+                    "$ref": "#/definitions/types.DIDLookupRequest"
+                },
+                "senderDomain": {
+                    "description": "origin of the request (where DNS is published with Mailio public key)",
+                    "type": "string"
+                },
+                "signatureBase64": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.DIDDocumentSignedResponse": {
+            "type": "object",
+            "required": [
+                "cborPayloadBase64",
+                "didLookupResponse",
+                "signatureBase64"
+            ],
+            "properties": {
+                "cborPayloadBase64": {
+                    "type": "string"
+                },
+                "didLookupResponse": {
+                    "$ref": "#/definitions/types.DIDLookupResponse"
+                },
+                "signatureBase64": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.DIDLookup": {
+            "type": "object",
+            "required": [
+                "email",
+                "originServer"
+            ],
+            "properties": {
+                "email": {
+                    "description": "email address",
+                    "type": "string"
+                },
+                "emailHash": {
+                    "description": "scrypt hash of the email address",
+                    "type": "string"
+                },
+                "originServer": {
+                    "$ref": "#/definitions/types.OriginServer"
+                }
+            }
+        },
+        "types.DIDLookupRequest": {
+            "type": "object",
+            "required": [
+                "didLookups",
+                "lookupHeader",
+                "senderAddress"
+            ],
+            "properties": {
+                "didLookups": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.DIDLookup"
+                    }
+                },
+                "lookupHeader": {
+                    "$ref": "#/definitions/types.LookupHeader"
+                },
+                "senderAddress": {
+                    "description": "intended senders Mailio address",
+                    "type": "string"
+                }
+            }
+        },
+        "types.DIDLookupResponse": {
+            "type": "object",
+            "required": [
+                "lookupHeader"
+            ],
+            "properties": {
+                "foundDIDDocuments": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/did.Document"
+                    }
+                },
+                "lookupHeader": {
+                    "$ref": "#/definitions/types.LookupHeader"
+                },
+                "notFoundLookups": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.DIDLookup"
+                    }
+                }
+            }
+        },
         "types.Domain": {
             "type": "object",
             "properties": {
@@ -2772,11 +2987,17 @@ const docTemplate = `{
                     "description": "Rev is the revision number returned\n_Rev    string ` + "`" + `json:\"_rev,omitempty\"` + "`" + `",
                     "type": "string"
                 },
+                "mailioCheckError": {
+                    "type": "string"
+                },
                 "mailioDIDDomain": {
                     "description": "mailio domain (if supportsMailio)",
                     "type": "string"
                 },
                 "mailioPublicKey": {
+                    "type": "string"
+                },
+                "mxCheckError": {
                     "type": "string"
                 },
                 "name": {
@@ -2804,9 +3025,15 @@ const docTemplate = `{
             "required": [
                 "data",
                 "id",
-                "mediaType"
+                "mediaType",
+                "name",
+                "size"
             ],
             "properties": {
+                "contentType": {
+                    "description": "the content type of the attachment",
+                    "type": "string"
+                },
                 "data": {
                     "description": "the encrypted message body",
                     "allOf": [
@@ -2815,28 +3042,49 @@ const docTemplate = `{
                         }
                     ]
                 },
-                "description": {
-                    "description": "a human-readable description of the attachment (optional)",
-                    "type": "string"
-                },
                 "id": {
                     "description": "a globally unique identifier for the attachment",
                     "type": "string"
                 },
+                "lastModTime": {
+                    "description": "the last modification time of the attachment in UTC milliseconds since epoch",
+                    "type": "integer"
+                },
                 "mediaType": {
                     "description": "the media type of the attachment",
                     "type": "string"
+                },
+                "name": {
+                    "description": "the name of the attachment",
+                    "type": "string"
+                },
+                "size": {
+                    "description": "the size of the attachment in bytes",
+                    "type": "integer"
                 }
             }
         },
         "types.EncryptedAttachmentData": {
             "type": "object",
             "required": [
-                "json"
+                "links"
             ],
             "properties": {
-                "json": {
-                    "$ref": "#/definitions/types.EncryptedBody"
+                "decryptionKey": {
+                    "description": "the key used to decrypt the ciphertext",
+                    "type": "string"
+                },
+                "hash": {
+                    "description": "the hash of the attachment",
+                    "type": "string"
+                },
+                "links": {
+                    "description": "the links to the attachment",
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },
@@ -2941,7 +3189,7 @@ const docTemplate = `{
                     "description": "origin server",
                     "allOf": [
                         {
-                            "$ref": "#/definitions/types.HandshakeOriginServer"
+                            "$ref": "#/definitions/types.OriginServer"
                         }
                     ]
                 },
@@ -2991,27 +3239,6 @@ const docTemplate = `{
                 }
             }
         },
-        "types.HandshakeHeader": {
-            "type": "object",
-            "required": [
-                "signatureScheme",
-                "timestamp"
-            ],
-            "properties": {
-                "emailLookupHashScheme": {
-                    "type": "string"
-                },
-                "signatureScheme": {
-                    "type": "string",
-                    "enum": [
-                        "EdDSA_X25519"
-                    ]
-                },
-                "timestamp": {
-                    "type": "integer"
-                }
-            }
-        },
         "types.HandshakeLink": {
             "type": "object",
             "properties": {
@@ -3023,10 +3250,15 @@ const docTemplate = `{
         "types.HandshakeLookup": {
             "type": "object",
             "required": [
+                "email",
                 "originServer"
             ],
             "properties": {
                 "address": {
+                    "type": "string"
+                },
+                "email": {
+                    "description": "email address",
                     "type": "string"
                 },
                 "emailHash": {
@@ -3037,42 +3269,43 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "originServer": {
-                    "$ref": "#/definitions/types.HandshakeOriginServer"
+                    "$ref": "#/definitions/types.OriginServer"
                 }
             }
         },
-        "types.HandshakeOriginServer": {
+        "types.HandshakeLookupResponse": {
             "type": "object",
-            "required": [
-                "domain"
-            ],
             "properties": {
-                "domain": {
-                    "description": "required",
-                    "type": "string"
+                "found": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.HandshakeContent"
+                    }
                 },
-                "ip": {
-                    "description": "optional",
-                    "type": "string"
+                "notFound": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.HandshakeLookup"
+                    }
                 }
             }
         },
         "types.HandshakeRequest": {
             "type": "object",
             "required": [
-                "handshakeHeader",
                 "handshakeLookups",
+                "lookupHeader",
                 "senderAddress"
             ],
             "properties": {
-                "handshakeHeader": {
-                    "$ref": "#/definitions/types.HandshakeHeader"
-                },
                 "handshakeLookups": {
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/types.HandshakeLookup"
                     }
+                },
+                "lookupHeader": {
+                    "$ref": "#/definitions/types.LookupHeader"
                 },
                 "returnDefaultServerHandshake": {
                     "description": "default false",
@@ -3087,18 +3320,18 @@ const docTemplate = `{
         "types.HandshakeResponse": {
             "type": "object",
             "required": [
-                "handshakeHeader",
-                "handshakes"
+                "handshakes",
+                "lookupHeader"
             ],
             "properties": {
-                "handshakeHeader": {
-                    "$ref": "#/definitions/types.HandshakeHeader"
-                },
                 "handshakes": {
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/types.HandshakeContent"
                     }
+                },
+                "lookupHeader": {
+                    "$ref": "#/definitions/types.LookupHeader"
                 }
             }
         },
@@ -3172,6 +3405,18 @@ const docTemplate = `{
                 "kid": {
                     "description": "(Key ID): A hint indicating which key was used to encrypt the",
                     "type": "string"
+                }
+            }
+        },
+        "types.InputDIDLookup": {
+            "type": "object",
+            "properties": {
+                "lookups": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "$ref": "#/definitions/types.DIDLookup"
+                    }
                 }
             }
         },
@@ -3286,6 +3531,27 @@ const docTemplate = `{
                 }
             }
         },
+        "types.LookupHeader": {
+            "type": "object",
+            "required": [
+                "signatureScheme",
+                "timestamp"
+            ],
+            "properties": {
+                "emailLookupHashScheme": {
+                    "type": "string"
+                },
+                "signatureScheme": {
+                    "type": "string",
+                    "enum": [
+                        "EdDSA_X25519"
+                    ]
+                },
+                "timestamp": {
+                    "type": "integer"
+                }
+            }
+        },
         "types.MTPStatusCode": {
             "type": "object",
             "required": [
@@ -3334,6 +3600,22 @@ const docTemplate = `{
                 }
             }
         },
+        "types.OriginServer": {
+            "type": "object",
+            "required": [
+                "domain"
+            ],
+            "properties": {
+                "domain": {
+                    "description": "required",
+                    "type": "string"
+                },
+                "ip": {
+                    "description": "optional",
+                    "type": "string"
+                }
+            }
+        },
         "types.OutputBasicUserInfo": {
             "type": "object",
             "properties": {
@@ -3348,6 +3630,23 @@ const docTemplate = `{
                 },
                 "usedDisk": {
                     "type": "integer"
+                }
+            }
+        },
+        "types.OutputDIDLookup": {
+            "type": "object",
+            "properties": {
+                "found": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/did.Document"
+                    }
+                },
+                "notFound": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.DIDLookup"
+                    }
                 }
             }
         },

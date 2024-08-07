@@ -2,7 +2,10 @@ package services
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net"
+	"net/mail"
 	"net/url"
 	"strings"
 	"time"
@@ -40,6 +43,11 @@ func getUserByScryptEmail(repo repository.Repository, hashedEmail string) (*type
 	return &userMapping, nil
 }
 
+// resolveDomain resolves the domain by checking if it supports mailio and standard emails
+// Errors:
+// - ErrNotFound: if the domain is not found
+// - ErrMxRecordCheckFailed: if the MX record check fails
+// - any other error that occurs during the process
 func resolveDomain(domainRepo repository.Repository, domain string, forceDiscovery bool) (*types.Domain, error) {
 	// get domain from database
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
@@ -54,16 +62,17 @@ func resolveDomain(domainRepo repository.Repository, domain string, forceDiscove
 
 	var domainObj types.Domain
 	// if found map to domainObj
-	resp := response.(*resty.Response)
-	if response != nil && resp.StatusCode() == 200 {
-		if err := repository.MapToObject(response, &domainObj); err != nil {
-			global.Logger.Log("msg", "error while mapping object", "err", err)
-			return nil, err
+	if response != nil {
+		resp := response.(*resty.Response)
+		if resp.StatusCode() == 200 {
+			if err := repository.MapToObject(response, &domainObj); err != nil {
+				global.Logger.Log("msg", "error while mapping object", "err", err)
+				return nil, err
+			}
 		}
 	}
-	if response != nil && !forceDiscovery {
+	if !forceDiscovery && domainObj.Name != "" {
 		// domain found in database
-
 		shouldSave := false
 		ageInMillis := time.Now().UTC().UnixMilli() - domainObj.Timestamp
 		if shouldUpdateStandardEmails(ageInMillis) {
@@ -103,6 +112,13 @@ func resolveDomain(domainRepo repository.Repository, domain string, forceDiscove
 	}
 	uErr := updateDomain(newDomainObj, domain)
 	if uErr != nil {
+		if errors.Is(uErr, types.ErrMxRecordCheckFailed) {
+			newDomainObj.MxCheckError = uErr.Error()
+			saveDomain(ctx, domainRepo, domain, newDomainObj)
+			return newDomainObj, nil
+		}
+		newDomainObj.MailioCheckError = uErr.Error()
+		saveDomain(ctx, domainRepo, domain, newDomainObj)
 		global.Logger.Log("msg", "error while updating domain", "err", uErr)
 		return nil, uErr
 	}
@@ -129,7 +145,7 @@ func updateDomain(domainObj *types.Domain, domain string) error {
 	supportsStandard, cErr := util.CheckMXRecords(domain)
 	if cErr != nil {
 		global.Logger.Log("msg", "error while checking MX records", "err", cErr)
-		return cErr
+		return fmt.Errorf("failed to check MX record for domain %s: %w", domain+", "+cErr.Error(), types.ErrMxRecordCheckFailed)
 	}
 	domainObj.SupportsStandardEmails = supportsStandard
 	discovery, err := checkIfMailioServer(domain)
@@ -216,4 +232,36 @@ func getHostWithoutPort(host string) string {
 		idnaLookupHost = strings.Split(idnaLookupHost, ":")[0]
 	}
 	return idnaLookupHost
+}
+
+// splits the lookup list into local and remote lookups
+// local lookups are those that are in the same domain as the server
+// remote lookups are those that are in different domains
+// it also checks if all the email addresses are valid
+func getLocalAndRemoteRecipients(lookups []*types.DIDLookup) ([]*types.DIDLookup, map[string][]*types.DIDLookup, error) {
+	localDomainMap := make(map[string]string)
+	for _, localDomain := range global.Conf.Mailio.DomainConfig {
+		localDomainMap[localDomain.Domain] = ""
+	}
+
+	localLookups := []*types.DIDLookup{}
+	remoteLookups := map[string][]*types.DIDLookup{}
+	for _, lookup := range lookups {
+		lookupEmailParsed, lepErr := mail.ParseAddress(lookup.Email)
+		if lepErr != nil {
+			global.Logger.Log("msg", "failed to parse email address", "err", lepErr)
+			return nil, nil, lepErr
+		}
+		lookupEmailParsed.Address = strings.ToLower(lookupEmailParsed.Address)
+		lookup.Email = lookupEmailParsed.Address
+		lookupDomain := strings.Split(lookupEmailParsed.Address, "@")[1]
+		// check if local or remote
+		if _, ok := localDomainMap[lookupDomain]; ok {
+			localLookups = append(localLookups, lookup)
+		} else {
+			// remote domain
+			remoteLookups[lookupDomain] = append(remoteLookups[lookupDomain], lookup)
+		}
+	}
+	return localLookups, remoteLookups, nil
 }

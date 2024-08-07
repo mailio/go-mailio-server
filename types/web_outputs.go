@@ -1,5 +1,7 @@
 package types
 
+import "github.com/mailio/go-mailio-did/did"
+
 type OutputBasicUserInfo struct {
 	Address   string `json:"address"`
 	TotalDisk int64  `json:"totalDisk,omitempty"`
@@ -15,4 +17,9 @@ type DIDCommApiResponse struct {
 	ID             string           `json:"id"`
 	Type           string           `json:"type,omitempty"`
 	MTPStatusCodes []*MTPStatusCode `json:"mtpStatusCodes,omitempty"`
+}
+
+type OutputDIDLookup struct {
+	Found    []*did.Document `json:"found,omitempty"`
+	NotFound []*DIDLookup    `json:"notFound,omitempty"`
 }

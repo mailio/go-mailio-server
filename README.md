@@ -21,7 +21,6 @@ mailio:
   diskSpace: 524288000 # initial maximum disk size in bytes (500 MB)
   authenticationPath: /api/v1/didauth # don't change unless you know what you're doing
   messagingPath: /api/v1/mtp/message # don't change unless you know what you're doing
-  emailSaltHex: abcdefgh # 8 bytes hex (abcdefgh)
   serverKeysPath: test_server_keys.json
   readVsReceived: 30 # 30% read makes a message go to goodreads, less to other
   serverDomain: mio.example.com # where this server is located on the internet

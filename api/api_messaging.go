@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/base64"
 	"fmt"
 	"net/http"
 	"time"
@@ -231,7 +230,7 @@ func (ma *MessagingApi) validateSmtpSender(c *gin.Context, fromEmailAddress stri
 		ApiErrorf(c, http.StatusInternalServerError, "failed to scrypt email address")
 		return err
 	}
-	_, mErr := ma.userService.FindUserByScryptEmail(base64.URLEncoding.EncodeToString(scryptedMail))
+	_, mErr := ma.userService.FindUserByScryptEmail(scryptedMail)
 	if mErr != nil {
 		if mErr == types.ErrNotFound {
 			ApiErrorf(c, http.StatusForbidden, "From email address and your address don't match")

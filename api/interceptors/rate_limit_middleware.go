@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	LimitRequestsPerSecond     = 5
+	LimitRequestsPerSecond     = 10
 	LimitRequestNoncePerSecond = 1
 )
 

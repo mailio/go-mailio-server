@@ -18,12 +18,14 @@ import (
 
 type DIDApi struct {
 	ssiService *services.SelfSovereignService
+	mtpService *services.MtpService
 	validate   *validator.Validate
 }
 
-func NewDIDApi(ssiService *services.SelfSovereignService) *DIDApi {
+func NewDIDApi(ssiService *services.SelfSovereignService, mtpService *services.MtpService) *DIDApi {
 	return &DIDApi{
 		ssiService: ssiService,
+		mtpService: mtpService,
 		validate:   validator.New(),
 	}
 }
@@ -134,4 +136,49 @@ func (did *DIDApi) GetDIDDocument(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, resolved)
+}
+
+// @Summary Fetch all DID documents (local and remote)
+// @Description Fetch all DID documents (local and remote)
+// @Security Bearer
+// @Tags Messaging
+// @Accept json
+// @Produce json
+// @Param lookups body types.InputDIDLookup true "InputDIDLookup"
+// @Success 200 {object} types.OutputDIDLookup
+// @Failure 429 {object} api.ApiError "rate limit exceeded"
+// @Failure 400 {object} api.ApiError "invalid email address"
+// @Failure 500 {object} api.ApiError "error fetching did documents"
+// @Router /api/v1/resolve/did [post]
+func (da *DIDApi) FetchDIDDocuments(c *gin.Context) {
+	address, exists := c.Get("subjectAddress")
+	if !exists {
+		ApiErrorf(c, http.StatusUnauthorized, "not authorized to create personal handshake")
+		return
+	}
+	// Fetch all DID documents (local and remote)
+	var input types.InputDIDLookup
+	if err := c.ShouldBindJSON(&input); err != nil {
+		ApiErrorf(c, http.StatusBadRequest, "invalid format")
+		return
+	}
+	err := da.validate.Struct(input)
+	if err != nil {
+		msg := util.ValidationErrorToMessage(err)
+		ApiErrorf(c, http.StatusBadRequest, msg)
+		return
+	}
+	found, notFound, fErr := da.mtpService.FetchDIDDocuments(address.(string), input.Lookups)
+	if fErr != nil {
+		if fErr == types.ErrInvalidEmail {
+			ApiErrorf(c, http.StatusBadRequest, "invalid email format")
+			return
+		}
+		ApiErrorf(c, http.StatusInternalServerError, "error fetching did documents")
+		return
+	}
+	c.JSON(http.StatusOK, types.OutputDIDLookup{
+		Found:    found,
+		NotFound: notFound,
+	})
 }

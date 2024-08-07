@@ -48,7 +48,6 @@ type MailioConfig struct {
 	MessagingPath            string                        `yaml:"messagingPath"`
 	ServerDomain             string                        `yaml:"serverDomain"`
 	ServerSubdomainQueryList []*MailioServerSubdomainQuery `yaml:"serverSubdomainQueryList"`
-	EmailSaltHex             string                        `yaml:"emailSaltHex"`
 	ServerKeysPath           string                        `yaml:"serverKeysPath"`
 	ServerHanshake           ServerHandshakeConfig         `yaml:"serverHandshake"`
 	ReadVsReceived           int                           `yaml:"readVsReceived"`

@@ -281,7 +281,7 @@ func (ua *UserAccountApi) Register(c *gin.Context) {
 
 	user := &types.User{
 		Email:          emailAddr.Address,
-		EncryptedEmail: base64.URLEncoding.EncodeToString(scryptedEmail),
+		EncryptedEmail: scryptedEmail,
 		MailioAddress:  inputRegister.MailioAddress,
 		Created:        util.GetTimestamp(),
 	}

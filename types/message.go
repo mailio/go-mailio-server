@@ -84,14 +84,19 @@ type PlainBodyDelivery struct {
 // EncryptedMailioAttachment is a struct that represents an encrypted attachment according to JWE standard
 type EncryptedAttachment struct {
 	ID          string                   `json:"id" validate:"required"`                                              // a globally unique identifier for the attachment
-	Description string                   `json:"description,omitempty"`                                               // a human-readable description of the attachment (optional)
 	MediaType   string                   `json:"mediaType" validate:"required,eq=application/didcomm-encrypted+json"` // the media type of the attachment
+	ContentType string                   `json:"contentType,omitempty"`                                               // the content type of the attachment
+	LastModTime int64                    `json:"lastModTime,omitempty"`                                               // the last modification time of the attachment in UTC milliseconds since epoch
+	Size        int64                    `json:"size" validate:"required"`                                            // the size of the attachment in bytes
+	Name        string                   `json:"name" validate:"required"`                                            // the name of the attachment
 	Data        *EncryptedAttachmentData `json:"data" validate:"required"`                                            // the encrypted message body
 }
 
 // EncryptedAttachmentData JWE encrypted attachment data
 type EncryptedAttachmentData struct {
-	Json *EncryptedBody `json:"json" validate:"required"`
+	Hash          string   `json:"hash,omitempty"`                  // the hash of the attachment
+	DecryptionKey string   `json:"decryptionKey"`                   // the key used to decrypt the ciphertext
+	Links         []string `json:"links" validate:"required,min=1"` // the links to the attachment
 }
 
 // Recipient is a struct that represents a recipient of an encrypted message

@@ -855,6 +855,82 @@ definitions:
     - senderDomain
     - signatureBase64
     type: object
+  types.DIDDocumentSignedRequest:
+    properties:
+      cborPayloadBase64:
+        type: string
+      didLookupRequest:
+        $ref: '#/definitions/types.DIDLookupRequest'
+      senderDomain:
+        description: origin of the request (where DNS is published with Mailio public
+          key)
+        type: string
+      signatureBase64:
+        type: string
+    required:
+    - cborPayloadBase64
+    - didLookupRequest
+    - senderDomain
+    - signatureBase64
+    type: object
+  types.DIDDocumentSignedResponse:
+    properties:
+      cborPayloadBase64:
+        type: string
+      didLookupResponse:
+        $ref: '#/definitions/types.DIDLookupResponse'
+      signatureBase64:
+        type: string
+    required:
+    - cborPayloadBase64
+    - didLookupResponse
+    - signatureBase64
+    type: object
+  types.DIDLookup:
+    properties:
+      email:
+        description: email address
+        type: string
+      emailHash:
+        description: scrypt hash of the email address
+        type: string
+      originServer:
+        $ref: '#/definitions/types.OriginServer'
+    required:
+    - email
+    - originServer
+    type: object
+  types.DIDLookupRequest:
+    properties:
+      didLookups:
+        items:
+          $ref: '#/definitions/types.DIDLookup'
+        type: array
+      lookupHeader:
+        $ref: '#/definitions/types.LookupHeader'
+      senderAddress:
+        description: intended senders Mailio address
+        type: string
+    required:
+    - didLookups
+    - lookupHeader
+    - senderAddress
+    type: object
+  types.DIDLookupResponse:
+    properties:
+      foundDIDDocuments:
+        items:
+          $ref: '#/definitions/did.Document'
+        type: array
+      lookupHeader:
+        $ref: '#/definitions/types.LookupHeader'
+      notFoundLookups:
+        items:
+          $ref: '#/definitions/types.DIDLookup'
+        type: array
+    required:
+    - lookupHeader
+    type: object
   types.Domain:
     properties:
       _deleted:
@@ -866,10 +942,14 @@ definitions:
           Rev is the revision number returned
           _Rev    string `json:"_rev,omitempty"`
         type: string
+      mailioCheckError:
+        type: string
       mailioDIDDomain:
         description: mailio domain (if supportsMailio)
         type: string
       mailioPublicKey:
+        type: string
+      mxCheckError:
         type: string
       name:
         type: string
@@ -887,30 +967,52 @@ definitions:
     type: object
   types.EncryptedAttachment:
     properties:
+      contentType:
+        description: the content type of the attachment
+        type: string
       data:
         allOf:
         - $ref: '#/definitions/types.EncryptedAttachmentData'
         description: the encrypted message body
-      description:
-        description: a human-readable description of the attachment (optional)
-        type: string
       id:
         description: a globally unique identifier for the attachment
         type: string
+      lastModTime:
+        description: the last modification time of the attachment in UTC milliseconds
+          since epoch
+        type: integer
       mediaType:
         description: the media type of the attachment
         type: string
+      name:
+        description: the name of the attachment
+        type: string
+      size:
+        description: the size of the attachment in bytes
+        type: integer
     required:
     - data
     - id
     - mediaType
+    - name
+    - size
     type: object
   types.EncryptedAttachmentData:
     properties:
-      json:
-        $ref: '#/definitions/types.EncryptedBody'
+      decryptionKey:
+        description: the key used to decrypt the ciphertext
+        type: string
+      hash:
+        description: the hash of the attachment
+        type: string
+      links:
+        description: the links to the attachment
+        items:
+          type: string
+        minItems: 1
+        type: array
     required:
-    - json
+    - links
     type: object
   types.EncryptedBody:
     properties:
@@ -984,7 +1086,7 @@ definitions:
         type: string
       originServer:
         allOf:
-        - $ref: '#/definitions/types.HandshakeOriginServer'
+        - $ref: '#/definitions/types.OriginServer'
         description: origin server
       ownerAddress:
         description: mailio address of the owner of the handshake
@@ -1017,20 +1119,6 @@ definitions:
         description: handshake type
         type: string
     type: object
-  types.HandshakeHeader:
-    properties:
-      emailLookupHashScheme:
-        type: string
-      signatureScheme:
-        enum:
-        - EdDSA_X25519
-        type: string
-      timestamp:
-        type: integer
-    required:
-    - signatureScheme
-    - timestamp
-    type: object
   types.HandshakeLink:
     properties:
       link:
@@ -1040,35 +1128,39 @@ definitions:
     properties:
       address:
         type: string
+      email:
+        description: email address
+        type: string
       emailHash:
         description: scrypt hash of the email address
         type: string
       id:
         type: string
       originServer:
-        $ref: '#/definitions/types.HandshakeOriginServer'
+        $ref: '#/definitions/types.OriginServer'
     required:
+    - email
     - originServer
     type: object
-  types.HandshakeOriginServer:
+  types.HandshakeLookupResponse:
     properties:
-      domain:
-        description: required
-        type: string
-      ip:
-        description: optional
-        type: string
-    required:
-    - domain
+      found:
+        items:
+          $ref: '#/definitions/types.HandshakeContent'
+        type: array
+      notFound:
+        items:
+          $ref: '#/definitions/types.HandshakeLookup'
+        type: array
     type: object
   types.HandshakeRequest:
     properties:
-      handshakeHeader:
-        $ref: '#/definitions/types.HandshakeHeader'
       handshakeLookups:
         items:
           $ref: '#/definitions/types.HandshakeLookup'
         type: array
+      lookupHeader:
+        $ref: '#/definitions/types.LookupHeader'
       returnDefaultServerHandshake:
         description: default false
         type: boolean
@@ -1076,21 +1168,21 @@ definitions:
         description: intended senders Mailio address
         type: string
     required:
-    - handshakeHeader
     - handshakeLookups
+    - lookupHeader
     - senderAddress
     type: object
   types.HandshakeResponse:
     properties:
-      handshakeHeader:
-        $ref: '#/definitions/types.HandshakeHeader'
       handshakes:
         items:
           $ref: '#/definitions/types.HandshakeContent'
         type: array
+      lookupHeader:
+        $ref: '#/definitions/types.LookupHeader'
     required:
-    - handshakeHeader
     - handshakes
+    - lookupHeader
     type: object
   types.HandshakeSignedRequest:
     properties:
@@ -1142,6 +1234,14 @@ definitions:
     required:
     - epk
     - kid
+    type: object
+  types.InputDIDLookup:
+    properties:
+      lookups:
+        items:
+          $ref: '#/definitions/types.DIDLookup'
+        minItems: 1
+        type: array
     type: object
   types.InputHandshakeLookup:
     properties:
@@ -1222,6 +1322,20 @@ definitions:
     - jwsToken
     - smartKeyPasswordPart
     type: object
+  types.LookupHeader:
+    properties:
+      emailLookupHashScheme:
+        type: string
+      signatureScheme:
+        enum:
+        - EdDSA_X25519
+        type: string
+      timestamp:
+        type: integer
+    required:
+    - signatureScheme
+    - timestamp
+    type: object
   types.MTPStatusCode:
     properties:
       address:
@@ -1257,6 +1371,17 @@ definitions:
       nonce:
         type: string
     type: object
+  types.OriginServer:
+    properties:
+      domain:
+        description: required
+        type: string
+      ip:
+        description: optional
+        type: string
+    required:
+    - domain
+    type: object
   types.OutputBasicUserInfo:
     properties:
       address:
@@ -1267,6 +1392,17 @@ definitions:
         type: integer
       usedDisk:
         type: integer
+    type: object
+  types.OutputDIDLookup:
+    properties:
+      found:
+        items:
+          $ref: '#/definitions/did.Document'
+        type: array
+      notFound:
+        items:
+          $ref: '#/definitions/types.DIDLookup'
+        type: array
     type: object
   types.OutputUserAddress:
     properties:
@@ -1905,9 +2041,7 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/types.HandshakeContent'
-            type: array
+            $ref: '#/definitions/types.HandshakeLookupResponse'
         "400":
           description: bad request
           schema:
@@ -2006,11 +2140,48 @@ paths:
       summary: Logout user
       tags:
       - User Account
+  /api/v1/mtp/did:
+    post:
+      consumes:
+      - application/json
+      description: Request did documents from this server by email hash (must be digitally
+        signed bny senders Mailio server)
+      parameters:
+      - description: DIDDocumentSignedRequest
+        in: body
+        name: handshake
+        required: true
+        schema:
+          $ref: '#/definitions/types.DIDDocumentSignedRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.DIDDocumentSignedResponse'
+        "400":
+          description: bad request
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "401":
+          description: invalid signature
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "429":
+          description: rate limit exceeded
+          schema:
+            $ref: '#/definitions/api.ApiError'
+      summary: Request did docouments from this server (must be digitally signed by
+        senders Mailio server)
+      tags:
+      - Mailio Transfer Protocol
   /api/v1/mtp/handshake:
     post:
       consumes:
       - application/json
-      description: Request handshake from this server (must be digitally signed)
+      description: Request handshake from this server (must be digitally signed by
+        senders Mailio server)
       parameters:
       - description: HandshakeSignedRequest
         in: body
@@ -2037,7 +2208,8 @@ paths:
           description: rate limit exceeded
           schema:
             $ref: '#/definitions/api.ApiError'
-      summary: Request handshake from this server (must be digitally signed)
+      summary: Request handshake from this server (must be digitally signed by senders
+        Mailio server)
       tags:
       - Mailio Transfer Protocol
   /api/v1/mtp/message:
@@ -2173,6 +2345,42 @@ paths:
       summary: Register user
       tags:
       - User Account
+  /api/v1/resolve/did:
+    post:
+      consumes:
+      - application/json
+      description: Fetch all DID documents (local and remote)
+      parameters:
+      - description: InputDIDLookup
+        in: body
+        name: lookups
+        required: true
+        schema:
+          $ref: '#/definitions/types.InputDIDLookup'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.OutputDIDLookup'
+        "400":
+          description: invalid email address
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "429":
+          description: rate limit exceeded
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "500":
+          description: error fetching did documents
+          schema:
+            $ref: '#/definitions/api.ApiError'
+      security:
+      - Bearer: []
+      summary: Fetch all DID documents (local and remote)
+      tags:
+      - Messaging
   /api/v1/resolve/domain:
     get:
       consumes:

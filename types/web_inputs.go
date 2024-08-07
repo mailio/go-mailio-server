@@ -24,3 +24,7 @@ type InputDID struct {
 type InputHandshakeLookup struct {
 	Lookups []HandshakeLookup `json:"lookups" validate:"min=1"`
 }
+
+type InputDIDLookup struct {
+	Lookups []*DIDLookup `json:"lookups" validate:"min=1"`
+}

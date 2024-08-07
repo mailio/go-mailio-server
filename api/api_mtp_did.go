@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/services"
@@ -14,17 +13,17 @@ import (
 	"github.com/mailio/go-mailio-server/util"
 )
 
-type HandshakeMTPApi struct {
+type DIDMtpApi struct {
 	handshakeService *services.HandshakeService
 	mtpService       *services.MtpService
 	validate         *validator.Validate
 	env              *types.Environment
 }
 
-func NewHandshakeMTPApi(handshakeService *services.HandshakeService, mtpService *services.MtpService, env *types.Environment) *HandshakeMTPApi {
+func NewDIDMtpApi(handshakeService *services.HandshakeService, mtpService *services.MtpService, env *types.Environment) *DIDMtpApi {
 	validate := validator.New()
 
-	return &HandshakeMTPApi{
+	return &DIDMtpApi{
 		handshakeService: handshakeService,
 		mtpService:       mtpService,
 		validate:         validate,
@@ -32,43 +31,45 @@ func NewHandshakeMTPApi(handshakeService *services.HandshakeService, mtpService 
 	}
 }
 
-// Request handshake from local database (digitally signed)
-// @Summary Request handshake from this server (must be digitally signed by senders Mailio server)
-// @Description Request handshake from this server (must be digitally signed by senders Mailio server)
+// Request DID Documents from local database by email hash (digitally signed)
+// The request is typically make from remote server method FetchDIDDocuments (above)
+// @Summary Request did docouments from this server (must be digitally signed by senders Mailio server)
+// @Description Request did documents from this server by email hash (must be digitally signed bny senders Mailio server)
 // @Tags Mailio Transfer Protocol
 // @Accept json
 // @Produce json
-// @Param handshake body types.HandshakeSignedRequest true "HandshakeSignedRequest"
-// @Success 200 {object} types.HandshakeSignedResponse
+// @Param handshake body types.DIDDocumentSignedRequest true "DIDDocumentSignedRequest"
+// @Success 200 {object} types.DIDDocumentSignedResponse
 // @Failure 401 {object} api.ApiError "invalid signature"
 // @Failure 400 {object} api.ApiError "bad request"
 // @Failure 429 {object} api.ApiError "rate limit exceeded"
-// @Router /api/v1/mtp/handshake [post]
-func (hs *HandshakeMTPApi) GetLocalHandshakes(c *gin.Context) {
-	var input types.HandshakeSignedRequest
-	if err := c.ShouldBindBodyWith(&input, binding.JSON); err != nil {
+// @Router /api/v1/mtp/did [post]
+func (didMtp *DIDMtpApi) GetLocalDIDDocuments(c *gin.Context) {
+	// input DIDDocumentSignedRequest
+	var input types.DIDDocumentSignedRequest
+	if err := c.ShouldBindJSON(&input); err != nil {
 		ApiErrorf(c, http.StatusBadRequest, "invalid format")
 		return
 	}
-	err := hs.validate.Struct(input)
+	err := didMtp.validate.Struct(input)
 	if err != nil {
 		msg := util.ValidationErrorToMessage(err)
 		ApiErrorf(c, http.StatusBadRequest, msg)
 		return
 	}
-
-	// return all found handshakes found in the local database
-	found, _, err := hs.mtpService.LocalHandshakeLookup(input.HandshakeRequest.SenderAddress, input.HandshakeRequest.HandshakeLookups)
-	if err != nil {
-		ApiErrorf(c, http.StatusBadRequest, "failed to lookup handshakes")
+	found, notFound, fErr := didMtp.mtpService.GetLocalDIDDocumentsByEmailHash(input.DIDLookupRequest.DIDLookups)
+	if fErr != nil {
+		ApiErrorf(c, http.StatusBadRequest, "error getting did documents")
 		return
 	}
-	response := types.HandshakeResponse{
-		Handshakes: found,
-		HandshakeHeader: types.LookupHeader{
+
+	response := types.DIDLookupResponse{
+		LookupHeader: types.LookupHeader{
 			SignatureScheme: types.Signature_Scheme_EdDSA_X25519,
 			Timestamp:       time.Now().UnixMilli(),
 		},
+		FoundDIDDocuments: found,
+		NotFoundLookups:   notFound,
 	}
 
 	cbBytes, cbErr := util.CborEncode(response)
@@ -83,10 +84,11 @@ func (hs *HandshakeMTPApi) GetLocalHandshakes(c *gin.Context) {
 		return
 	}
 
-	signedResponse := types.HandshakeSignedResponse{
-		HandshakeResponse: response,
+	signedResponse := types.DIDDocumentSignedResponse{
+		DIDLookupResponse: response,
 		SignatureBase64:   base64.StdEncoding.EncodeToString(signature),
 		CborPayloadBase64: base64.StdEncoding.EncodeToString(cbBytes),
 	}
+
 	c.JSON(http.StatusOK, signedResponse)
 }

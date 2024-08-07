@@ -49,4 +49,7 @@ var (
 	// Mailio Errors
 	// ErrInvalidMailioAddress - invalid mailio address`
 	ErrInvalidMailioAddress = errors.New("invalid mailio address")
+
+	// ErrMxRecordCheckFailed - ony any error checking MX records
+	ErrMxRecordCheckFailed = errors.New("mx record check failed")
 )
