@@ -65,6 +65,12 @@ func (ma *MessagingApi) SendDIDMessage(c *gin.Context) {
 		return
 	}
 
+	// either To or ToEmail field must be set
+	if len(input.To) == 0 && len(input.ToEmails) == 0 {
+		ApiErrorf(c, http.StatusBadRequest, "no recipient")
+		return
+	}
+
 	// default is messaging
 	if input.Intent == "" {
 		input.Intent = types.DIDCommIntentMessage

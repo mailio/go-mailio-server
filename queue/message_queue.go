@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-resty/resty/v2"
 	"github.com/hibiken/asynq"
+	"github.com/mailio/go-mailio-did/did"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/repository"
 	"github.com/mailio/go-mailio-server/services"
@@ -114,7 +115,21 @@ func (msq *MessageQueue) DIDCommSendMessage(userAddress string, message *types.D
 	}
 
 	//validate recipients (checks if they are valid DIDs and if they are reachable via HTTP/HTTPS)
-	recipientDidMap, mtpStatusErrors := msq.validateRecipientDIDs(message)
+	// alternatively validateRecipientDIDFromEmails can be used to validate recipients from emails
+	recipientDidMap := map[string]did.Document{}
+	mtpStatusErrors := []*types.MTPStatusCode{}
+	if len(message.To) > 0 {
+		recMap, mtpErrors := msq.validateRecipientDIDs(message)
+		recipientDidMap = recMap
+		mtpStatusErrors = mtpErrors
+	}
+	if len(message.ToEmails) > 0 {
+		recMap, mtpErrors := msq.validateRecipientDIDFromEmails(message)
+		for k, v := range recMap {
+			recipientDidMap[k] = v
+		}
+		mtpStatusErrors = append(mtpStatusErrors, mtpErrors...)
+	}
 
 	// collect endpoints
 	endpointMap := make(map[string]string)

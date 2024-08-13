@@ -35,11 +35,17 @@ type MailioMessage struct {
 	IsRead      bool   `json:"isRead,omitempty"`            // true if the message is read
 }
 
+type ToEmail struct {
+	Email     string `json:"email" validate:"required,email"` // recipient email address
+	EmailHash string `json:"emailHash" validate:"required"`   // recipient email address hash
+}
+
 type DIDCommMessage struct {
 	Type                 string                 `json:"type" validate:"required,oneof=application/didcomm-encrypted+json application/didcomm-signed+json application/mailio-smtp+json"` // a valid message type URI (MUST be: application/didcomm-encrypted+json or application/didcomm-signed+json or application/mailio-smtp+json)
 	ID                   string                 `json:"id" validate:"required"`                                                                                                         // globally unique message identifier UUID (RFC 4122) recommended
 	From                 string                 `json:"from" validate:"required"`                                                                                                       // sender DID required because all mailio messages are encrypted
-	To                   []string               `json:"to" validate:"required,min=1"`                                                                                                   // in format: did:web:mail.io:0xabc -> recipient DIDs
+	To                   []string               `json:"to,omitempty"`                                                                                                                   // in format: did:web:mail.io:0xabc -> recipient DIDs
+	ToEmails             []*ToEmail             `json:"toEmails,omitempty"`                                                                                                             // recipient email addresses (email and hash as alternative to To field with DID addresses)
 	Thid                 string                 `json:"thid,omitempty"`                                                                                                                 // thread identifier. Uniquely identifies the thread that the message belongs to. If not included, the id property of the message MUST be treated as the value of the thid.
 	Pthid                string                 `json:"pthid,omitempty"`                                                                                                                // parent thread identifier. Uniquely identifies the parent thread that the message belongs to. If not included, the message is the first message in the thread.
 	ExpiresTime          int64                  `json:"expiresTime,omitempty"`                                                                                                          // sender will abort the protocol if it doesn't get a response by this time (UTC milliseconds since epoch)

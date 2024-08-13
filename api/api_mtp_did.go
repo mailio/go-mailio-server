@@ -68,8 +68,8 @@ func (didMtp *DIDMtpApi) GetLocalDIDDocuments(c *gin.Context) {
 			SignatureScheme: types.Signature_Scheme_EdDSA_X25519,
 			Timestamp:       time.Now().UnixMilli(),
 		},
-		FoundDIDDocuments: found,
-		NotFoundLookups:   notFound,
+		FoundLookups:    found,
+		NotFoundLookups: notFound,
 	}
 
 	cbBytes, cbErr := util.CborEncode(response)

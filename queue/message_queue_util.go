@@ -36,6 +36,47 @@ func (msq *MessageQueue) extractDIDMessageEndpoint(didDoc *did.Document) string 
 	return endpoint
 }
 
+// validateRecipientDIDFromEmails validates the recipient DIDs from emails and collect valid DIDs in a recipientDidMap
+// this is alternative to validateRecipientDIDs (which requires To field to have all DIDs)
+func (msq *MessageQueue) validateRecipientDIDFromEmails(message *types.DIDCommMessage) (map[string]did.Document, []*types.MTPStatusCode) {
+	//validate recipients (checks if they are valid DIDs and if they are reachable via HTTP/HTTPS)
+	mtpStatusErrors := []*types.MTPStatusCode{}
+	recipientDidMap := map[string]did.Document{}
+
+	// create lookups list
+	lookups := []*types.DIDLookup{}
+	for _, recipientEmail := range message.ToEmails {
+		lookup := &types.DIDLookup{
+			Email:     recipientEmail.Email,
+			EmailHash: recipientEmail.EmailHash,
+		}
+		lookups = append(lookups, lookup)
+	}
+	hasinvalidEmail := false
+	found, notFound, err := msq.mtpService.FetchDIDDocuments(message.From, lookups)
+	if err != nil {
+		if err == types.ErrInvalidEmail { // should not happen
+			mtpStatusErrors = append(mtpStatusErrors, types.NewMTPStatusCode(5, 1, 1, fmt.Sprintf("one of the recipients has invalid email")))
+			hasinvalidEmail = true
+		}
+	}
+	if hasinvalidEmail {
+		return nil, mtpStatusErrors
+	}
+
+	for _, notFoundRecipient := range notFound {
+		mtpStatusErrors = append(mtpStatusErrors, types.NewMTPStatusCode(5, 1, 1, fmt.Sprintf("recipient not found: %s", notFoundRecipient.Email)))
+	}
+
+	for _, recipient := range found {
+		didDoc := recipient.DIDDocument
+		rec := didDoc.ID
+		recipientDidMap[rec.String()] = *recipient.DIDDocument
+	}
+
+	return recipientDidMap, mtpStatusErrors
+}
+
 // validateRecipientDid validates the recipient DIDs and collect valid DIDs in a recipientDidMap
 // invalid recipients are added to MailioMessage as MTPStatusCodes
 func (msq *MessageQueue) validateRecipientDIDs(message *types.DIDCommMessage) (map[string]did.Document, []*types.MTPStatusCode) {

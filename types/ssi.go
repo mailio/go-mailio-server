@@ -1,6 +1,8 @@
 package types
 
-import "github.com/mailio/go-mailio-did/did"
+import (
+	"github.com/mailio/go-mailio-did/did"
+)
 
 type DidDocument struct {
 	BaseDocument `json:",inline"`
@@ -14,9 +16,12 @@ type VerifiableCredentialDocument struct {
 
 // DIDLookup from scrypted email address
 type DIDLookup struct {
-	EmailHash   string       `json:"emailHash,omitempty"`       // scrypt hash of the email address
-	Email       string       `json:"email" validate:"required"` // email address
-	OriginSever OriginServer `json:"originServer" validate:"required"`
+	EmailHash             string         `json:"emailHash" validate:"required"`   // scrypt hash of the email address
+	Email                 string         `json:"email" validate:"required"`       // email address
+	SupportsMailio        bool           `json:"supportsMailio,omitempty"`        // if the recipient supports Mailio (derived from domain resolving)
+	SupportsStandardEmail bool           `json:"supportsStandardEmail,omitempty"` // if the recipient supports standard email (derrived from domain resolving)
+	DIDDocument           *did.Document  `json:"didDocument,omitempty"`
+	MTPStatusCode         *MTPStatusCode `json:"mtpStatusCode,omitempty"`
 }
 
 type DIDLookupRequest struct {
@@ -24,10 +29,11 @@ type DIDLookupRequest struct {
 	LookupHeader  LookupHeader `json:"lookupHeader" validate:"required"`
 	DIDLookups    []*DIDLookup `json:"didLookups" validate:"required"`
 }
+
 type DIDLookupResponse struct {
-	LookupHeader      LookupHeader    `json:"lookupHeader" validate:"required"`
-	FoundDIDDocuments []*did.Document `json:"foundDIDDocuments,omitempty"`
-	NotFoundLookups   []*DIDLookup    `json:"notFoundLookups,omitempty"`
+	LookupHeader    LookupHeader `json:"lookupHeader" validate:"required"`
+	FoundLookups    []*DIDLookup `json:"foundLookups,omitempty"`
+	NotFoundLookups []*DIDLookup `json:"notFoundLookups,omitempty"`
 }
 
 type DIDDocumentSignedRequest struct {

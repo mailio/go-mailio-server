@@ -251,7 +251,7 @@ func (mtp *MtpService) GetServerDIDDocument(domain string) (*did.Document, error
 //
 //	ErrInvalidEmail when email address is not valid
 //	ErrBadRequest when remote server returns code >= 400
-func (mtp *MtpService) FetchDIDDocuments(userMailioAddress string, didLookups []*types.DIDLookup) (found []*did.Document, notFound []*types.DIDLookup, err error) {
+func (mtp *MtpService) FetchDIDDocuments(userMailioAddress string, didLookups []*types.DIDLookup) (found []*types.DIDLookup, notFound []*types.DIDLookup, err error) {
 	// Create a map for quick lookup of local domains
 	localLookups, remoteLookups, err := getLocalAndRemoteRecipients(didLookups)
 	if err != nil {
@@ -275,8 +275,8 @@ func (mtp *MtpService) FetchDIDDocuments(userMailioAddress string, didLookups []
 }
 
 // GetLocalDIDDocuments fetches DID documents for a list of email addresses with corresponding email hashes
-func (mtp *MtpService) GetLocalDIDDocumentsByEmailHash(localLookups []*types.DIDLookup) (found []*did.Document, notFound []*types.DIDLookup, err error) {
-	found = []*did.Document{}
+func (mtp *MtpService) GetLocalDIDDocumentsByEmailHash(localLookups []*types.DIDLookup) (found []*types.DIDLookup, notFound []*types.DIDLookup, err error) {
+	found = []*types.DIDLookup{}
 	notFound = []*types.DIDLookup{}
 
 	// resolve local lookups
@@ -287,8 +287,11 @@ func (mtp *MtpService) GetLocalDIDDocumentsByEmailHash(localLookups []*types.DID
 				notFound = append(notFound, lookup)
 				continue
 			}
-			global.Logger.Log("msg", "error while getting user by email", "err", mErr)
-			return nil, nil, mErr
+			handleDIDLookupError(mErr,
+				*types.NewMTPStatusCode(types.ClassCodePermFailure, types.SubjectCodeMailSystem, 0, "local: error while getting user by email"),
+				found,
+				&notFound)
+			continue
 		}
 		didDoc, dErr := mtp.ssiService.GetDIDDocument(mapping.MailioAddress)
 		if dErr != nil {
@@ -296,28 +299,52 @@ func (mtp *MtpService) GetLocalDIDDocumentsByEmailHash(localLookups []*types.DID
 				notFound = append(notFound, lookup)
 				continue
 			}
-			global.Logger.Log("msg", "error while resolving did", "err", dErr)
-			return nil, nil, dErr
+			handleDIDLookupError(dErr,
+				*types.NewMTPStatusCode(types.ClassCodePermFailure, types.SubjectCodeMailSystem, 0, "local: error while resolving did"),
+				found,
+				&notFound)
+			continue
 		}
-		found = append(found, didDoc)
+		lookup.DIDDocument = didDoc
+		lookup.SupportsMailio = true                                    // local server supports mailio
+		lookup.SupportsStandardEmail = len(global.Conf.SmtpServers) > 0 // local server supports standard email
+
+		found = append(found, lookup)
 	}
 	return found, notFound, nil
 }
 
-// FetchRemoteDID fetches DID documents for a list of email addresses with corresponding email hashes
-func (mtp *MtpService) FetchRemoteDIDByEmailHash(userMailioAddress string, lookups map[string][]*types.DIDLookup) (found []*did.Document, notFound []*types.DIDLookup, err error) {
+func handleDIDLookupError(
+	err error,
+	errorCode types.MTPStatusCode,
+	lookup []*types.DIDLookup,
+	notFound *[]*types.DIDLookup,
+) {
+	level.Error(global.Logger).Log("msg", errorCode.Description, "err", err)
+	for _, l := range lookup {
+		l.MTPStatusCode = &errorCode
+	}
+	*notFound = append(*notFound, lookup...)
+}
 
-	found = []*did.Document{}
+// FetchRemoteDID fetches DID documents for a list of email addresses with corresponding email hashes
+// Returns a list of found DID documents and a list of not found email addresses
+// userMailioAddress string requesting user
+// lookups map[string][]*types.DIDLookup email domain to list of lookups
+// notFound array is filled out when remote server returns code >= 400
+func (mtp *MtpService) FetchRemoteDIDByEmailHash(userMailioAddress string, lookups map[string][]*types.DIDLookup) (found []*types.DIDLookup, notFound []*types.DIDLookup, err error) {
+
+	found = []*types.DIDLookup{}
 	notFound = []*types.DIDLookup{}
 
-	// don't resolve the domain more than once for the same domain
-	emailToResolvedEmailMapping := map[string]types.Domain{}
+	// resolve each domain once only
+	emailToResolvedEmailMapping := map[string]*types.Domain{}
 	// resolve domain from the lookups
 	for emailDomain, lookup := range lookups {
 		// check if domain is already resolved
 		var resolvedDomain types.Domain
 		if resolved, ok := emailToResolvedEmailMapping[emailDomain]; ok {
-			resolvedDomain = resolved
+			emailToResolvedEmailMapping[emailDomain] = resolved
 		} else {
 			rd, dErr := resolveDomain(mtp.domainRepo, emailDomain, false)
 			if dErr != nil {
@@ -328,12 +355,34 @@ func (mtp *MtpService) FetchRemoteDIDByEmailHash(userMailioAddress string, looku
 				if dErr == types.ErrMxRecordCheckFailed {
 					// do nothing (not interested in MX records)
 				} else {
-					global.Logger.Log("msg", "error while resolving domain", "err", dErr)
-					return nil, nil, dErr
+					handleDIDLookupError(dErr,
+						*types.NewMTPStatusCode(types.ClassCodePermFailure, types.SubjectCodeNetwork, 3, "error while resolving domain"),
+						lookup,
+						&notFound)
+					continue
 				}
 			}
-			emailToResolvedEmailMapping[emailDomain] = *rd
+			emailToResolvedEmailMapping[emailDomain] = rd
 			resolvedDomain = *rd
+		}
+
+		if !resolvedDomain.SupportsMailio && resolvedDomain.SupportsStandardEmails {
+			// smtp domain resolved
+			for _, l := range lookup {
+				l.SupportsStandardEmail = true
+				l.SupportsMailio = false
+			}
+			found = append(found, lookup...)
+			continue
+		}
+		if !resolvedDomain.SupportsMailio && !resolvedDomain.SupportsStandardEmails {
+			for _, l := range lookup {
+				l.SupportsMailio = false
+				l.SupportsStandardEmail = false
+				l.MTPStatusCode = types.NewMTPStatusCode(types.ClassCodePermFailure, types.SubjectCodeMailSystem, 0, "domain does not support mailio or standard email")
+			}
+			notFound = append(notFound, lookup...)
+			continue
 		}
 		// create handshake request objects signed by this server and request handshake from the domain
 		request := &types.DIDDocumentSignedRequest{
@@ -350,14 +399,20 @@ func (mtp *MtpService) FetchRemoteDIDByEmailHash(userMailioAddress string, looku
 		}
 		cborPayload, cErr := util.CborEncode(request.DIDLookupRequest)
 		if cErr != nil {
-			level.Error(global.Logger).Log("msg", "failed to cbor encode request", "err", cErr)
-			return nil, nil, cErr
+			handleDIDLookupError(cErr,
+				*types.NewMTPStatusCode(types.ClassCodePermFailure, types.SubjectMessageContent, 0, "failed to cbor encode request"),
+				lookup,
+				&notFound)
+			continue
 		}
 
 		signature, sErr := util.Sign(cborPayload, global.PrivateKey)
 		if sErr != nil {
-			level.Error(global.Logger).Log("msg", "failed to sign request", "err", sErr)
-			return nil, nil, sErr
+			handleDIDLookupError(cErr,
+				*types.NewMTPStatusCode(types.ClassCodePermFailure, types.SubjectSecurity, 5, "failed to sign request"),
+				lookup,
+				&notFound)
+			continue
 		}
 		request.CborPayloadBase64 = base64.StdEncoding.EncodeToString(cborPayload)
 		request.SignatureBase64 = base64.StdEncoding.EncodeToString(signature)
@@ -367,32 +422,78 @@ func (mtp *MtpService) FetchRemoteDIDByEmailHash(userMailioAddress string, looku
 		response, rErr := mtp.restyClient.R().SetHeader("Content-Type", "application/json").
 			SetBody(request).SetResult(&signedResponse).Post("https://" + resolvedDomain.Name + "/api/v1/mtp/did")
 		if rErr != nil {
-			level.Error(global.Logger).Log("msg", "failed to request DID document from remote server", "err", rErr)
-			return nil, nil, rErr
+			handleDIDLookupError(rErr,
+				*types.NewMTPStatusCode(types.ClassCodeTempFailure, types.SubjectCodeNetwork, 1, "failed to request DID document from remote server"),
+				lookup,
+				&notFound)
+			continue
 		}
 		if response.IsError() {
-			level.Error(global.Logger).Log("msg", "error in did document response", "err", response.Error())
-			return nil, nil, response.Error().(error)
+			if response.StatusCode() >= 400 {
+				handleDIDLookupError(rErr,
+					*types.NewMTPStatusCode(types.ClassCodeTempFailure, types.SubjectCodeNetwork, 0, "received error from remote server: "+resolvedDomain.Name),
+					lookup,
+					&notFound)
+				continue
+			}
+			if response.StatusCode() == 404 {
+				handleDIDLookupError(errors.New("DID not found"),
+					*types.NewMTPStatusCode(types.ClassCodePermFailure, types.SubjectCodeNetwork, 0, "API not found on remote server: "+resolvedDomain.Name),
+					lookup,
+					&notFound)
+				continue
+			}
+			if response.StatusCode() == 429 {
+				handleDIDLookupError(errors.New("rate limit exceeded"),
+					*types.NewMTPStatusCode(types.ClassCodeTempFailure, types.SubjectCodeNetwork, 5, "rate limit exceeded: "+resolvedDomain.Name),
+					lookup,
+					&notFound)
+				continue
+			}
+			handleDIDLookupError(errors.New("unknown network error"),
+				*types.NewMTPStatusCode(types.ClassCodePermFailure, types.SubjectCodeNetwork, 0, "unkown network error: "+resolvedDomain.Name),
+				lookup,
+				&notFound)
+			continue
 		}
 		rcborPayload, rcErr := base64.StdEncoding.DecodeString(signedResponse.CborPayloadBase64)
 		rsignature, rsErr := base64.StdEncoding.DecodeString(signedResponse.SignatureBase64)
 		if errors.Join(rcErr, rsErr) != nil {
-			level.Error(global.Logger).Log("msg", "failed to decode cbor payload and signature responses", "err", errors.Join(rcErr, rsErr))
-			return nil, nil, types.ErrSignatureInvalid
+			handleDIDLookupError(errors.Join(rcErr, rsErr),
+				*types.NewMTPStatusCode(types.ClassCodePermFailure, types.SubjectMessageContent, 5, "failed to decode cbor payload and signature responses"),
+				lookup,
+				&notFound)
+			continue
 		}
 
 		isValid, rsErr := util.Verify(rcborPayload, rsignature, resolvedDomain.MailioPublicKey)
 		if rsErr != nil {
-			level.Error(global.Logger).Log("msg", "failed to verify response", "err", rsErr)
-			return nil, nil, types.ErrSignatureInvalid
+			handleDIDLookupError(rsErr,
+				*types.NewMTPStatusCode(types.ClassCodePermFailure, types.SubjectSecurity, 7, "failed to verify response signature"),
+				lookup,
+				&notFound)
+			continue
 		}
 		if !isValid {
-			level.Error(global.Logger).Log("msg", "failed to verify response", "err", "invalid signature")
-			return nil, nil, types.ErrSignatureInvalid
+			handleDIDLookupError(errors.New("invalid signature"),
+				*types.NewMTPStatusCode(types.ClassCodePermFailure, types.SubjectSecurity, 7, "invalid signature"),
+				lookup,
+				&notFound)
+			continue
 		}
 
-		foundRemoteDIDs := signedResponse.DIDLookupResponse.FoundDIDDocuments
+		foundRemoteDIDs := signedResponse.DIDLookupResponse.FoundLookups
 		notFoundRemoteDIDs := signedResponse.DIDLookupResponse.NotFoundLookups
+
+		// found remote DID documents add info about domain resolution
+		for _, foundRD := range foundRemoteDIDs {
+			foundRD.SupportsMailio = resolvedDomain.SupportsMailio
+			foundRD.SupportsStandardEmail = resolvedDomain.SupportsStandardEmails
+		}
+		for _, notFoundRD := range notFoundRemoteDIDs {
+			notFoundRD.SupportsMailio = resolvedDomain.SupportsMailio
+			notFoundRD.SupportsStandardEmail = resolvedDomain.SupportsStandardEmails
+		}
 
 		found = append(found, foundRemoteDIDs...)
 		notFound = append(notFound, notFoundRemoteDIDs...)
