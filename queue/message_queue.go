@@ -23,6 +23,7 @@ type MessageQueue struct {
 	handshakeService   *services.HandshakeService
 	deliveryService    *services.MessageDeliveryService
 	s3Service          *services.S3Service
+	malwareService     *services.MalwareService
 	restyClient        *resty.Client
 	env                *types.Environment
 }
@@ -36,6 +37,7 @@ func NewMessageQueue(dbSelector *repository.CouchDBSelector, env *types.Environm
 	handshakeService := services.NewHandshakeService(dbSelector)
 	deliveryService := services.NewMessageDeliveryService(dbSelector)
 	userProfileService := services.NewUserProfileService(dbSelector, env)
+	malwareService := services.NewMalwareService()
 	s3Service := services.NewS3Service(env)
 
 	return &MessageQueue{
@@ -44,6 +46,7 @@ func NewMessageQueue(dbSelector *repository.CouchDBSelector, env *types.Environm
 		mtpService:         mtpService,
 		handshakeService:   handshakeService,
 		deliveryService:    deliveryService,
+		malwareService:     malwareService,
 		restyClient:        rcClient,
 		env:                env,
 		userProfileService: userProfileService,

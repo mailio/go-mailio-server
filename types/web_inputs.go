@@ -1,5 +1,9 @@
 package types
 
+import (
+	smtptypes "github.com/mailio/go-mailio-server/email/smtp/types"
+)
+
 // for login
 type InputLogin struct {
 	Email                         string `json:"email" validate:"required,email"`
@@ -27,4 +31,17 @@ type InputHandshakeLookup struct {
 
 type InputDIDLookup struct {
 	Lookups []*DIDLookup `json:"lookups" validate:"min=1"`
+}
+
+type SmtpEmailInput struct {
+	From        string                      `json:"from"`                // The email address of the original sender.
+	ReplyTo     []*string                   `json:"replyTo,omitempty"`   // The email address to which bounces (undeliverable notifications) are to be forwarded.
+	To          []string                    `json:"to"`                  // The email addresses of the recipients.
+	Cc          []*string                   `json:"cc,omitempty"`        // The email addresses of the CC recipients.
+	Bcc         []*string                   `json:"bcc,omitempty"`       // The email addresses of the BCC recipients.
+	MessageId   *string                     `json:"messageId,omitempty"` // message id
+	Subject     *string                     `json:"subject,omitempty"`
+	BodyText    *string                     `json:"bodyText,omitempty"` // The text version of the email.
+	BodyHTML    *string                     `json:"bodyHtml,omitempty"` // The HTML version of the email.
+	Attachments []*smtptypes.SmtpAttachment `json:"attachments,omitempty"`
 }

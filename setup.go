@@ -94,6 +94,21 @@ func ConfigDBSelector() repository.DBSelector {
 	return dbSelector
 }
 
+func loadMalwareList() {
+	malwareService := services.NewMalwareService()
+	err := malwareService.LoadInMemoryMalwareList()
+	if err != nil {
+		global.Logger.Log("error", "Failed to load malware list", "error", err.Error())
+		panic(err)
+	}
+}
+
+func ConfigMalwareScanner(conf *global.Config, environment *types.Environment) {
+	loadMalwareList()                                       // load malware list on startup
+	environment.Cron.AddFunc("@every 24h", loadMalwareList) // re-load malware list every 24 hours
+	environment.Cron.Start()
+}
+
 func ConfigDBIndexing(dbSelector *repository.CouchDBSelector, environment *types.Environment) {
 	// CREATE REQUIRED SERVICES
 	nonceService := services.NewNonceService(dbSelector)

@@ -32,7 +32,7 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 
 	corsConfig := cors.Config{
 		AllowAllOrigins:     false,
-		AllowOrigins:        []string{"http://localhost:4200", "https://" + global.Conf.Host, "https://" + global.Conf.Mailio.ServerDomain, "http://localhost:8080"},
+		AllowOrigins:        []string{"http://localhost:4200", "https://" + global.Conf.Host, "https://" + global.Conf.Mailio.ServerDomain, "http://localhost:8080", "https://c4eb-2605-a601-f3fe-2701-28f0-7c2c-dea3-1478.ngrok-free.app"},
 		AllowMethods:        []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"},
 		AllowWildcard:       true,
 		AllowPrivateNetwork: true,
@@ -109,8 +109,8 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 		rootApi.POST("/v1/handshakefetch", handshakeApi.HandshakeFetch)
 
 		// Messaging
-		rootApi.POST("/v1/didmessage", messageApi.SendDIDMessage)
-		rootApi.POST("/v1/smtp", messageApi.SendSmtpMessage)
+		rootApi.POST("/v1/senddid", messageApi.SendDIDMessage)
+		rootApi.POST("/v1/sendsmtp", messageApi.SendSmtpMessage)
 
 		// VCs
 		rootApi.GET("/v1/credentials/list/:address", vcApi.ListVCs)

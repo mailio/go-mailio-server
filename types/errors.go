@@ -52,4 +52,25 @@ var (
 
 	// ErrMxRecordCheckFailed - ony any error checking MX records
 	ErrMxRecordCheckFailed = errors.New("mx record check failed")
+
+	// ErrTooManyRequests - too many requests
+	ErrTooManyRequests = errors.New("too many requests")
+
+	// ErrNoRecipient - no recipient
+	ErrNoRecipient = errors.New("no recipient")
+
+	// ErrInvaidRecipient - invalid recipient
+	ErrInvaidRecipient = errors.New("invalid recipient")
+
+	// ErrMessageTooLarge - message too large
+	ErrMessageTooLarge = errors.New("message too large")
+
+	// ErrTooManyAttachments - too many attachments
+	ErrTooManyAttachments = errors.New("too many attachments")
+
+	// ErrTooManyRecipients - too many recipients
+	ErrTooManyRecipients = errors.New("too many recipients")
+
+	// ErrBadRequestMissingSubjectOrBody - missing subject or body
+	ErrBadRequestMissingSubjectOrBody = errors.New("missing subject or body")
 )

@@ -251,63 +251,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/didmessage": {
-            "post": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Send end-to-end encrypted message to DID recipients",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Messaging"
-                ],
-                "summary": "Send end-to-end encrypted message to DID recipients",
-                "parameters": [
-                    {
-                        "description": "didcomm-encrypted+json",
-                        "name": "handshake",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/types.DIDCommMessage"
-                        }
-                    }
-                ],
-                "responses": {
-                    "202": {
-                        "description": "Accepted",
-                        "schema": {
-                            "$ref": "#/definitions/types.DIDCommApiResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "bad request",
-                        "schema": {
-                            "$ref": "#/definitions/api.ApiError"
-                        }
-                    },
-                    "401": {
-                        "description": "invalid signature or unauthorized to send messages",
-                        "schema": {
-                            "$ref": "#/definitions/api.ApiError"
-                        }
-                    },
-                    "429": {
-                        "description": "rate limit exceeded",
-                        "schema": {
-                            "$ref": "#/definitions/api.ApiError"
-                        }
-                    }
-                }
-            }
-        },
         "/api/v1/domains": {
             "get": {
                 "description": "Returns a list of all supported domains",
@@ -1338,7 +1281,64 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/smtp": {
+        "/api/v1/senddid": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Send end-to-end encrypted message to DID recipients",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Messaging"
+                ],
+                "summary": "Send end-to-end encrypted message to DID recipients",
+                "parameters": [
+                    {
+                        "description": "didcomm-encrypted+json",
+                        "name": "handshake",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.DIDCommMessage"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "$ref": "#/definitions/types.DIDCommApiResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "bad request",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "401": {
+                        "description": "invalid signature or unauthorized to send messages",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "429": {
+                        "description": "rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/sendsmtp": {
             "post": {
                 "security": [
                     {
@@ -1382,6 +1382,24 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "invalid signature or unauthorized to send messages",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "403": {
+                        "description": "user not authorized",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "413": {
+                        "description": "message too large",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "422": {
+                        "description": "no recipient/no subject body/too many attachments",
                         "schema": {
                             "$ref": "#/definitions/api.ApiError"
                         }
@@ -1968,234 +1986,8 @@ const docTemplate = `{
                 }
             }
         },
-        "mail.Address": {
-            "type": "object",
-            "properties": {
-                "address": {
-                    "description": "user@domain",
-                    "type": "string"
-                },
-                "name": {
-                    "description": "Proper name; may be empty.",
-                    "type": "string"
-                }
-            }
-        },
         "mailiosmtp.Mail": {
-            "type": "object",
-            "properties": {
-                "attachments": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/mailiosmtp.SmtpAttachment"
-                    }
-                },
-                "bcc": {
-                    "description": "The email addresses of the BCC recipients.",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/mail.Address"
-                    }
-                },
-                "bodyHTMLWithoutUnsafeTags": {
-                    "description": "The HTML version of the email with removed unsafe tags",
-                    "type": "string"
-                },
-                "bodyHtml": {
-                    "description": "The HTML version of the email.",
-                    "type": "string"
-                },
-                "bodyInlinePart": {
-                    "description": "The raw inline content of the email.",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/mailiosmtp.MailBodyRaw"
-                    }
-                },
-                "bodyText": {
-                    "description": "The text version of the email.",
-                    "type": "string"
-                },
-                "cc": {
-                    "description": "The email addresses of the CC recipients.",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/mail.Address"
-                    }
-                },
-                "dkimVerdict": {
-                    "description": "optional, dkim verdict",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/mailiosmtp.VerdictStatus"
-                        }
-                    ]
-                },
-                "dmarcVerdict": {
-                    "description": "optional, dmarc verdict",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/mailiosmtp.VerdictStatus"
-                        }
-                    ]
-                },
-                "from": {
-                    "description": "The email address of the original sender.",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/mail.Address"
-                        }
-                    ]
-                },
-                "headers": {
-                    "description": "The email headers. (one header can be specified multiple times with different values)",
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        }
-                    }
-                },
-                "messageId": {
-                    "description": "message id",
-                    "type": "string"
-                },
-                "replyTo": {
-                    "description": "The email address to which bounces (undeliverable notifications) are to be forwarded.",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/mail.Address"
-                    }
-                },
-                "sizeAttachmentsBytes": {
-                    "description": "The size of the attachments in bytes.",
-                    "type": "integer"
-                },
-                "sizeBytes": {
-                    "description": "The size of the email in bytes.",
-                    "type": "integer"
-                },
-                "sizeHtmlBodyBytes": {
-                    "description": "The size of the HTML body in bytes.",
-                    "type": "integer"
-                },
-                "sizeInlineBytes": {
-                    "description": "The size of the inline content in bytes.",
-                    "type": "integer"
-                },
-                "spamVerdict": {
-                    "description": "optional, spam verdict",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/mailiosmtp.VerdictStatus"
-                        }
-                    ]
-                },
-                "spfVerdict": {
-                    "description": "optinal, spf verdict",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/mailiosmtp.VerdictStatus"
-                        }
-                    ]
-                },
-                "subject": {
-                    "type": "string"
-                },
-                "timestamp": {
-                    "description": "since epoch in miliseconds",
-                    "type": "integer"
-                },
-                "to": {
-                    "description": "The email addresses of the recipients.",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/mail.Address"
-                    }
-                },
-                "virusVerdict": {
-                    "description": "optional, virus verdict",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/mailiosmtp.VerdictStatus"
-                        }
-                    ]
-                }
-            }
-        },
-        "mailiosmtp.MailBodyRaw": {
-            "type": "object",
-            "properties": {
-                "content": {
-                    "description": "The raw content of the email.",
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                },
-                "contentDisposition": {
-                    "description": "The content disposition of the raw email.",
-                    "type": "string"
-                },
-                "contentId": {
-                    "description": "The content id of the raw email.",
-                    "type": "string"
-                },
-                "contentType": {
-                    "description": "The content type of the raw email.",
-                    "type": "string"
-                }
-            }
-        },
-        "mailiosmtp.SmtpAttachment": {
-            "type": "object",
-            "properties": {
-                "content": {
-                    "description": "The content of the attachment.",
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                },
-                "contentDisposition": {
-                    "description": "The content disposition of the attachment.",
-                    "type": "string"
-                },
-                "contentId": {
-                    "description": "The content id of the attachment.",
-                    "type": "string"
-                },
-                "contentType": {
-                    "description": "The content type of the attachment.",
-                    "type": "string"
-                },
-                "contentUrl": {
-                    "description": "The content uri of the attachment.",
-                    "type": "string"
-                },
-                "filename": {
-                    "description": "The name of the attachment.",
-                    "type": "string"
-                }
-            }
-        },
-        "mailiosmtp.VerdictStatus": {
-            "type": "object",
-            "required": [
-                "status"
-            ],
-            "properties": {
-                "status": {
-                    "description": "possible values: PASS, FAIL, NOT_AVAILABLE",
-                    "type": "string",
-                    "enum": [
-                        "PASS",
-                        "FAIL",
-                        "NOT_AVAILABLE"
-                    ]
-                }
-            }
+            "type": "object"
         },
         "protocol.AttestedCredentialData": {
             "type": "object",
@@ -2715,6 +2507,9 @@ const docTemplate = `{
         "types.DIDCommApiResponse": {
             "type": "object",
             "properties": {
+                "didCommId": {
+                    "type": "string"
+                },
                 "id": {
                     "type": "string"
                 },
@@ -2734,7 +2529,6 @@ const docTemplate = `{
             "required": [
                 "from",
                 "id",
-                "to",
                 "type"
             ],
             "properties": {
@@ -2801,9 +2595,15 @@ const docTemplate = `{
                 "to": {
                     "description": "in format: did:web:mail.io:0xabc -\u003e recipient DIDs",
                     "type": "array",
-                    "minItems": 1,
                     "items": {
                         "type": "string"
+                    }
+                },
+                "toEmails": {
+                    "description": "recipient email addresses (email and hash as alternative to To field with DID addresses)",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.ToEmail"
                     }
                 },
                 "type": {
@@ -2912,9 +2712,12 @@ const docTemplate = `{
             "type": "object",
             "required": [
                 "email",
-                "originServer"
+                "emailHash"
             ],
             "properties": {
+                "didDocument": {
+                    "$ref": "#/definitions/did.Document"
+                },
                 "email": {
                     "description": "email address",
                     "type": "string"
@@ -2923,8 +2726,16 @@ const docTemplate = `{
                     "description": "scrypt hash of the email address",
                     "type": "string"
                 },
-                "originServer": {
-                    "$ref": "#/definitions/types.OriginServer"
+                "mtpStatusCode": {
+                    "$ref": "#/definitions/types.MTPStatusCode"
+                },
+                "supportsMailio": {
+                    "description": "if the recipient supports Mailio (derived from domain resolving)",
+                    "type": "boolean"
+                },
+                "supportsStandardEmail": {
+                    "description": "if the recipient supports standard email (derrived from domain resolving)",
+                    "type": "boolean"
                 }
             }
         },
@@ -2957,10 +2768,10 @@ const docTemplate = `{
                 "lookupHeader"
             ],
             "properties": {
-                "foundDIDDocuments": {
+                "foundLookups": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/did.Document"
+                        "$ref": "#/definitions/types.DIDLookup"
                     }
                 },
                 "lookupHeader": {
@@ -3511,12 +3322,16 @@ const docTemplate = `{
         "types.JwsTokenWithSmartKey": {
             "type": "object",
             "required": [
+                "didDocument",
                 "email",
                 "encryptedSmartKeyBase64",
                 "jwsToken",
                 "smartKeyPasswordPart"
             ],
             "properties": {
+                "didDocument": {
+                    "$ref": "#/definitions/did.Document"
+                },
                 "email": {
                     "type": "string"
                 },
@@ -3584,6 +3399,7 @@ const docTemplate = `{
                 "subject": {
                     "description": "Represents the subject category of the status code",
                     "type": "integer",
+                    "maximum": 8,
                     "minimum": 0
                 },
                 "timestamp": {
@@ -3639,7 +3455,7 @@ const docTemplate = `{
                 "found": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/did.Document"
+                        "$ref": "#/definitions/types.DIDLookup"
                     }
                 },
                 "notFound": {
@@ -3792,6 +3608,23 @@ const docTemplate = `{
                 },
                 "smartKeyEncrypted": {
                     "description": "encrypted pre-Shamir secret sharing",
+                    "type": "string"
+                }
+            }
+        },
+        "types.ToEmail": {
+            "type": "object",
+            "required": [
+                "email",
+                "emailHash"
+            ],
+            "properties": {
+                "email": {
+                    "description": "recipient email address",
+                    "type": "string"
+                },
+                "emailHash": {
+                    "description": "recipient email address hash",
                     "type": "string"
                 }
             }

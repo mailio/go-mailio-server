@@ -426,12 +426,11 @@ func (a *WebAuthnApi) LoginVerify(c *gin.Context) {
 		return
 	}
 
-	credential, err := a.env.WebAuthN.ValidateDiscoverableLogin(a.WebauthnUserHandler, session, parsedResponse)
+	_, err = a.env.WebAuthN.ValidateDiscoverableLogin(a.WebauthnUserHandler, session, parsedResponse)
 	if err != nil {
 		ApiErrorf(c, http.StatusForbidden, "failed to validate login: %s", err)
 		return
 	}
-	fmt.Printf("Credential: %+v\n", credential)
 	userMailioAddress := string(parsedResponse.Response.UserHandle)
 
 	// check if user enabled
@@ -494,6 +493,7 @@ func (a *WebAuthnApi) LoginVerify(c *gin.Context) {
 		JwsToken:                jwsToken,
 		SmartKeyPasswordPart:    smartKey.PasswordShare,
 		Email:                   smartKey.Email,
+		DidDocument:             userDIDDoc,
 	}
 
 	c.JSON(http.StatusOK, output)

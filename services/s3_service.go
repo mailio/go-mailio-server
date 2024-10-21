@@ -5,10 +5,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
+	s3Service "github.com/aws/aws-sdk-go-v2/service/s3"
 	s3Types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
 	"github.com/mailio/go-mailio-server/global"
@@ -34,7 +37,7 @@ func (s3s *S3Service) UploadAttachment(bucket, path string, content []byte) (str
 	defer cancel()
 
 	ioReader := bytes.NewReader(content)
-	_, uErr := s3s.env.S3Uploader.Upload(ctx, &s3.PutObjectInput{
+	_, uErr := s3s.env.S3Uploader.Upload(ctx, &s3Service.PutObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String(path),
 		Body:   ioReader,
@@ -48,7 +51,7 @@ func (s3s *S3Service) UploadAttachment(bucket, path string, content []byte) (str
 
 // Delete attachment at specific bucket and path
 func (s3s *S3Service) DeleteAttachment(bucket, path string) error {
-	input := &s3.DeleteObjectInput{
+	input := &s3Service.DeleteObjectInput{
 		Bucket: aws.String(global.Conf.Storage.Bucket),
 		Key:    aws.String(path),
 	}
@@ -77,21 +80,32 @@ func (s3s *S3Service) DeleteAttachment(bucket, path string) error {
 }
 
 // download attachment from s3
-// func (us *UserService) DownloadAttachment(attachmentUrl string) ([]byte, error) {
-// 	if attachmentUrl == "" {
-// 		return nil, types.ErrBadRequest
-// 	}
-// 	splitted := strings.Split(attachmentUrl, "s3://"+global.Conf.Storage.Bucket+"/")
-// 	if len(splitted) != 2 {
-// 		return nil, types.ErrBadRequest
-// 	}
-// 	buf := aws.NewWriteAtBuffer([]byte{})
-// 	_, err := us.env.S3Downloader.Download(buf, &s3manager.DownloadInput{
-// 		Bucket: aws.String(global.Conf.Storage.Bucket),
-// 		Key:    aws.String(attachmentUrl),
-// 	})
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	return buf.Bytes(), nil
-// }
+func (s3 *S3Service) DownloadAttachment(attachmentUrl string) ([]byte, error) {
+	if attachmentUrl == "" {
+		return nil, types.ErrBadRequest
+	}
+	parsedURL, pErr := url.Parse(attachmentUrl)
+	if pErr != nil {
+		global.Logger.Log(pErr.Error(), "failed to parse attachment url")
+		return nil, pErr
+	}
+	// Extract the file key from the path (after the first "/")
+	fileKey := strings.TrimPrefix(parsedURL.Path, "/")
+	if fileKey == "" {
+		global.Logger.Log("error", "invalid attachment url", "attachmentUrl", attachmentUrl)
+		return nil, types.ErrBadRequest
+	}
+
+	buf := manager.NewWriteAtBuffer([]byte{})
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	_, err := s3.env.S3Downloader.Download(ctx, buf, &s3Service.GetObjectInput{
+		Bucket: aws.String(global.Conf.Storage.Bucket),
+		Key:    aws.String(fileKey),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}

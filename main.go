@@ -199,6 +199,9 @@ func main() {
 	// configure S3 storage
 	ConfigS3Storage(&global.Conf, env)
 
+	// configure malware scanner (abuse.ch)
+	ConfigMalwareScanner(&global.Conf, env)
+
 	// register SMTP handlers from config
 	RegisterSmtpHandlers(&global.Conf)
 	RegisterDiskUsageHandlers(&global.Conf)

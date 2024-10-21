@@ -82,7 +82,7 @@ func GetHandler(name string) SmtpHandler {
 	return nil
 }
 
-func htmlToText(html string) string {
+func HtmlToText(html string) string {
 	p := bluemonday.NewPolicy()
 	p.AllowStandardURLs()
 
@@ -135,7 +135,7 @@ func ToMime(msg *mailiosmtp.Mail, rfc2822MessageID string) ([]byte, error) {
 	// convert html to text (remove unwanted tags)
 	text := msg.BodyText
 	if msg.BodyText == "" {
-		text = htmlToText(msg.BodyHTML)
+		text = HtmlToText(msg.BodyHTML)
 	}
 
 	cleanHtml := msg.BodyHTML

@@ -162,160 +162,7 @@ definitions:
       type:
         type: string
     type: object
-  mail.Address:
-    properties:
-      address:
-        description: user@domain
-        type: string
-      name:
-        description: Proper name; may be empty.
-        type: string
-    type: object
   mailiosmtp.Mail:
-    properties:
-      attachments:
-        items:
-          $ref: '#/definitions/mailiosmtp.SmtpAttachment'
-        type: array
-      bcc:
-        description: The email addresses of the BCC recipients.
-        items:
-          $ref: '#/definitions/mail.Address'
-        type: array
-      bodyHTMLWithoutUnsafeTags:
-        description: The HTML version of the email with removed unsafe tags
-        type: string
-      bodyHtml:
-        description: The HTML version of the email.
-        type: string
-      bodyInlinePart:
-        description: The raw inline content of the email.
-        items:
-          $ref: '#/definitions/mailiosmtp.MailBodyRaw'
-        type: array
-      bodyText:
-        description: The text version of the email.
-        type: string
-      cc:
-        description: The email addresses of the CC recipients.
-        items:
-          $ref: '#/definitions/mail.Address'
-        type: array
-      dkimVerdict:
-        allOf:
-        - $ref: '#/definitions/mailiosmtp.VerdictStatus'
-        description: optional, dkim verdict
-      dmarcVerdict:
-        allOf:
-        - $ref: '#/definitions/mailiosmtp.VerdictStatus'
-        description: optional, dmarc verdict
-      from:
-        allOf:
-        - $ref: '#/definitions/mail.Address'
-        description: The email address of the original sender.
-      headers:
-        additionalProperties:
-          items:
-            type: string
-          type: array
-        description: The email headers. (one header can be specified multiple times
-          with different values)
-        type: object
-      messageId:
-        description: message id
-        type: string
-      replyTo:
-        description: The email address to which bounces (undeliverable notifications)
-          are to be forwarded.
-        items:
-          $ref: '#/definitions/mail.Address'
-        type: array
-      sizeAttachmentsBytes:
-        description: The size of the attachments in bytes.
-        type: integer
-      sizeBytes:
-        description: The size of the email in bytes.
-        type: integer
-      sizeHtmlBodyBytes:
-        description: The size of the HTML body in bytes.
-        type: integer
-      sizeInlineBytes:
-        description: The size of the inline content in bytes.
-        type: integer
-      spamVerdict:
-        allOf:
-        - $ref: '#/definitions/mailiosmtp.VerdictStatus'
-        description: optional, spam verdict
-      spfVerdict:
-        allOf:
-        - $ref: '#/definitions/mailiosmtp.VerdictStatus'
-        description: optinal, spf verdict
-      subject:
-        type: string
-      timestamp:
-        description: since epoch in miliseconds
-        type: integer
-      to:
-        description: The email addresses of the recipients.
-        items:
-          $ref: '#/definitions/mail.Address'
-        type: array
-      virusVerdict:
-        allOf:
-        - $ref: '#/definitions/mailiosmtp.VerdictStatus'
-        description: optional, virus verdict
-    type: object
-  mailiosmtp.MailBodyRaw:
-    properties:
-      content:
-        description: The raw content of the email.
-        items:
-          type: integer
-        type: array
-      contentDisposition:
-        description: The content disposition of the raw email.
-        type: string
-      contentId:
-        description: The content id of the raw email.
-        type: string
-      contentType:
-        description: The content type of the raw email.
-        type: string
-    type: object
-  mailiosmtp.SmtpAttachment:
-    properties:
-      content:
-        description: The content of the attachment.
-        items:
-          type: integer
-        type: array
-      contentDisposition:
-        description: The content disposition of the attachment.
-        type: string
-      contentId:
-        description: The content id of the attachment.
-        type: string
-      contentType:
-        description: The content type of the attachment.
-        type: string
-      contentUrl:
-        description: The content uri of the attachment.
-        type: string
-      filename:
-        description: The name of the attachment.
-        type: string
-    type: object
-  mailiosmtp.VerdictStatus:
-    properties:
-      status:
-        description: 'possible values: PASS, FAIL, NOT_AVAILABLE'
-        enum:
-        - PASS
-        - FAIL
-        - NOT_AVAILABLE
-        type: string
-    required:
-    - status
     type: object
   protocol.AttestedCredentialData:
     properties:
@@ -736,6 +583,8 @@ definitions:
     - VerificationDiscouraged
   types.DIDCommApiResponse:
     properties:
+      didCommId:
+        type: string
       id:
         type: string
       mtpStatusCodes:
@@ -804,7 +653,12 @@ definitions:
         description: 'in format: did:web:mail.io:0xabc -> recipient DIDs'
         items:
           type: string
-        minItems: 1
+        type: array
+      toEmails:
+        description: recipient email addresses (email and hash as alternative to To
+          field with DID addresses)
+        items:
+          $ref: '#/definitions/types.ToEmail'
         type: array
       type:
         description: 'a valid message type URI (MUST be: application/didcomm-encrypted+json
@@ -817,7 +671,6 @@ definitions:
     required:
     - from
     - id
-    - to
     - type
     type: object
   types.DIDCommRequest:
@@ -888,17 +741,26 @@ definitions:
     type: object
   types.DIDLookup:
     properties:
+      didDocument:
+        $ref: '#/definitions/did.Document'
       email:
         description: email address
         type: string
       emailHash:
         description: scrypt hash of the email address
         type: string
-      originServer:
-        $ref: '#/definitions/types.OriginServer'
+      mtpStatusCode:
+        $ref: '#/definitions/types.MTPStatusCode'
+      supportsMailio:
+        description: if the recipient supports Mailio (derived from domain resolving)
+        type: boolean
+      supportsStandardEmail:
+        description: if the recipient supports standard email (derrived from domain
+          resolving)
+        type: boolean
     required:
     - email
-    - originServer
+    - emailHash
     type: object
   types.DIDLookupRequest:
     properties:
@@ -918,9 +780,9 @@ definitions:
     type: object
   types.DIDLookupResponse:
     properties:
-      foundDIDDocuments:
+      foundLookups:
         items:
-          $ref: '#/definitions/did.Document'
+          $ref: '#/definitions/types.DIDLookup'
         type: array
       lookupHeader:
         $ref: '#/definitions/types.LookupHeader'
@@ -1308,6 +1170,8 @@ definitions:
     type: object
   types.JwsTokenWithSmartKey:
     properties:
+      didDocument:
+        $ref: '#/definitions/did.Document'
       email:
         type: string
       encryptedSmartKeyBase64:
@@ -1317,6 +1181,7 @@ definitions:
       smartKeyPasswordPart:
         type: string
     required:
+    - didDocument
     - email
     - encryptedSmartKeyBase64
     - jwsToken
@@ -1356,6 +1221,7 @@ definitions:
         type: integer
       subject:
         description: Represents the subject category of the status code
+        maximum: 8
         minimum: 0
         type: integer
       timestamp:
@@ -1397,7 +1263,7 @@ definitions:
     properties:
       found:
         items:
-          $ref: '#/definitions/did.Document'
+          $ref: '#/definitions/types.DIDLookup'
         type: array
       notFound:
         items:
@@ -1508,6 +1374,18 @@ definitions:
     - primaryEd25519PublicKey
     - primaryX25519PublicKey
     - smartKeyEncrypted
+    type: object
+  types.ToEmail:
+    properties:
+      email:
+        description: recipient email address
+        type: string
+      emailHash:
+        description: recipient email address hash
+        type: string
+    required:
+    - email
+    - emailHash
     type: object
   types.UserDomain:
     properties:
@@ -1785,42 +1663,6 @@ paths:
       summary: List all VCs for a specific mailio address
       tags:
       - Verifiable Credentials
-  /api/v1/didmessage:
-    post:
-      consumes:
-      - application/json
-      description: Send end-to-end encrypted message to DID recipients
-      parameters:
-      - description: didcomm-encrypted+json
-        in: body
-        name: handshake
-        required: true
-        schema:
-          $ref: '#/definitions/types.DIDCommMessage'
-      produces:
-      - application/json
-      responses:
-        "202":
-          description: Accepted
-          schema:
-            $ref: '#/definitions/types.DIDCommApiResponse'
-        "400":
-          description: bad request
-          schema:
-            $ref: '#/definitions/api.ApiError'
-        "401":
-          description: invalid signature or unauthorized to send messages
-          schema:
-            $ref: '#/definitions/api.ApiError'
-        "429":
-          description: rate limit exceeded
-          schema:
-            $ref: '#/definitions/api.ApiError'
-      security:
-      - Bearer: []
-      summary: Send end-to-end encrypted message to DID recipients
-      tags:
-      - Messaging
   /api/v1/domains:
     get:
       consumes:
@@ -2494,7 +2336,43 @@ paths:
         from a bucket.
       tags:
       - S3
-  /api/v1/smtp:
+  /api/v1/senddid:
+    post:
+      consumes:
+      - application/json
+      description: Send end-to-end encrypted message to DID recipients
+      parameters:
+      - description: didcomm-encrypted+json
+        in: body
+        name: handshake
+        required: true
+        schema:
+          $ref: '#/definitions/types.DIDCommMessage'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            $ref: '#/definitions/types.DIDCommApiResponse'
+        "400":
+          description: bad request
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "401":
+          description: invalid signature or unauthorized to send messages
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "429":
+          description: rate limit exceeded
+          schema:
+            $ref: '#/definitions/api.ApiError'
+      security:
+      - Bearer: []
+      summary: Send end-to-end encrypted message to DID recipients
+      tags:
+      - Messaging
+  /api/v1/sendsmtp:
     post:
       consumes:
       - application/json
@@ -2519,6 +2397,18 @@ paths:
             $ref: '#/definitions/api.ApiError'
         "401":
           description: invalid signature or unauthorized to send messages
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "403":
+          description: user not authorized
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "413":
+          description: message too large
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "422":
+          description: no recipient/no subject body/too many attachments
           schema:
             $ref: '#/definitions/api.ApiError'
         "429":

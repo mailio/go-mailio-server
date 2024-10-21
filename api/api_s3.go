@@ -65,10 +65,12 @@ func (pa *S3Api) GetPresignedUrlPut(c *gin.Context) {
 	var request v4.PresignedHTTPRequest
 	var err error
 
+	currentTime := time.Now().Format("20060102T150405")
+
 	m5 := md5.New()
 	m5.Write([]byte(objectKey))
 	m5Sum := m5.Sum(nil)
-	path := address.(string) + "/" + hex.EncodeToString(m5Sum)
+	path := address.(string) + "/" + hex.EncodeToString(m5Sum) + "_" + currentTime
 
 	if method == "put" {
 		r, e := pa.env.S3PresignClient.PresignPutObject(ctx, &s3.PutObjectInput{

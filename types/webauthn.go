@@ -2,6 +2,7 @@ package types
 
 import (
 	"github.com/go-webauthn/webauthn/webauthn"
+	"github.com/mailio/go-mailio-did/did"
 )
 
 type WebauthRegistrationVerify struct {
@@ -104,8 +105,9 @@ func (u *WebAuhnUser) WebAuthnIcon() string {
 }
 
 type JwsTokenWithSmartKey struct {
-	JwsToken                string `json:"jwsToken" validate:"required"`
-	EncryptedSmartKeyBase64 string `json:"encryptedSmartKeyBase64" validate:"required"`
-	SmartKeyPasswordPart    string `json:"smartKeyPasswordPart" validate:"required"`
-	Email                   string `json:"email" validate:"required"`
+	JwsToken                string        `json:"jwsToken" validate:"required"`
+	EncryptedSmartKeyBase64 string        `json:"encryptedSmartKeyBase64" validate:"required"`
+	SmartKeyPasswordPart    string        `json:"smartKeyPasswordPart" validate:"required"`
+	Email                   string        `json:"email" validate:"required"`
+	DidDocument             *did.Document `json:"didDocument" validate:"required"`
 }

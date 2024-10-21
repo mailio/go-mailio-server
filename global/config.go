@@ -43,6 +43,7 @@ type CouchDBConfig struct {
 }
 
 type MailioConfig struct {
+	DailySmtpSentLimit       int                           `yaml:"dailySmtpSentLimit"`
 	DiskSpace                int64                         `yaml:"diskSpace"`
 	AuthenticationPath       string                        `yaml:"authenticationPath"`
 	MessagingPath            string                        `yaml:"messagingPath"`

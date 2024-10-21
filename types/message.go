@@ -26,13 +26,14 @@ type MailioMessage struct {
 	From           string          `json:"from" validate:"required"` // either the sender's DID or the sender's email address
 	DIDCommMessage *DIDCommMessage `json:"didCommMessage,omitempty"` // the DIDComm message
 	// SmtpMessage    *SMTPMessage     `json:"smtpMessage,omitempty"`       // the SMTP message
-	Folder      string `json:"folder" validate:"required"`  // the folder where the message is stored
-	Created     int64  `json:"created" validate:"required"` // time of message creation in UTC milliseconds since epoch
-	Modified    int64  `json:"modified,omitempty"`          // time of message modification in UTC milliseconds since epoch
-	IsAutomated bool   `json:"isAutomated,omitempty"`       // true if the message is automated
-	IsForwarded bool   `json:"isForwarded,omitempty"`       // true if the message is forwarded
-	IsReplied   bool   `json:"isReplied,omitempty"`         // true if the message is replied
-	IsRead      bool   `json:"isRead,omitempty"`            // true if the message is read
+	Folder         string `json:"folder" validate:"required"`                                                      // the folder where the message is stored
+	Created        int64  `json:"created" validate:"required"`                                                     // time of message creation in UTC milliseconds since epoch
+	Modified       int64  `json:"modified,omitempty"`                                                              // time of message modification in UTC milliseconds since epoch
+	IsAutomated    bool   `json:"isAutomated,omitempty"`                                                           // true if the message is automated
+	IsForwarded    bool   `json:"isForwarded,omitempty"`                                                           // true if the message is forwarded
+	IsReplied      bool   `json:"isReplied,omitempty"`                                                             // true if the message is replied
+	IsRead         bool   `json:"isRead,omitempty"`                                                                // true if the message is read
+	SecurityStatus string `json:"securityStatus,omitempty" validate:"omitempty,oneof=clean malware spam phishing"` // the security status of the message (optional)
 }
 
 type ToEmail struct {
