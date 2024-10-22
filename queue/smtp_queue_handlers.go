@@ -32,6 +32,9 @@ func (msq *MessageQueue) SendSMTPMessage(fromMailioAddress string, email *smtpty
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
+	//TODO!: validate sending email (outside handler)
+	securityStatus := "clean"
+
 	taskCanceled, tsErr := msq.env.RedisClient.Get(ctx, fmt.Sprintf("cancel:%s", taskId)).Result()
 	if tsErr != nil {
 		if tsErr != redis.Nil {
@@ -125,7 +128,7 @@ func (msq *MessageQueue) SendSMTPMessage(fromMailioAddress string, email *smtpty
 			Intent:          types.SMPTIntentMessage,
 			PlainBodyBase64: plainBody,
 		},
-		SecurityStatus: "clean",
+		SecurityStatus: securityStatus,
 	}
 	_, msErr := msq.userService.SaveMessage(fromMailioAddress, mm)
 	if msErr != nil {

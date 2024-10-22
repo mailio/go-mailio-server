@@ -59,7 +59,7 @@ func (ma *MessagingApi) SendDIDMessage(c *gin.Context) {
 	}
 
 	// input DIDCommMessage
-	var input types.DIDCommMessage
+	var input types.DIDCommMessageInput
 	if err := c.ShouldBindBodyWith(&input, binding.JSON); err != nil {
 		ApiErrorf(c, http.StatusBadRequest, "invalid format")
 		return
@@ -227,44 +227,44 @@ func (ma *MessagingApi) sendSMTPMessage(c *gin.Context, mail *smtptypes.Mail, up
 }
 
 // sendDIDCommMessage sends a DIDComm message
-func (ma *MessagingApi) sendDIDCommMessage(senderAddress string, input types.DIDCommMessage) (*string, error) {
+func (ma *MessagingApi) sendDIDCommMessage(senderAddress string, input types.DIDCommMessageInput) (*string, error) {
 	// validate input
-	if len(input.To) == 0 && len(input.ToEmails) == 0 {
+	if len(input.DIDCommMessage.To) == 0 && len(input.DIDCommMessage.ToEmails) == 0 {
 		return nil, types.ErrNoRecipient
 	}
-	if len(input.ToEmails) > 50 { // maximum allowed recipients
+	if len(input.DIDCommMessage.ToEmails) > 50 { // maximum allowed recipients
 		return nil, types.ErrTooManyRecipients
 	}
-	if len(input.EncryptedBody.Ciphertext) > 3*1024*1024 { // maximum total allowed size
+	if len(input.DIDCommMessage.EncryptedBody.Ciphertext) > 3*1024*1024 { // maximum total allowed size
 		return nil, types.ErrMessageTooLarge
 	}
-	if len(input.EncryptedAttachments) > 50 { // maximum allowed attachments
+	if len(input.DIDCommMessage.Attachments) > 50 { // maximum allowed attachments
 		return nil, types.ErrTooManyAttachments
 	}
 
 	// default is messaging
-	if input.Intent == "" {
-		input.Intent = types.DIDCommIntentMessage
+	if input.DIDCommMessage.Intent == "" {
+		input.DIDCommMessage.Intent = types.DIDCommIntentMessage
 	}
 
 	// Ensure the 'from' field is set to the subject address and it's coming from this server
 	from := fmt.Sprintf("did:web:%s#%s", global.Conf.Mailio.ServerDomain, senderAddress)
-	if input.From != from {
+	if input.DIDCommMessage.From != from {
 		return nil, types.ErrNotAuthorized
 	}
 
 	// intended folder for sender is "sent"
-	id, idErr := util.DIDDocumentToUniqueID(&input, types.MailioFolderSent)
+	id, idErr := util.DIDDocumentToUniqueID(&input.DIDCommMessage, types.MailioFolderSent)
 	if idErr != nil {
 		global.Logger.Log(idErr.Error(), "failed to create unique id")
 		return nil, types.ErrInternal
 	}
-	input.ID = id
-	input.CreatedTime = time.Now().UTC().UnixMilli()
+	input.DIDCommMessage.ID = id
+	input.DIDCommMessage.CreatedTime = time.Now().UTC().UnixMilli()
 
 	task := &types.Task{
 		Address:        senderAddress,
-		DIDCommMessage: &input,
+		DIDCommMessage: &input.DIDCommMessage,
 	}
 	sendTask, tErr := types.NewDIDCommSendTask(task)
 	if tErr != nil {
@@ -273,10 +273,10 @@ func (ma *MessagingApi) sendDIDCommMessage(senderAddress string, input types.DID
 	}
 
 	taskInfo, tqErr := ma.env.TaskClient.Enqueue(sendTask,
-		asynq.MaxRetry(3),             // max number of times to retry the task
-		asynq.Timeout(60*time.Second), // max time to process the task
-		asynq.TaskID(input.ID),        // unique task id
-		asynq.Unique(time.Second*10))  // unique for 10 seconds (preventing multiple equal messages in the queue)
+		asynq.MaxRetry(3),                     // max number of times to retry the task
+		asynq.Timeout(60*time.Second),         // max time to process the task
+		asynq.TaskID(input.DIDCommMessage.ID), // unique task id
+		asynq.Unique(time.Second*10))          // unique for 10 seconds (preventing multiple equal messages in the queue)
 	if tqErr != nil {
 		global.Logger.Log(tqErr.Error(), "failed to send message")
 		return nil, types.ErrInternal

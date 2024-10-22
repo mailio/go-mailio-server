@@ -505,9 +505,8 @@ func ParseMime(mime []byte) (*mailiosmtp.Mail, error) {
 	}
 
 	// body (plain, html, html cleaned)
-	email.BodyHTML = msg.HTML
+	email.BodyHTML = cleanupUGCHtml(msg.HTML)
 	email.BodyText = msg.Text
-	email.BodyHTMLWithoutUnsafeTags = cleanupUGCHtml(email.BodyHTML)
 
 	// mime.Inlines is a slice of inlined attacments. These are typically images that are embedded in the HTML body
 	totalInlineSize := int64(0)

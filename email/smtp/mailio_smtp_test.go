@@ -58,18 +58,17 @@ func TestToMime(t *testing.T) {
 
 func TestToBounce(t *testing.T) {
 	receivedMsg := mailiosmtp.Mail{
-		From:                      mail.Address{Name: "John", Address: "john@doe.com"},
-		To:                        []mail.Address{{Name: "Jane", Address: "jane@jane.com"}},
-		Subject:                   "Testing mailio",
-		BodyHTML:                  "<h1>Testing mailio</h1>",
-		Timestamp:                 time.Now().UTC().UnixMilli(),
-		BodyHTMLWithoutUnsafeTags: "<h1>Testing mailio</h1>",
-		SpamVerdict:               &mailiosmtp.VerdictStatus{Status: "PASS"},
-		VirusVerdict:              &mailiosmtp.VerdictStatus{Status: "PASS"},
-		SpfVerdict:                &mailiosmtp.VerdictStatus{Status: "PASS"},
-		DkimVerdict:               &mailiosmtp.VerdictStatus{Status: "PASS"},
-		BodyText:                  "Testing mailio",
-		MessageId:                 "123456",
+		From:         mail.Address{Name: "John", Address: "john@doe.com"},
+		To:           []mail.Address{{Name: "Jane", Address: "jane@jane.com"}},
+		Subject:      "Testing mailio",
+		BodyHTML:     "<h1>Testing mailio</h1>",
+		Timestamp:    time.Now().UTC().UnixMilli(),
+		SpamVerdict:  &mailiosmtp.VerdictStatus{Status: "PASS"},
+		VirusVerdict: &mailiosmtp.VerdictStatus{Status: "PASS"},
+		SpfVerdict:   &mailiosmtp.VerdictStatus{Status: "PASS"},
+		DkimVerdict:  &mailiosmtp.VerdictStatus{Status: "PASS"},
+		BodyText:     "Testing mailio",
+		MessageId:    "123456",
 	}
 
 	bounce, err := ToBounce(receivedMsg.To[0], receivedMsg, "5.1.1", "Recipient address rejected: User unknown in virtual mailbox table", hostname)
@@ -93,18 +92,17 @@ func TestToComplaint(t *testing.T) {
 	}
 
 	receivedMsg := mailiosmtp.Mail{
-		From:                      mail.Address{Name: "spam person", Address: "spammer@spam.com"},
-		To:                        []mail.Address{{Name: "Jane", Address: "jane@alice.com"}},
-		Subject:                   "Testing mailio",
-		BodyHTML:                  "<h1>Testing mailio</h1>",
-		Timestamp:                 time.Now().UTC().UnixMilli(),
-		BodyHTMLWithoutUnsafeTags: "<h1>Testing mailio</h1>",
-		SpamVerdict:               &mailiosmtp.VerdictStatus{Status: "FAIL"},
-		VirusVerdict:              &mailiosmtp.VerdictStatus{Status: "PASS"},
-		SpfVerdict:                &mailiosmtp.VerdictStatus{Status: "FAIL"},
-		DkimVerdict:               &mailiosmtp.VerdictStatus{Status: "NOT_AVAILABLE"},
-		BodyText:                  "Testing mailio",
-		MessageId:                 "123456",
+		From:         mail.Address{Name: "spam person", Address: "spammer@spam.com"},
+		To:           []mail.Address{{Name: "Jane", Address: "jane@alice.com"}},
+		Subject:      "Testing mailio",
+		BodyHTML:     "<h1>Testing mailio</h1>",
+		Timestamp:    time.Now().UTC().UnixMilli(),
+		SpamVerdict:  &mailiosmtp.VerdictStatus{Status: "FAIL"},
+		VirusVerdict: &mailiosmtp.VerdictStatus{Status: "PASS"},
+		SpfVerdict:   &mailiosmtp.VerdictStatus{Status: "FAIL"},
+		DkimVerdict:  &mailiosmtp.VerdictStatus{Status: "NOT_AVAILABLE"},
+		BodyText:     "Testing mailio",
+		MessageId:    "123456",
 		Attachments: []*mailiosmtp.SmtpAttachment{
 			{
 				ContentType: "image/jpeg",
@@ -205,18 +203,17 @@ func TestEmailParsingMultipeHeaders(t *testing.T) {
 
 func TestParseBounce(t *testing.T) {
 	receivedMsg := mailiosmtp.Mail{
-		From:                      mail.Address{Name: "John", Address: "john@doe.com"},
-		To:                        []mail.Address{{Name: "Jane", Address: "jane@jane.com"}},
-		Subject:                   "Testing mailio",
-		BodyHTML:                  "<h1>Testing mailio</h1>",
-		Timestamp:                 time.Now().UTC().UnixMilli(),
-		BodyHTMLWithoutUnsafeTags: "<h1>Testing mailio</h1>",
-		SpamVerdict:               &mailiosmtp.VerdictStatus{Status: "PASS"},
-		VirusVerdict:              &mailiosmtp.VerdictStatus{Status: "PASS"},
-		SpfVerdict:                &mailiosmtp.VerdictStatus{Status: "PASS"},
-		DkimVerdict:               &mailiosmtp.VerdictStatus{Status: "PASS"},
-		BodyText:                  "Testing mailio",
-		MessageId:                 "123456",
+		From:         mail.Address{Name: "John", Address: "john@doe.com"},
+		To:           []mail.Address{{Name: "Jane", Address: "jane@jane.com"}},
+		Subject:      "Testing mailio",
+		BodyHTML:     "<h1>Testing mailio</h1>",
+		Timestamp:    time.Now().UTC().UnixMilli(),
+		SpamVerdict:  &mailiosmtp.VerdictStatus{Status: "PASS"},
+		VirusVerdict: &mailiosmtp.VerdictStatus{Status: "PASS"},
+		SpfVerdict:   &mailiosmtp.VerdictStatus{Status: "PASS"},
+		DkimVerdict:  &mailiosmtp.VerdictStatus{Status: "PASS"},
+		BodyText:     "Testing mailio",
+		MessageId:    "123456",
 	}
 	bounceBytes, bErr := ToBounce(receivedMsg.To[0], receivedMsg, "5.1.1", "Recipient address rejected: User unknown in virtual mailbox table", hostname)
 	if bErr != nil {
@@ -271,7 +268,6 @@ func TestLargerExample(t *testing.T) {
 		t.Fatal(err)
 	}
 	fmt.Printf("original: %v\n", mail.BodyHTML)
-	fmt.Printf("cleaned : %v\n", mail.BodyHTMLWithoutUnsafeTags)
 	assert.Equal(t, mailiosmtp.VerdictStatusPass, mail.SpfVerdict.Status)
 	assert.Equal(t, mailiosmtp.VerdictStatusPass, mail.DkimVerdict.Status)
 	assert.Equal(t, mailiosmtp.VerdictStatusPass, mail.DmarcVerdict.Status)
@@ -284,5 +280,5 @@ func TestInBucketTestData_1(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	fmt.Printf("cleaned : %v\n", mail.BodyHTMLWithoutUnsafeTags)
+	fmt.Printf("cleaned : %v\n", mail.BodyHTML)
 }
