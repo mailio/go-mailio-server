@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/hibiken/asynq"
 	diskusagehandler "github.com/mailio/go-mailio-diskusage-handler"
 	"github.com/mailio/go-mailio-server/diskusage"
@@ -32,8 +33,13 @@ func (msq *MessageQueue) SendSMTPMessage(fromMailioAddress string, email *smtpty
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	//TODO!: validate sending email (outside handler)
-	securityStatus := "clean"
+	securityStatus := "clean" // default
+
+	//TODO: SMTP validation handler
+	smtpValidatorHandlers := validator.Handlers()
+	if len(smtpValidatorHandlers) > 0 {
+		// call each validator handler
+	}
 
 	taskCanceled, tsErr := msq.env.RedisClient.Get(ctx, fmt.Sprintf("cancel:%s", taskId)).Result()
 	if tsErr != nil {
