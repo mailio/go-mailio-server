@@ -5,11 +5,9 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
-	"errors"
 	src "math/rand"
 	"regexp"
 
-	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/types"
 	"golang.org/x/crypto/scrypt"
 )
@@ -28,21 +26,13 @@ var (
 	scryptLen = 32 // 32 bytes long
 )
 
-func ScryptEmail(email string) ([]byte, error) {
-	slt := global.Conf.Mailio.EmailSaltHex
-	if slt == "" {
-		return nil, errors.New("emailSalt configuration is empty")
-	}
-	emailSalt, dErr := hex.DecodeString(slt)
-	if dErr != nil {
-		return nil, dErr
-	}
-
-	dk, err := scrypt.Key([]byte(email), emailSalt, scryptN, scryptR, scryptP, scryptLen)
+func ScryptEmail(email string) (string, error) {
+	dk, err := scrypt.Key([]byte(email), []byte(email), scryptN, scryptR, scryptP, scryptLen)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	return dk, nil
+	// Encode the hashed result to base64
+	return base64.StdEncoding.EncodeToString(dk), nil
 }
 
 const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"

@@ -78,7 +78,7 @@ func ServerSideHandshake(publicServerKey ed25519.PublicKey, privateServerKey ed2
 	handshake := &types.Handshake{
 		Content: types.HandshakeContent{
 			HandshakeID: ID,
-			OriginServer: types.HandshakeOriginServer{
+			OriginServer: types.OriginServer{
 				Domain: domain,
 			},
 			Type:                 types.HANDSHAKE_TYPE_SERVER,

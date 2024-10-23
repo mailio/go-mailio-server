@@ -50,7 +50,7 @@ func TestCBORExample(t *testing.T) {
 	example := &types.Handshake{
 		Content: types.HandshakeContent{
 			HandshakeID: "1234567890",
-			OriginServer: types.HandshakeOriginServer{
+			OriginServer: types.OriginServer{
 				Domain: "test.mail.io",
 			},
 			Created: float64(time.Now().UnixMilli()),
@@ -96,7 +96,7 @@ func TestCBOR(t *testing.T) {
 	example := types.Handshake{
 		Content: types.HandshakeContent{
 			HandshakeID:  "1234567890",
-			OriginServer: types.HandshakeOriginServer{Domain: "test.mail.io"},
+			OriginServer: types.OriginServer{Domain: "test.mail.io"},
 		},
 		// SignatureBase64:   "123",
 		// CborPayloadBase64: "123",

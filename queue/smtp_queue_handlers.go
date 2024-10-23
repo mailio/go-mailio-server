@@ -2,7 +2,9 @@ package queue
 
 import (
 	"context"
+	"crypto/md5"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,6 +17,7 @@ import (
 	"github.com/mailio/go-mailio-server/diskusage"
 	mailiosmtp "github.com/mailio/go-mailio-server/email/smtp"
 	smtptypes "github.com/mailio/go-mailio-server/email/smtp/types"
+	smtpvalidator "github.com/mailio/go-mailio-server/email/smtp/validator"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/types"
 	"github.com/mailio/go-mailio-server/util"
@@ -29,6 +32,14 @@ func (msq *MessageQueue) SendSMTPMessage(fromMailioAddress string, email *smtpty
 	// if the user canceled the email sending, delete the draft message per message ID
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+
+	securityStatus := "clean" // default
+
+	//TODO: SMTP validation handler
+	smtpValidatorHandlers := smtpvalidator.Handlers()
+	if len(smtpValidatorHandlers) > 0 {
+		// call each validator handler
+	}
 
 	taskCanceled, tsErr := msq.env.RedisClient.Get(ctx, fmt.Sprintf("cancel:%s", taskId)).Result()
 	if tsErr != nil {
@@ -67,6 +78,13 @@ func (msq *MessageQueue) SendSMTPMessage(fromMailioAddress string, email *smtpty
 	email.MessageId = rfc2822MessageID
 	//TODO: check if message is reply to another message (In-Reply-To or References headers)
 
+	// download attachments from s3 and store in the email object
+	paErr := msq.processSendAttachments(email)
+	if paErr != nil {
+		global.Logger.Log(paErr.Error(), "failed processing attachments")
+		return fmt.Errorf("failed processing attachments: %v: %w", paErr, asynq.SkipRetry)
+	}
+
 	// convert email to mime
 	mime, mErr := mailiosmtp.ToMime(email, rfc2822MessageID)
 	if mErr != nil {
@@ -74,10 +92,12 @@ func (msq *MessageQueue) SendSMTPMessage(fromMailioAddress string, email *smtpty
 		return fmt.Errorf("failed converting email to mime: %v: %w", mErr, asynq.SkipRetry)
 	}
 
-	paErr := msq.processAttachments(email, fromMailioAddress)
-	if paErr != nil {
-		global.Logger.Log(paErr.Error(), "failed processing attachments")
-		return fmt.Errorf("failed processing attachments: %v: %w", paErr, asynq.SkipRetry)
+	// before storing the email in the database, we need to remove the attachment contents
+	// as they are stored in s3 and we only need the s3 urls
+	if len(email.Attachments) > 0 {
+		for i := range email.Attachments {
+			email.Attachments[i].Content = []byte{}
+		}
 	}
 
 	// store the email in the database
@@ -114,6 +134,7 @@ func (msq *MessageQueue) SendSMTPMessage(fromMailioAddress string, email *smtpty
 			Intent:          types.SMPTIntentMessage,
 			PlainBodyBase64: plainBody,
 		},
+		SecurityStatus: securityStatus,
 	}
 	_, msErr := msq.userService.SaveMessage(fromMailioAddress, mm)
 	if msErr != nil {
@@ -124,6 +145,7 @@ func (msq *MessageQueue) SendSMTPMessage(fromMailioAddress string, email *smtpty
 	docID, err := mgHandler.SendMimeMail(email.From, mime, email.To)
 	if err != nil {
 		global.Logger.Log(err.Error(), "failed to send smtp email")
+		//TODO: store the email in the inbox folder if sending fails
 		return fmt.Errorf("failed sending smtp email: %v: %w", err, asynq.SkipRetry)
 	}
 	global.Logger.Log(fmt.Sprintf("smtp message sent: %s", docID), "message sent")
@@ -165,12 +187,15 @@ func (msq *MessageQueue) ReceiveSMTPMessage(email *smtptypes.Mail, taskId string
 	// default folder
 	folder := types.MailioFolderOther
 
+	securityStatus := "clean"
+
 	// Check if the email is market as spam (to spam folder)
 	isSpam := false
 	if email.SpamVerdict != nil && email.SpamVerdict.Status == smtptypes.VerdictStatusFail {
 		// save to spam folder for all recipients
 		isSpam = true
 		folder = types.MailioFolderSpam
+		securityStatus = "spam"
 	}
 
 	// prepare to fields
@@ -192,9 +217,9 @@ func (msq *MessageQueue) ReceiveSMTPMessage(email *smtptypes.Mail, taskId string
 		scryptedMail, err := util.ScryptEmail(to.Address)
 		if err != nil {
 			sendBounce(to, email, smtpHandler, "4.3.0", fmt.Sprintf("Recipient not found: %s", to.Address))
+			continue
 		}
-		scryptedBaseUrl64 := base64.URLEncoding.EncodeToString(scryptedMail)
-		userMapping, umErr := msq.userService.FindUserByScryptEmail(scryptedBaseUrl64)
+		userMapping, umErr := msq.userService.FindUserByScryptEmail(scryptedMail)
 		if umErr != nil {
 			if umErr == types.ErrNotFound {
 				global.Logger.Log("error, find user by scrypt not found", to.Address, umErr.Error())
@@ -208,6 +233,7 @@ func (msq *MessageQueue) ReceiveSMTPMessage(email *smtptypes.Mail, taskId string
 		if upErr != nil {
 			global.Logger.Log("error", upErr.Error())
 			sendBounce(to, email, smtpHandler, "4.3.0", fmt.Sprintf("Recipient not found: %s", to.Address))
+			continue
 		}
 		if !userProfile.Enabled {
 			global.Logger.Log("user disabled", userMapping.MailioAddress)
@@ -240,8 +266,19 @@ func (msq *MessageQueue) ReceiveSMTPMessage(email *smtptypes.Mail, taskId string
 		}
 
 		// uploads attachments to s3 and stores references in the email object
-		paErr := msq.processAttachments(email, userMapping.MailioAddress)
+		paErr := msq.processReceiveAttachments(email, userMapping.MailioAddress)
 		if paErr != nil {
+			if paErr == types.ErrMessageTooLarge {
+				global.Logger.Log("attachment too large", "messageId", email.MessageId)
+				sendBounce(to, email, smtpHandler, "5.3.4", "Message too large")
+				continue
+			}
+			if paErr.Error() == "malware detected" {
+				global.Logger.Log("malware detected", "messageId", email.MessageId)
+				sendBounce(to, email, smtpHandler, "5.6.1", "Malware detected")
+				isSpam = true
+				securityStatus = "malware"
+			}
 			global.Logger.Log("error processing attachments", paErr.Error())
 			sendBounce(to, email, smtpHandler, "5.3.4", "Error processing attachments")
 			continue
@@ -295,6 +332,7 @@ func (msq *MessageQueue) ReceiveSMTPMessage(email *smtptypes.Mail, taskId string
 			IsForwarded:    isForwarded(email),
 			IsReplied:      isReply(email),
 			DIDCommMessage: dcMsg,
+			SecurityStatus: securityStatus,
 		}
 		mm, mErr := msq.userService.SaveMessage(userMapping.MailioAddress, mailioMessage)
 		if mErr != nil {
@@ -425,30 +463,94 @@ func isReply(email *smtptypes.Mail) bool {
 	return false
 }
 
+// processReceiveAttachments processes the attachments of the given received email.
+// It generates a unique ID for each attachment, downloads the attachment
+// and updates the attachment content prepared for sending.
+// It also clears the content of the attachment after uploading.
+//
+// Parameters:
+//
+//		email - A pointer to the Mail object containing the email and its attachments.
+//	 recipientAddress - A string representing the recipient's email address for constructing the attachment path.
+//
+// Errors:
+//
+//	types.ErrMessageTooLarge - If an attachment is larger than 30MB, the function returns an error.
+func (msq *MessageQueue) processReceiveAttachments(email *smtptypes.Mail, recipientAddress string) error {
+	if len(email.Attachments) > 0 {
+		for i, att := range email.Attachments {
+			if att.Content == nil {
+				global.Logger.Log("attachment content is nil", att.ContentID, "filename:", att.Filename, "messageId", email.MessageId)
+				continue
+			}
+			if att.Content != nil {
+				if len(att.Content) < 30*1024*1024 {
+					global.Logger.Log("attachment content is too large", att.ContentID, "filename:", att.Filename, "messageId", email.MessageId, "size: ", len(att.Content))
+					// deny attachments larger than 30MB
+					return types.ErrMessageTooLarge
+				}
+				if att.Filename == "" {
+					att.Filename = "attachmentunknown"
+				}
+
+				m5 := md5.New()
+				m5.Write(att.Content)
+				m5Sum := m5.Sum(nil)
+				now := time.Now().UTC().Format("20061010T150405Z")
+				fileMd5 := hex.EncodeToString(m5Sum)
+				// check for malware of the attachment
+				if msq.malwareService.IsMalware(fileMd5) {
+					// TODO: store email but with warning of malware?
+					global.Logger.Log("malware detected", "filename", att.Filename, "md5", fileMd5)
+					return fmt.Errorf("malware detected: %w", asynq.SkipRetry)
+				}
+				path := recipientAddress + "/" + fileMd5 + "_" + now
+
+				p, err := msq.s3Service.UploadAttachment(global.Conf.Storage.Bucket, path, att.Content)
+				if err != nil {
+					global.Logger.Log(err.Error(), "failed to upload attachment", path)
+					return fmt.Errorf("failed uploading attachment: %v", err)
+				}
+				email.Attachments[i].ContentURL = &p
+				if util.DetectInlineContentType(att.Filename) {
+					att.ContentDisposition = fmt.Sprintf(`inline; filename="%s"`, att.Filename)
+				} else {
+					att.ContentDisposition = fmt.Sprintf(`attachment; filename="%s"`, att.Filename)
+				}
+				email.Attachments[i].Content = []byte{} // clear the content
+			}
+		}
+	}
+	return nil
+}
+
 // processAttachments processes the attachments of the given email.
-// It generates a unique ID for each attachment, uploads the attachment
-// to the specified storage bucket, and updates the attachment's ContentURL.
+// It generates a unique ID for each attachment, downloads the attachment
+// and updates the attachment content prepared for sending.
 // It also clears the content of the attachment after uploading.
 //
 // Parameters:
 //
 //	email - A pointer to the Mail object containing the email and its attachments.
 //	mailioAddress - A string representing the mailio address for constructing the attachment path.
-func (msq *MessageQueue) processAttachments(email *smtptypes.Mail, mailioAddress string) error {
+func (msq *MessageQueue) processSendAttachments(email *smtptypes.Mail) error {
 	if len(email.Attachments) > 0 {
-		for i := range email.Attachments {
-			attachmentID, aErr := util.SmtpMailToUniqueID(email, email.Attachments[i].Filename)
-			if aErr != nil {
-				global.Logger.Log(aErr.Error(), "failed to create attachment ID")
+		for i, att := range email.Attachments {
+			if att.ContentURL == nil {
+				continue
 			}
-			attPath := fmt.Sprintf("/%s/%s", mailioAddress, attachmentID)
-			url, s3Err := msq.userService.UploadAttachment(global.Conf.Storage.Bucket, attPath, email.Attachments[i].Content)
-			if s3Err != nil {
-				global.Logger.Log(s3Err.Error(), "failed to upload attachment")
-				return fmt.Errorf("failed uploading attachment: %v: %w", s3Err, asynq.SkipRetry)
+			content, dErr := msq.s3Service.DownloadAttachment(*att.ContentURL)
+			if dErr != nil {
+				global.Logger.Log(dErr.Error(), "failed to download attachment")
+				return fmt.Errorf("failed downloading attachment: %v: %w", dErr, asynq.SkipRetry)
 			}
-			email.Attachments[i].ContentURL = &url
-			email.Attachments[i].Content = []byte{} // clear the content
+			email.Attachments[i].Content = content
+			isInlineContentDispositon := util.DetectInlineContentType(att.Filename)
+			if isInlineContentDispositon {
+				email.Attachments[i].ContentDisposition = fmt.Sprintf(`inline; filename="%s"`, att.Filename)
+			} else {
+				email.Attachments[i].ContentDisposition = fmt.Sprintf(`attachment; filename="%s"`, att.Filename)
+			}
 		}
 	}
 	return nil

@@ -19,9 +19,11 @@ import (
 )
 
 type SelfSovereignService struct {
-	didRepo     repository.Repository
-	vcsRepo     repository.Repository
-	restyClient *resty.Client
+	didRepo              repository.Repository
+	vcsRepo              repository.Repository
+	handshakeMappingRepo repository.Repository
+	domainRepo           repository.Repository
+	restyClient          *resty.Client
 }
 
 // Self Sovereign Service operates over Mailios DID and VC documents
@@ -62,10 +64,21 @@ func NewSelfSovereignService(dbSelector repository.DBSelector) *SelfSovereignSer
 	if err != nil {
 		panic(err)
 	}
+	mappingRepo, err := dbSelector.ChooseDB(repository.MailioMapping)
+	if err != nil {
+		panic(err)
+	}
+	domainRepo, err := dbSelector.ChooseDB(repository.Domain)
+	if err != nil {
+		panic(err)
+	}
+
 	return &SelfSovereignService{
-		didRepo:     didRepo,
-		vcsRepo:     vcsRepo,
-		restyClient: restyClient,
+		didRepo:              didRepo,
+		vcsRepo:              vcsRepo,
+		handshakeMappingRepo: mappingRepo,
+		domainRepo:           domainRepo,
+		restyClient:          restyClient,
 	}
 }
 
@@ -252,7 +265,7 @@ func (ssi *SelfSovereignService) ListSubjectVCs(address string, limit int, bookm
 }
 
 // FetchRemoteDID parses the WEB did and fetched DID document from the remote server
-// FetchRemoteDID tries a list of subdomain queries to find the correct endpoint
+// FetchRemoteDID doesn't resolve domains since it expects already resolved domain
 // Returns the DID document for the given web mailio address
 // - ErrInvalidFormat when DID address not valid
 // - ErrBadRequest when remote server returns code >= 400
@@ -267,22 +280,6 @@ func (ssi *SelfSovereignService) FetchRemoteDID(remoteDid *did.DID) (*did.Docume
 	if strings.Contains(domain, "localhost") || strings.Contains(domain, "127.0.0.1") {
 		protocol = "http"
 	}
-
-	// // find the right domain for the given did
-	// for i, query := range global.Conf.Mailio.ServerSubdomainQueryList {
-	// 	possibleUrl := query.Prefix + "." + domain
-	// 	parsedUrl, err := url.Parse(possibleUrl)
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
-	// 	domain, dErr := resolveDomain(domainRepoi, parsedUrl.Host, false)
-	// 	if dErr != nil {
-	// 		if i == len(global.Conf.Mailio.ServerSubdomainQueryList)-1 {
-	// 			return nil, dErr
-	// 		}
-
-	// 	}
-	// }
 
 	userAddress := remoteDid.Fragment()
 

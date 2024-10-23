@@ -251,63 +251,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/didmessage": {
-            "post": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Send end-to-end encrypted message to DID recipients",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Messaging"
-                ],
-                "summary": "Send end-to-end encrypted message to DID recipients",
-                "parameters": [
-                    {
-                        "description": "didcomm-encrypted+json",
-                        "name": "handshake",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/types.DIDCommMessage"
-                        }
-                    }
-                ],
-                "responses": {
-                    "202": {
-                        "description": "Accepted",
-                        "schema": {
-                            "$ref": "#/definitions/types.DIDCommApiResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "bad request",
-                        "schema": {
-                            "$ref": "#/definitions/api.ApiError"
-                        }
-                    },
-                    "401": {
-                        "description": "invalid signature or unauthorized to send messages",
-                        "schema": {
-                            "$ref": "#/definitions/api.ApiError"
-                        }
-                    },
-                    "429": {
-                        "description": "rate limit exceeded",
-                        "schema": {
-                            "$ref": "#/definitions/api.ApiError"
-                        }
-                    }
-                }
-            }
-        },
         "/api/v1/domains": {
             "get": {
                 "description": "Returns a list of all supported domains",
@@ -657,10 +600,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/types.HandshakeContent"
-                            }
+                            "$ref": "#/definitions/types.HandshakeLookupResponse"
                         }
                     },
                     "400": {
@@ -782,9 +722,37 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/mtp/handshake": {
+        "/api/v1/logout": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Logout user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "User Account"
+                ],
+                "summary": "Logout user",
+                "responses": {
+                    "429": {
+                        "description": "rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/mtp/did": {
             "post": {
-                "description": "Request handshake from this server (must be digitally signed)",
+                "description": "Request did documents from this server by email hash (must be digitally signed bny senders Mailio server)",
                 "consumes": [
                     "application/json"
                 ],
@@ -794,7 +762,59 @@ const docTemplate = `{
                 "tags": [
                     "Mailio Transfer Protocol"
                 ],
-                "summary": "Request handshake from this server (must be digitally signed)",
+                "summary": "Request did docouments from this server (must be digitally signed by senders Mailio server)",
+                "parameters": [
+                    {
+                        "description": "DIDDocumentSignedRequest",
+                        "name": "handshake",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.DIDDocumentSignedRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.DIDDocumentSignedResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "bad request",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "401": {
+                        "description": "invalid signature",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "429": {
+                        "description": "rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/mtp/handshake": {
+            "post": {
+                "description": "Request handshake from this server (must be digitally signed by senders Mailio server)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Mailio Transfer Protocol"
+                ],
+                "summary": "Request handshake from this server (must be digitally signed by senders Mailio server)",
                 "parameters": [
                     {
                         "description": "HandshakeSignedRequest",
@@ -1035,6 +1055,63 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/resolve/did": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Fetch all DID documents (local and remote)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Messaging"
+                ],
+                "summary": "Fetch all DID documents (local and remote)",
+                "parameters": [
+                    {
+                        "description": "InputDIDLookup",
+                        "name": "lookups",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.InputDIDLookup"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.OutputDIDLookup"
+                        }
+                    },
+                    "400": {
+                        "description": "invalid email address",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "429": {
+                        "description": "rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "500": {
+                        "description": "error fetching did documents",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/resolve/domain": {
             "get": {
                 "security": [
@@ -1097,7 +1174,171 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/smtp": {
+        "/api/v1/s3": {
+            "delete": {
+                "description": "Delete object from s3 bucket (only in logged in users folder)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "S3"
+                ],
+                "summary": "Delete object from s3 bucket",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "objectKey",
+                        "name": "objectKey",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.PresignedUrl"
+                        }
+                    },
+                    "400": {
+                        "description": "invalid api call",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "429": {
+                        "description": "rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "500": {
+                        "description": "error deletin object",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/s3presign": {
+            "get": {
+                "description": "The presigned request is valid for the specified number of seconds.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "S3"
+                ],
+                "summary": "GetObject makes a presigned request that can be used to get an object from a bucket.",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "objectKey",
+                        "name": "objectKey",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "method",
+                        "name": "method",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.PresignedUrl"
+                        }
+                    },
+                    "400": {
+                        "description": "invalid api call",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "429": {
+                        "description": "rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "500": {
+                        "description": "error creating presigned url",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/senddid": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Send end-to-end encrypted message to DID recipients",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Messaging"
+                ],
+                "summary": "Send end-to-end encrypted message to DID recipients",
+                "parameters": [
+                    {
+                        "description": "didcomm-encrypted+json",
+                        "name": "handshake",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.DIDCommMessage"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "$ref": "#/definitions/types.DIDCommApiResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "bad request",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "401": {
+                        "description": "invalid signature or unauthorized to send messages",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "429": {
+                        "description": "rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/sendsmtp": {
             "post": {
                 "security": [
                     {
@@ -1145,6 +1386,24 @@ const docTemplate = `{
                             "$ref": "#/definitions/api.ApiError"
                         }
                     },
+                    "403": {
+                        "description": "user not authorized",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "413": {
+                        "description": "message too large",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "422": {
+                        "description": "no recipient/no subject body/too many attachments",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
                     "429": {
                         "description": "rate limit exceeded",
                         "schema": {
@@ -1177,6 +1436,211 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/types.OutputBasicUserInfo"
+                        }
+                    },
+                    "429": {
+                        "description": "rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/verify_cookie": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Get logged in users smartkey based on a JWS token",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "User Account"
+                ],
+                "summary": "Get logged in users smartkey based on a JWS token",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.JwsTokenWithSmartKey"
+                        }
+                    },
+                    "429": {
+                        "description": "rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/webauthn/login_options": {
+            "get": {
+                "description": "LoginOptions return WebAuthN login options",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "WebAuthn"
+                ],
+                "summary": "LoginOptions return login options",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/protocol.PublicKeyCredentialRequestOptions"
+                        }
+                    },
+                    "400": {
+                        "description": "invalid input parameters",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "429": {
+                        "description": "rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/webauthn/login_verify": {
+            "post": {
+                "description": "LoginOptions return WebAuthN login options",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "WebAuthn"
+                ],
+                "summary": "LoginOptions return login options",
+                "parameters": [
+                    {
+                        "description": "Credential Assertion Data",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/protocol.ParsedCredentialAssertionData"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/protocol.PublicKeyCredentialRequestOptions"
+                        }
+                    },
+                    "400": {
+                        "description": "invalid input parameters",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "429": {
+                        "description": "rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/webauthn/registration_options": {
+            "get": {
+                "description": "Registration options for a new WebAuthn device",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "WebAuthn"
+                ],
+                "summary": "Registration options for a new WebAuthn device",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Email address to register",
+                        "name": "email",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/protocol.PublicKeyCredentialCreationOptions"
+                        }
+                    },
+                    "400": {
+                        "description": "invalid email address",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "429": {
+                        "description": "rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/webauthn/registration_verify": {
+            "post": {
+                "description": "WebAuthnVerifyRegistration check the signed digital challenge",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "WebAuthn"
+                ],
+                "summary": "WebAuthnVerifyRegistration check the validity of the registration",
+                "parameters": [
+                    {
+                        "description": "Attestation object + Encrypted SmartKey payload",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.WebauthRegistrationVerify"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "JWS",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "invalid input parameters",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
                         }
                     },
                     "429": {
@@ -1522,238 +1986,530 @@ const docTemplate = `{
                 }
             }
         },
-        "mail.Address": {
+        "mailiosmtp.Mail": {
+            "type": "object"
+        },
+        "protocol.AttestedCredentialData": {
             "type": "object",
             "properties": {
-                "address": {
-                    "description": "user@domain",
+                "aaguid": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "credential_id": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "public_key": {
+                    "description": "The raw credential public key bytes received from the attestation data.",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                }
+            }
+        },
+        "protocol.AuthenticationExtensions": {
+            "type": "object",
+            "additionalProperties": true
+        },
+        "protocol.AuthenticationExtensionsClientOutputs": {
+            "type": "object",
+            "additionalProperties": true
+        },
+        "protocol.AuthenticatorAssertionResponse": {
+            "type": "object",
+            "properties": {
+                "authenticatorData": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "clientDataJSON": {
+                    "description": "From the spec https://www.w3.org/TR/webauthn/#dom-authenticatorresponse-clientdatajson\nThis attribute contains a JSON serialization of the client data passed to the authenticator\nby the client in its call to either create() or get().",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "signature": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "userHandle": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                }
+            }
+        },
+        "protocol.AuthenticatorAttachment": {
+            "type": "string",
+            "enum": [
+                "platform",
+                "cross-platform"
+            ],
+            "x-enum-varnames": [
+                "Platform",
+                "CrossPlatform"
+            ]
+        },
+        "protocol.AuthenticatorData": {
+            "type": "object",
+            "properties": {
+                "att_data": {
+                    "$ref": "#/definitions/protocol.AttestedCredentialData"
+                },
+                "ext_data": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "flags": {
+                    "$ref": "#/definitions/protocol.AuthenticatorFlags"
+                },
+                "rpid": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "sign_count": {
+                    "type": "integer"
+                }
+            }
+        },
+        "protocol.AuthenticatorFlags": {
+            "type": "integer",
+            "enum": [
+                1,
+                2,
+                4,
+                8,
+                16,
+                32,
+                64,
+                128
+            ],
+            "x-enum-comments": {
+                "FlagBackupEligible": "Referred to as BE",
+                "FlagUserPresent": "Referred to as UP"
+            },
+            "x-enum-varnames": [
+                "FlagUserPresent",
+                "FlagRFU1",
+                "FlagUserVerified",
+                "FlagBackupEligible",
+                "FlagBackupState",
+                "FlagRFU2",
+                "FlagAttestedCredentialData",
+                "FlagHasExtensions"
+            ]
+        },
+        "protocol.AuthenticatorSelection": {
+            "type": "object",
+            "properties": {
+                "authenticatorAttachment": {
+                    "description": "AuthenticatorAttachment If this member is present, eligible authenticators are filtered to only\nauthenticators attached with the specified AuthenticatorAttachment enum.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/protocol.AuthenticatorAttachment"
+                        }
+                    ]
+                },
+                "requireResidentKey": {
+                    "description": "RequireResidentKey this member describes the Relying Party's requirements regarding resident\ncredentials. If the parameter is set to true, the authenticator MUST create a client-side-resident\npublic key credential source when creating a public key credential.",
+                    "type": "boolean"
+                },
+                "residentKey": {
+                    "description": "ResidentKey this member describes the Relying Party's requirements regarding resident\ncredentials per Webauthn Level 2.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/protocol.ResidentKeyRequirement"
+                        }
+                    ]
+                },
+                "userVerification": {
+                    "description": "UserVerification This member describes the Relying Party's requirements regarding user verification for\nthe create() operation. Eligible authenticators are filtered to only those capable of satisfying this\nrequirement.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/protocol.UserVerificationRequirement"
+                        }
+                    ]
+                }
+            }
+        },
+        "protocol.AuthenticatorTransport": {
+            "type": "string",
+            "enum": [
+                "usb",
+                "nfc",
+                "ble",
+                "hybrid",
+                "internal"
+            ],
+            "x-enum-varnames": [
+                "USB",
+                "NFC",
+                "BLE",
+                "Hybrid",
+                "Internal"
+            ]
+        },
+        "protocol.CeremonyType": {
+            "type": "string",
+            "enum": [
+                "webauthn.create",
+                "webauthn.get"
+            ],
+            "x-enum-varnames": [
+                "CreateCeremony",
+                "AssertCeremony"
+            ]
+        },
+        "protocol.CollectedClientData": {
+            "type": "object",
+            "properties": {
+                "challenge": {
+                    "type": "string"
+                },
+                "new_keys_may_be_added_here": {
+                    "description": "Chromium (Chrome) returns a hint sometimes about how to handle clientDataJSON in a safe manner.",
+                    "type": "string"
+                },
+                "origin": {
+                    "type": "string"
+                },
+                "tokenBinding": {
+                    "$ref": "#/definitions/protocol.TokenBinding"
+                },
+                "type": {
+                    "description": "Type the string \"webauthn.create\" when creating new credentials,\nand \"webauthn.get\" when getting an assertion from an existing credential. The\npurpose of this member is to prevent certain types of signature confusion attacks\n(where an attacker substitutes one legitimate signature for another).",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/protocol.CeremonyType"
+                        }
+                    ]
+                }
+            }
+        },
+        "protocol.ConveyancePreference": {
+            "type": "string",
+            "enum": [
+                "none",
+                "indirect",
+                "direct",
+                "enterprise"
+            ],
+            "x-enum-varnames": [
+                "PreferNoAttestation",
+                "PreferIndirectAttestation",
+                "PreferDirectAttestation",
+                "PreferEnterpriseAttestation"
+            ]
+        },
+        "protocol.CredentialAssertionResponse": {
+            "type": "object",
+            "properties": {
+                "authenticatorAttachment": {
+                    "type": "string"
+                },
+                "clientExtensionResults": {
+                    "$ref": "#/definitions/protocol.AuthenticationExtensionsClientOutputs"
+                },
+                "id": {
+                    "description": "ID is The credential’s identifier. The requirements for the\nidentifier are distinct for each type of credential. It might\nrepresent a username for username/password tuples, for example.",
+                    "type": "string"
+                },
+                "rawId": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "response": {
+                    "$ref": "#/definitions/protocol.AuthenticatorAssertionResponse"
+                },
+                "type": {
+                    "description": "Type is the value of the object’s interface object's [[type]] slot,\nwhich specifies the credential type represented by this object.\nThis should be type \"public-key\" for Webauthn credentials.",
+                    "type": "string"
+                }
+            }
+        },
+        "protocol.CredentialDescriptor": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "description": "CredentialID The ID of a credential to allow/disallow.",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "transports": {
+                    "description": "The authenticator transports that can be used.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/protocol.AuthenticatorTransport"
+                    }
+                },
+                "type": {
+                    "description": "The valid credential types.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/protocol.CredentialType"
+                        }
+                    ]
+                }
+            }
+        },
+        "protocol.CredentialParameter": {
+            "type": "object",
+            "properties": {
+                "alg": {
+                    "$ref": "#/definitions/webauthncose.COSEAlgorithmIdentifier"
+                },
+                "type": {
+                    "$ref": "#/definitions/protocol.CredentialType"
+                }
+            }
+        },
+        "protocol.CredentialType": {
+            "type": "string",
+            "enum": [
+                "public-key"
+            ],
+            "x-enum-varnames": [
+                "PublicKeyCredentialType"
+            ]
+        },
+        "protocol.ParsedAssertionResponse": {
+            "type": "object",
+            "properties": {
+                "authenticatorData": {
+                    "$ref": "#/definitions/protocol.AuthenticatorData"
+                },
+                "collectedClientData": {
+                    "$ref": "#/definitions/protocol.CollectedClientData"
+                },
+                "signature": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "userHandle": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                }
+            }
+        },
+        "protocol.ParsedCredentialAssertionData": {
+            "type": "object",
+            "properties": {
+                "authenticatorAttachment": {
+                    "$ref": "#/definitions/protocol.AuthenticatorAttachment"
+                },
+                "clientExtensionResults": {
+                    "$ref": "#/definitions/protocol.AuthenticationExtensionsClientOutputs"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "raw": {
+                    "$ref": "#/definitions/protocol.CredentialAssertionResponse"
+                },
+                "rawId": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "response": {
+                    "$ref": "#/definitions/protocol.ParsedAssertionResponse"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "protocol.PublicKeyCredentialCreationOptions": {
+            "type": "object",
+            "properties": {
+                "attestation": {
+                    "$ref": "#/definitions/protocol.ConveyancePreference"
+                },
+                "authenticatorSelection": {
+                    "$ref": "#/definitions/protocol.AuthenticatorSelection"
+                },
+                "challenge": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "excludeCredentials": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/protocol.CredentialDescriptor"
+                    }
+                },
+                "extensions": {
+                    "$ref": "#/definitions/protocol.AuthenticationExtensions"
+                },
+                "pubKeyCredParams": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/protocol.CredentialParameter"
+                    }
+                },
+                "rp": {
+                    "$ref": "#/definitions/protocol.RelyingPartyEntity"
+                },
+                "timeout": {
+                    "type": "integer"
+                },
+                "user": {
+                    "$ref": "#/definitions/protocol.UserEntity"
+                }
+            }
+        },
+        "protocol.PublicKeyCredentialRequestOptions": {
+            "type": "object",
+            "properties": {
+                "allowCredentials": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/protocol.CredentialDescriptor"
+                    }
+                },
+                "challenge": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "extensions": {
+                    "$ref": "#/definitions/protocol.AuthenticationExtensions"
+                },
+                "rpId": {
+                    "type": "string"
+                },
+                "timeout": {
+                    "type": "integer"
+                },
+                "userVerification": {
+                    "$ref": "#/definitions/protocol.UserVerificationRequirement"
+                }
+            }
+        },
+        "protocol.RelyingPartyEntity": {
+            "type": "object",
+            "properties": {
+                "icon": {
+                    "description": "A serialized URL which resolves to an image associated with the entity. For example,\nthis could be a user’s avatar or a Relying Party's logo. This URL MUST be an a priori\nauthenticated URL. Authenticators MUST accept and store a 128-byte minimum length for\nan icon member’s value. Authenticators MAY ignore an icon member’s value if its length\nis greater than 128 bytes. The URL’s scheme MAY be \"data\" to avoid fetches of the URL,\nat the cost of needing more storage.\n\nDeprecated: this has been removed from the specification recommendations.",
+                    "type": "string"
+                },
+                "id": {
+                    "description": "A unique identifier for the Relying Party entity, which sets the RP ID.",
                     "type": "string"
                 },
                 "name": {
-                    "description": "Proper name; may be empty.",
+                    "description": "A human-palatable name for the entity. Its function depends on what the PublicKeyCredentialEntity represents:\n\nWhen inherited by PublicKeyCredentialRpEntity it is a human-palatable identifier for the Relying Party,\nintended only for display. For example, \"ACME Corporation\", \"Wonderful Widgets, Inc.\" or \"ОАО Примертех\".\n\nWhen inherited by PublicKeyCredentialUserEntity, it is a human-palatable identifier for a user account. It is\nintended only for display, i.e., aiding the user in determining the difference between user accounts with similar\ndisplayNames. For example, \"alexm\", \"alex.p.mueller@example.com\" or \"+14255551234\".",
                     "type": "string"
                 }
             }
         },
-        "mailiosmtp.Mail": {
-            "type": "object",
-            "properties": {
-                "attachments": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/mailiosmtp.SmtpAttachment"
-                    }
-                },
-                "bcc": {
-                    "description": "The email addresses of the BCC recipients.",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/mail.Address"
-                    }
-                },
-                "bodyHTMLWithoutUnsafeTags": {
-                    "description": "The HTML version of the email with removed unsafe tags",
-                    "type": "string"
-                },
-                "bodyHtml": {
-                    "description": "The HTML version of the email.",
-                    "type": "string"
-                },
-                "bodyInlinePart": {
-                    "description": "The raw inline content of the email.",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/mailiosmtp.MailBodyRaw"
-                    }
-                },
-                "bodyText": {
-                    "description": "The text version of the email.",
-                    "type": "string"
-                },
-                "cc": {
-                    "description": "The email addresses of the CC recipients.",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/mail.Address"
-                    }
-                },
-                "dkimVerdict": {
-                    "description": "optional, dkim verdict",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/mailiosmtp.VerdictStatus"
-                        }
-                    ]
-                },
-                "dmarcVerdict": {
-                    "description": "optional, dmarc verdict",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/mailiosmtp.VerdictStatus"
-                        }
-                    ]
-                },
-                "from": {
-                    "description": "The email address of the original sender.",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/mail.Address"
-                        }
-                    ]
-                },
-                "headers": {
-                    "description": "The email headers. (one header can be specified multiple times with different values)",
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        }
-                    }
-                },
-                "messageId": {
-                    "description": "message id",
-                    "type": "string"
-                },
-                "replyTo": {
-                    "description": "The email address to which bounces (undeliverable notifications) are to be forwarded.",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/mail.Address"
-                    }
-                },
-                "sizeAttachmentsBytes": {
-                    "description": "The size of the attachments in bytes.",
-                    "type": "integer"
-                },
-                "sizeBytes": {
-                    "description": "The size of the email in bytes.",
-                    "type": "integer"
-                },
-                "sizeHtmlBodyBytes": {
-                    "description": "The size of the HTML body in bytes.",
-                    "type": "integer"
-                },
-                "sizeInlineBytes": {
-                    "description": "The size of the inline content in bytes.",
-                    "type": "integer"
-                },
-                "spamVerdict": {
-                    "description": "optional, spam verdict",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/mailiosmtp.VerdictStatus"
-                        }
-                    ]
-                },
-                "spfVerdict": {
-                    "description": "optinal, spf verdict",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/mailiosmtp.VerdictStatus"
-                        }
-                    ]
-                },
-                "subject": {
-                    "type": "string"
-                },
-                "timestamp": {
-                    "description": "since epoch in miliseconds",
-                    "type": "integer"
-                },
-                "to": {
-                    "description": "The email addresses of the recipients.",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/mail.Address"
-                    }
-                },
-                "virusVerdict": {
-                    "description": "optional, virus verdict",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/mailiosmtp.VerdictStatus"
-                        }
-                    ]
-                }
-            }
-        },
-        "mailiosmtp.MailBodyRaw": {
-            "type": "object",
-            "properties": {
-                "content": {
-                    "description": "The raw content of the email.",
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                },
-                "contentDisposition": {
-                    "description": "The content disposition of the raw email.",
-                    "type": "string"
-                },
-                "contentId": {
-                    "description": "The content id of the raw email.",
-                    "type": "string"
-                },
-                "contentType": {
-                    "description": "The content type of the raw email.",
-                    "type": "string"
-                }
-            }
-        },
-        "mailiosmtp.SmtpAttachment": {
-            "type": "object",
-            "properties": {
-                "content": {
-                    "description": "The content of the attachment.",
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                },
-                "contentDisposition": {
-                    "description": "The content disposition of the attachment.",
-                    "type": "string"
-                },
-                "contentId": {
-                    "description": "The content id of the attachment.",
-                    "type": "string"
-                },
-                "contentType": {
-                    "description": "The content type of the attachment.",
-                    "type": "string"
-                },
-                "contentUrl": {
-                    "description": "The content uri of the attachment.",
-                    "type": "string"
-                },
-                "filename": {
-                    "description": "The name of the attachment.",
-                    "type": "string"
-                }
-            }
-        },
-        "mailiosmtp.VerdictStatus": {
-            "type": "object",
-            "required": [
-                "status"
+        "protocol.ResidentKeyRequirement": {
+            "type": "string",
+            "enum": [
+                "discouraged",
+                "preferred",
+                "required"
             ],
+            "x-enum-varnames": [
+                "ResidentKeyRequirementDiscouraged",
+                "ResidentKeyRequirementPreferred",
+                "ResidentKeyRequirementRequired"
+            ]
+        },
+        "protocol.TokenBinding": {
+            "type": "object",
             "properties": {
+                "id": {
+                    "type": "string"
+                },
                 "status": {
-                    "description": "possible values: PASS, FAIL, NOT_AVAILABLE",
-                    "type": "string",
-                    "enum": [
-                        "PASS",
-                        "FAIL",
-                        "NOT_AVAILABLE"
-                    ]
+                    "$ref": "#/definitions/protocol.TokenBindingStatus"
                 }
             }
+        },
+        "protocol.TokenBindingStatus": {
+            "type": "string",
+            "enum": [
+                "present",
+                "supported",
+                "not-supported"
+            ],
+            "x-enum-varnames": [
+                "Present",
+                "Supported",
+                "NotSupported"
+            ]
+        },
+        "protocol.UserEntity": {
+            "type": "object",
+            "properties": {
+                "displayName": {
+                    "description": "A human-palatable name for the user account, intended only for display.\nFor example, \"Alex P. Müller\" or \"田中 倫\". The Relying Party SHOULD let\nthe user choose this, and SHOULD NOT restrict the choice more than necessary.",
+                    "type": "string"
+                },
+                "icon": {
+                    "description": "A serialized URL which resolves to an image associated with the entity. For example,\nthis could be a user’s avatar or a Relying Party's logo. This URL MUST be an a priori\nauthenticated URL. Authenticators MUST accept and store a 128-byte minimum length for\nan icon member’s value. Authenticators MAY ignore an icon member’s value if its length\nis greater than 128 bytes. The URL’s scheme MAY be \"data\" to avoid fetches of the URL,\nat the cost of needing more storage.\n\nDeprecated: this has been removed from the specification recommendations.",
+                    "type": "string"
+                },
+                "id": {
+                    "description": "ID is the user handle of the user account entity. To ensure secure operation,\nauthentication and authorization decisions MUST be made on the basis of this id\nmember, not the displayName nor name members. See Section 6.1 of\n[RFC8266](https://www.w3.org/TR/webauthn/#biblio-rfc8266)."
+                },
+                "name": {
+                    "description": "A human-palatable name for the entity. Its function depends on what the PublicKeyCredentialEntity represents:\n\nWhen inherited by PublicKeyCredentialRpEntity it is a human-palatable identifier for the Relying Party,\nintended only for display. For example, \"ACME Corporation\", \"Wonderful Widgets, Inc.\" or \"ОАО Примертех\".\n\nWhen inherited by PublicKeyCredentialUserEntity, it is a human-palatable identifier for a user account. It is\nintended only for display, i.e., aiding the user in determining the difference between user accounts with similar\ndisplayNames. For example, \"alexm\", \"alex.p.mueller@example.com\" or \"+14255551234\".",
+                    "type": "string"
+                }
+            }
+        },
+        "protocol.UserVerificationRequirement": {
+            "type": "string",
+            "enum": [
+                "required",
+                "preferred",
+                "discouraged"
+            ],
+            "x-enum-comments": {
+                "VerificationPreferred": "This is the default"
+            },
+            "x-enum-varnames": [
+                "VerificationRequired",
+                "VerificationPreferred",
+                "VerificationDiscouraged"
+            ]
         },
         "types.DIDCommApiResponse": {
             "type": "object",
             "properties": {
+                "didCommId": {
+                    "type": "string"
+                },
                 "id": {
                     "type": "string"
                 },
@@ -1773,7 +2529,6 @@ const docTemplate = `{
             "required": [
                 "from",
                 "id",
-                "to",
                 "type"
             ],
             "properties": {
@@ -1840,9 +2595,15 @@ const docTemplate = `{
                 "to": {
                     "description": "in format: did:web:mail.io:0xabc -\u003e recipient DIDs",
                     "type": "array",
-                    "minItems": 1,
                     "items": {
                         "type": "string"
+                    }
+                },
+                "toEmails": {
+                    "description": "recipient email addresses (email and hash as alternative to To field with DID addresses)",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.ToEmail"
                     }
                 },
                 "type": {
@@ -1904,6 +2665,126 @@ const docTemplate = `{
                 }
             }
         },
+        "types.DIDDocumentSignedRequest": {
+            "type": "object",
+            "required": [
+                "cborPayloadBase64",
+                "didLookupRequest",
+                "senderDomain",
+                "signatureBase64"
+            ],
+            "properties": {
+                "cborPayloadBase64": {
+                    "type": "string"
+                },
+                "didLookupRequest": {
+                    "$ref": "#/definitions/types.DIDLookupRequest"
+                },
+                "senderDomain": {
+                    "description": "origin of the request (where DNS is published with Mailio public key)",
+                    "type": "string"
+                },
+                "signatureBase64": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.DIDDocumentSignedResponse": {
+            "type": "object",
+            "required": [
+                "cborPayloadBase64",
+                "didLookupResponse",
+                "signatureBase64"
+            ],
+            "properties": {
+                "cborPayloadBase64": {
+                    "type": "string"
+                },
+                "didLookupResponse": {
+                    "$ref": "#/definitions/types.DIDLookupResponse"
+                },
+                "signatureBase64": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.DIDLookup": {
+            "type": "object",
+            "required": [
+                "email",
+                "emailHash"
+            ],
+            "properties": {
+                "didDocument": {
+                    "$ref": "#/definitions/did.Document"
+                },
+                "email": {
+                    "description": "email address",
+                    "type": "string"
+                },
+                "emailHash": {
+                    "description": "scrypt hash of the email address",
+                    "type": "string"
+                },
+                "mtpStatusCode": {
+                    "$ref": "#/definitions/types.MTPStatusCode"
+                },
+                "supportsMailio": {
+                    "description": "if the recipient supports Mailio (derived from domain resolving)",
+                    "type": "boolean"
+                },
+                "supportsStandardEmail": {
+                    "description": "if the recipient supports standard email (derrived from domain resolving)",
+                    "type": "boolean"
+                }
+            }
+        },
+        "types.DIDLookupRequest": {
+            "type": "object",
+            "required": [
+                "didLookups",
+                "lookupHeader",
+                "senderAddress"
+            ],
+            "properties": {
+                "didLookups": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.DIDLookup"
+                    }
+                },
+                "lookupHeader": {
+                    "$ref": "#/definitions/types.LookupHeader"
+                },
+                "senderAddress": {
+                    "description": "intended senders Mailio address",
+                    "type": "string"
+                }
+            }
+        },
+        "types.DIDLookupResponse": {
+            "type": "object",
+            "required": [
+                "lookupHeader"
+            ],
+            "properties": {
+                "foundLookups": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.DIDLookup"
+                    }
+                },
+                "lookupHeader": {
+                    "$ref": "#/definitions/types.LookupHeader"
+                },
+                "notFoundLookups": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.DIDLookup"
+                    }
+                }
+            }
+        },
         "types.Domain": {
             "type": "object",
             "properties": {
@@ -1917,11 +2798,17 @@ const docTemplate = `{
                     "description": "Rev is the revision number returned\n_Rev    string ` + "`" + `json:\"_rev,omitempty\"` + "`" + `",
                     "type": "string"
                 },
+                "mailioCheckError": {
+                    "type": "string"
+                },
                 "mailioDIDDomain": {
                     "description": "mailio domain (if supportsMailio)",
                     "type": "string"
                 },
                 "mailioPublicKey": {
+                    "type": "string"
+                },
+                "mxCheckError": {
                     "type": "string"
                 },
                 "name": {
@@ -1949,9 +2836,15 @@ const docTemplate = `{
             "required": [
                 "data",
                 "id",
-                "mediaType"
+                "mediaType",
+                "name",
+                "size"
             ],
             "properties": {
+                "contentType": {
+                    "description": "the content type of the attachment",
+                    "type": "string"
+                },
                 "data": {
                     "description": "the encrypted message body",
                     "allOf": [
@@ -1960,28 +2853,49 @@ const docTemplate = `{
                         }
                     ]
                 },
-                "description": {
-                    "description": "a human-readable description of the attachment (optional)",
-                    "type": "string"
-                },
                 "id": {
                     "description": "a globally unique identifier for the attachment",
                     "type": "string"
                 },
+                "lastModTime": {
+                    "description": "the last modification time of the attachment in UTC milliseconds since epoch",
+                    "type": "integer"
+                },
                 "mediaType": {
                     "description": "the media type of the attachment",
                     "type": "string"
+                },
+                "name": {
+                    "description": "the name of the attachment",
+                    "type": "string"
+                },
+                "size": {
+                    "description": "the size of the attachment in bytes",
+                    "type": "integer"
                 }
             }
         },
         "types.EncryptedAttachmentData": {
             "type": "object",
             "required": [
-                "json"
+                "links"
             ],
             "properties": {
-                "json": {
-                    "$ref": "#/definitions/types.EncryptedBody"
+                "decryptionKey": {
+                    "description": "the key used to decrypt the ciphertext",
+                    "type": "string"
+                },
+                "hash": {
+                    "description": "the hash of the attachment",
+                    "type": "string"
+                },
+                "links": {
+                    "description": "the links to the attachment",
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },
@@ -2086,7 +3000,7 @@ const docTemplate = `{
                     "description": "origin server",
                     "allOf": [
                         {
-                            "$ref": "#/definitions/types.HandshakeOriginServer"
+                            "$ref": "#/definitions/types.OriginServer"
                         }
                     ]
                 },
@@ -2136,27 +3050,6 @@ const docTemplate = `{
                 }
             }
         },
-        "types.HandshakeHeader": {
-            "type": "object",
-            "required": [
-                "signatureScheme",
-                "timestamp"
-            ],
-            "properties": {
-                "emailLookupHashScheme": {
-                    "type": "string"
-                },
-                "signatureScheme": {
-                    "type": "string",
-                    "enum": [
-                        "EdDSA_X25519"
-                    ]
-                },
-                "timestamp": {
-                    "type": "integer"
-                }
-            }
-        },
         "types.HandshakeLink": {
             "type": "object",
             "properties": {
@@ -2168,10 +3061,15 @@ const docTemplate = `{
         "types.HandshakeLookup": {
             "type": "object",
             "required": [
+                "email",
                 "originServer"
             ],
             "properties": {
                 "address": {
+                    "type": "string"
+                },
+                "email": {
+                    "description": "email address",
                     "type": "string"
                 },
                 "emailHash": {
@@ -2182,42 +3080,43 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "originServer": {
-                    "$ref": "#/definitions/types.HandshakeOriginServer"
+                    "$ref": "#/definitions/types.OriginServer"
                 }
             }
         },
-        "types.HandshakeOriginServer": {
+        "types.HandshakeLookupResponse": {
             "type": "object",
-            "required": [
-                "domain"
-            ],
             "properties": {
-                "domain": {
-                    "description": "required",
-                    "type": "string"
+                "found": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.HandshakeContent"
+                    }
                 },
-                "ip": {
-                    "description": "optional",
-                    "type": "string"
+                "notFound": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.HandshakeLookup"
+                    }
                 }
             }
         },
         "types.HandshakeRequest": {
             "type": "object",
             "required": [
-                "handshakeHeader",
                 "handshakeLookups",
+                "lookupHeader",
                 "senderAddress"
             ],
             "properties": {
-                "handshakeHeader": {
-                    "$ref": "#/definitions/types.HandshakeHeader"
-                },
                 "handshakeLookups": {
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/types.HandshakeLookup"
                     }
+                },
+                "lookupHeader": {
+                    "$ref": "#/definitions/types.LookupHeader"
                 },
                 "returnDefaultServerHandshake": {
                     "description": "default false",
@@ -2232,18 +3131,18 @@ const docTemplate = `{
         "types.HandshakeResponse": {
             "type": "object",
             "required": [
-                "handshakeHeader",
-                "handshakes"
+                "handshakes",
+                "lookupHeader"
             ],
             "properties": {
-                "handshakeHeader": {
-                    "$ref": "#/definitions/types.HandshakeHeader"
-                },
                 "handshakes": {
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/types.HandshakeContent"
                     }
+                },
+                "lookupHeader": {
+                    "$ref": "#/definitions/types.LookupHeader"
                 }
             }
         },
@@ -2317,6 +3216,18 @@ const docTemplate = `{
                 "kid": {
                     "description": "(Key ID): A hint indicating which key was used to encrypt the",
                     "type": "string"
+                }
+            }
+        },
+        "types.InputDIDLookup": {
+            "type": "object",
+            "properties": {
+                "lookups": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "$ref": "#/definitions/types.DIDLookup"
+                    }
                 }
             }
         },
@@ -2408,6 +3319,54 @@ const docTemplate = `{
                 }
             }
         },
+        "types.JwsTokenWithSmartKey": {
+            "type": "object",
+            "required": [
+                "didDocument",
+                "email",
+                "encryptedSmartKeyBase64",
+                "jwsToken",
+                "smartKeyPasswordPart"
+            ],
+            "properties": {
+                "didDocument": {
+                    "$ref": "#/definitions/did.Document"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "encryptedSmartKeyBase64": {
+                    "type": "string"
+                },
+                "jwsToken": {
+                    "type": "string"
+                },
+                "smartKeyPasswordPart": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.LookupHeader": {
+            "type": "object",
+            "required": [
+                "signatureScheme",
+                "timestamp"
+            ],
+            "properties": {
+                "emailLookupHashScheme": {
+                    "type": "string"
+                },
+                "signatureScheme": {
+                    "type": "string",
+                    "enum": [
+                        "EdDSA_X25519"
+                    ]
+                },
+                "timestamp": {
+                    "type": "integer"
+                }
+            }
+        },
         "types.MTPStatusCode": {
             "type": "object",
             "required": [
@@ -2440,6 +3399,7 @@ const docTemplate = `{
                 "subject": {
                     "description": "Represents the subject category of the status code",
                     "type": "integer",
+                    "maximum": 8,
                     "minimum": 0
                 },
                 "timestamp": {
@@ -2452,6 +3412,22 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "nonce": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.OriginServer": {
+            "type": "object",
+            "required": [
+                "domain"
+            ],
+            "properties": {
+                "domain": {
+                    "description": "required",
+                    "type": "string"
+                },
+                "ip": {
+                    "description": "optional",
                     "type": "string"
                 }
             }
@@ -2473,6 +3449,23 @@ const docTemplate = `{
                 }
             }
         },
+        "types.OutputDIDLookup": {
+            "type": "object",
+            "properties": {
+                "found": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.DIDLookup"
+                    }
+                },
+                "notFound": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.DIDLookup"
+                    }
+                }
+            }
+        },
         "types.OutputUserAddress": {
             "type": "object",
             "properties": {
@@ -2490,6 +3483,14 @@ const docTemplate = `{
                 "docs": {
                     "type": "array",
                     "items": {}
+                }
+            }
+        },
+        "types.PresignedUrl": {
+            "type": "object",
+            "properties": {
+                "url": {
+                    "type": "string"
                 }
             }
         },
@@ -2554,6 +3555,80 @@ const docTemplate = `{
                 }
             }
         },
+        "types.SmartKeyPayload": {
+            "type": "object",
+            "required": [
+                "address",
+                "challenge",
+                "challengeSignature",
+                "databasePassword",
+                "email",
+                "passwordShare",
+                "preRotatedMailioKey",
+                "primaryEd25519PublicKey",
+                "primaryX25519PublicKey",
+                "smartKeyEncrypted"
+            ],
+            "properties": {
+                "address": {
+                    "description": "mailio address",
+                    "type": "string"
+                },
+                "challenge": {
+                    "description": "challenge",
+                    "type": "string"
+                },
+                "challengeSignature": {
+                    "description": "signature of the challenge with the primary private key (held by client only)",
+                    "type": "string"
+                },
+                "databasePassword": {
+                    "description": "CoachDB password",
+                    "type": "string"
+                },
+                "email": {
+                    "description": "email address",
+                    "type": "string"
+                },
+                "passwordShare": {
+                    "description": "a single share of a Shamir secret (2 out of 3 required for decryption)",
+                    "type": "string"
+                },
+                "preRotatedMailioKey": {
+                    "description": "encypted pre-Shamir secret sharing",
+                    "type": "string"
+                },
+                "primaryEd25519PublicKey": {
+                    "description": "primary Ed25519 public key (associated with address)",
+                    "type": "string"
+                },
+                "primaryX25519PublicKey": {
+                    "description": "primary X25519 public key (associated with address)",
+                    "type": "string"
+                },
+                "smartKeyEncrypted": {
+                    "description": "encrypted pre-Shamir secret sharing",
+                    "type": "string"
+                }
+            }
+        },
+        "types.ToEmail": {
+            "type": "object",
+            "required": [
+                "email",
+                "emailHash"
+            ],
+            "properties": {
+                "email": {
+                    "description": "recipient email address",
+                    "type": "string"
+                },
+                "emailHash": {
+                    "description": "recipient email address hash",
+                    "type": "string"
+                }
+            }
+        },
         "types.UserDomain": {
             "type": "object",
             "properties": {
@@ -2575,6 +3650,102 @@ const docTemplate = `{
                     "type": "boolean"
                 }
             }
+        },
+        "types.WebauthRegistrationVerify": {
+            "type": "object",
+            "required": [
+                "attestationResponse",
+                "smartKeyPayload"
+            ],
+            "properties": {
+                "attestationResponse": {
+                    "$ref": "#/definitions/types.WebauthnAttestationResponseJSON"
+                },
+                "smartKeyPayload": {
+                    "$ref": "#/definitions/types.SmartKeyPayload"
+                }
+            }
+        },
+        "types.WebauthnAttestationResponse": {
+            "type": "object",
+            "properties": {
+                "attestationObject": {
+                    "type": "string"
+                },
+                "authenticatorData": {
+                    "type": "string"
+                },
+                "clientDataJSON": {
+                    "type": "string"
+                },
+                "publicKey": {
+                    "type": "string"
+                },
+                "publicKeyAlgorithm": {
+                    "type": "integer"
+                },
+                "transports": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "types.WebauthnAttestationResponseJSON": {
+            "type": "object",
+            "properties": {
+                "authenticatorAttachment": {
+                    "type": "string"
+                },
+                "clientExtensionResults": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "id": {
+                    "type": "string"
+                },
+                "rawId": {
+                    "type": "string"
+                },
+                "response": {
+                    "$ref": "#/definitions/types.WebauthnAttestationResponse"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "webauthncose.COSEAlgorithmIdentifier": {
+            "type": "integer",
+            "enum": [
+                -7,
+                -35,
+                -36,
+                -65535,
+                -257,
+                -258,
+                -259,
+                -37,
+                -38,
+                -39,
+                -8,
+                -47
+            ],
+            "x-enum-varnames": [
+                "AlgES256",
+                "AlgES384",
+                "AlgES512",
+                "AlgRS1",
+                "AlgRS256",
+                "AlgRS384",
+                "AlgRS512",
+                "AlgPS256",
+                "AlgPS384",
+                "AlgPS512",
+                "AlgEdDSA",
+                "AlgES256K"
+            ]
         }
     },
     "securityDefinitions": {

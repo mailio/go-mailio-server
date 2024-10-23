@@ -2,7 +2,10 @@ package services
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net"
+	"net/mail"
 	"net/url"
 	"strings"
 	"time"
@@ -26,158 +29,25 @@ func getUserByScryptEmail(repo repository.Repository, hashedEmail string) (*type
 	defer cancel()
 	response, eErr := repo.GetByID(ctx, hashedEmail)
 	if eErr != nil {
+		if eErr != types.ErrNotFound {
+			global.Logger.Log("msg", "error while getting user by email", "err", eErr)
+		}
 		return nil, eErr
 	}
 	var userMapping types.EmailToMailioMapping
 	mErr := repository.MapToObject(response, &userMapping)
 	if mErr != nil {
+		global.Logger.Log("msg", "error while mapping object", "err", mErr)
 		return nil, mErr
 	}
 	return &userMapping, nil
 }
 
-// // checking the database/redis cache for the specific domain
-// func resolveDomain(domainRepo repository.Repository, domain string, forceDiscovery bool) (*types.Domain, error) {
-// 	// get domain from database
-// 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-// 	defer cancel()
-
-// 	// check local database
-// 	response, err := domainRepo.GetByID(ctx, domain)
-// 	if err != nil {
-// 		if err != types.ErrNotFound {
-// 			// not found in the database
-// 			return nil, err
-// 		}
-// 	}
-// 	var domainObj types.Domain
-// 	// if something found, check if it's too old
-// 	if response != nil && !forceDiscovery {
-// 		// domain found in database
-// 		mErr := repository.MapToObject(response, &domainObj)
-// 		if mErr != nil {
-// 			return nil, mErr
-// 		}
-
-// 		needsSaving := updateDomainIfNeeded(&domainObj, domain)
-// 		if needsSaving {
-// 			saveDomain(ctx, domainRepo, domain, &domainObj)
-// 		}
-// 		return &domainObj, nil
-
-// 		needsSaving := false
-// 		// check if domain out of date for MX
-// 		ageInMillis := time.Now().UnixMilli() - domainObj.Timestamp
-// 		if domainObj.SupportsStandardEmails && ageInMillis >= AGE_OF_NON_MAILIO_DOMAINS_BEFORE_REFRESH {
-// 			isMx, _ := util.CheckMXRecords(domain)
-// 			domainObj.SupportsStandardEmails = isMx
-// 			needsSaving = true
-// 		}
-// 		// check if domain out of date for Mailio
-// 		if ageInMillis >= AGE_OF_MAILIO_DOMAINS_BEFORE_REFRESH {
-// 			// check if mailio server
-// 			discovery, disErr := checkIfMailioServer(domain)
-// 			if disErr != nil {
-// 				if disErr != types.ErrNotFound {
-// 					return nil, disErr
-// 				}
-// 				domainObj.SupportsMailio = false
-// 			} else {
-// 				domainObj.SupportsMailio = discovery.IsMailio
-// 				domainObj.MailioPublicKey = discovery.PublicKey
-// 				domainObj.MailioDIDDomain = discovery.MailioDIDDomain
-// 			}
-// 			needsSaving = true
-// 		}
-// 		if needsSaving {
-// 			domainObj.Timestamp = time.Now().UnixMilli()
-// 			sErr := domainRepo.Save(ctx, domain, &domainObj)
-// 			if sErr != nil {
-// 				// ignore error (we'll get it next time)
-// 				level.Error(global.Logger).Log("msg", "error while saving domain", "err", sErr)
-// 			}
-// 		}
-// 		return &domainObj, nil
-// 	}
-
-// 	newDomainObj := &types.Domain{
-// 		Name:      domain,
-// 		Timestamp: time.Now().UnixMilli(),
-// 	}
-
-// 	isMx, _ := util.CheckMXRecords(domain)
-// 	if isMx {
-// 		newDomainObj.SupportsStandardEmails = true
-// 	}
-// 	discovery, disErr := checkIfMailioServer(domain)
-// 	if disErr != nil {
-// 		if disErr != types.ErrNotFound {
-// 			return nil, disErr
-// 		}
-// 		newDomainObj.SupportsMailio = false
-// 	} else {
-// 		newDomainObj.SupportsMailio = discovery.IsMailio
-// 		newDomainObj.MailioPublicKey = discovery.PublicKey
-// 		newDomainObj.MailioDIDDomain = discovery.MailioDIDDomain
-// 	}
-
-// 	if domainObj.ID != "" {
-// 		newDomainObj.Rev = domainObj.Rev
-// 	}
-// 	// save to domains
-// 	newDomainObj.Timestamp = time.Now().UnixMilli()
-
-// 	sErr := domainRepo.Save(ctx, domain, newDomainObj)
-// 	if sErr != nil {
-// 		// ignore error (we'll get it next time)
-// 		level.Error(global.Logger).Log("msg", "error while saving domain", "err", sErr)
-// 	}
-
-// 	return newDomainObj, nil
-// }
-
-// func checkIfMailioServer(domain string) (*types.Discovery, error) {
-// 	allDomains := []string{domain}
-// 	for _, subdomain := range global.Conf.Mailio.ServerSubdomainQueryList {
-// 		allDomains = append(allDomains, subdomain.Prefix+"."+domain)
-// 	}
-// 	for i, possibleDomain := range allDomains {
-// 		host := possibleDomain
-// 		// schema added so that it can be parsed
-// 		if !strings.Contains(possibleDomain, "http") {
-// 			host = "http://" + host
-// 		}
-// 		parsedHost, pErr := url.Parse(host)
-// 		if pErr != nil {
-// 			global.Logger.Log(pErr.Error(), "error while parsing host")
-// 			return nil, pErr
-// 		}
-// 		// in case of ports attached to host
-// 		idnaLookupHost := parsedHost.Host
-// 		if strings.Contains(idnaLookupHost, ":") {
-// 			idnaLookupHost = strings.Split(idnaLookupHost, ":")[0]
-// 		}
-// 		lookupHost, lErr := idna.Lookup.ToASCII(idnaLookupHost)
-// 		if lErr != nil {
-// 			global.Logger.Log(lErr.Error(), "error converting host to IDNA")
-// 			return nil, lErr
-// 		}
-// 		dnsCtx, dnsCancel := context.WithTimeout(context.Background(), 3*time.Second)
-// 		defer dnsCancel()
-
-// 		discovery, dErr := util.MailioDNSDiscover(dnsCtx, lookupHost)
-// 		if dErr != nil {
-// 			if dErr == types.ErrNotFound && i < len(allDomains)-1 {
-// 				continue
-// 			}
-// 			return nil, dErr
-// 		}
-// 		discovery.MailioDIDDomain = possibleDomain
-// 		return discovery, nil
-// 	}
-// 	return nil, types.ErrNotFound
-// }
-
+// resolveDomain resolves the domain by checking if it supports mailio and standard emails
+// Errors:
+// - ErrNotFound: if the domain is not found
+// - ErrMxRecordCheckFailed: if the MX record check fails
+// - any other error that occurs during the process
 func resolveDomain(domainRepo repository.Repository, domain string, forceDiscovery bool) (*types.Domain, error) {
 	// get domain from database
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
@@ -186,20 +56,23 @@ func resolveDomain(domainRepo repository.Repository, domain string, forceDiscove
 	// check local database
 	response, err := domainRepo.GetByID(ctx, domain)
 	if err != nil && err != types.ErrNotFound {
+		global.Logger.Log("msg", "error while getting domain", "err", err)
 		return nil, err
 	}
 
 	var domainObj types.Domain
 	// if found map to domainObj
-	resp := response.(*resty.Response)
-	if response != nil && resp.StatusCode() == 200 {
-		if err := repository.MapToObject(response, &domainObj); err != nil {
-			return nil, err
+	if response != nil {
+		resp := response.(*resty.Response)
+		if resp.StatusCode() == 200 {
+			if err := repository.MapToObject(response, &domainObj); err != nil {
+				global.Logger.Log("msg", "error while mapping object", "err", err)
+				return nil, err
+			}
 		}
 	}
-	if response != nil && !forceDiscovery {
+	if !forceDiscovery && domainObj.Name != "" {
 		// domain found in database
-
 		shouldSave := false
 		ageInMillis := time.Now().UTC().UnixMilli() - domainObj.Timestamp
 		if shouldUpdateStandardEmails(ageInMillis) {
@@ -239,6 +112,13 @@ func resolveDomain(domainRepo repository.Repository, domain string, forceDiscove
 	}
 	uErr := updateDomain(newDomainObj, domain)
 	if uErr != nil {
+		if errors.Is(uErr, types.ErrMxRecordCheckFailed) {
+			newDomainObj.MxCheckError = uErr.Error()
+			saveDomain(ctx, domainRepo, domain, newDomainObj)
+			return newDomainObj, nil
+		}
+		newDomainObj.MailioCheckError = uErr.Error()
+		saveDomain(ctx, domainRepo, domain, newDomainObj)
 		global.Logger.Log("msg", "error while updating domain", "err", uErr)
 		return nil, uErr
 	}
@@ -265,7 +145,7 @@ func updateDomain(domainObj *types.Domain, domain string) error {
 	supportsStandard, cErr := util.CheckMXRecords(domain)
 	if cErr != nil {
 		global.Logger.Log("msg", "error while checking MX records", "err", cErr)
-		return cErr
+		return fmt.Errorf("failed to check MX record for domain %s: %w", domain+", "+cErr.Error(), types.ErrMxRecordCheckFailed)
 	}
 	domainObj.SupportsStandardEmails = supportsStandard
 	discovery, err := checkIfMailioServer(domain)
@@ -352,4 +232,36 @@ func getHostWithoutPort(host string) string {
 		idnaLookupHost = strings.Split(idnaLookupHost, ":")[0]
 	}
 	return idnaLookupHost
+}
+
+// splits the lookup list into local and remote lookups
+// local lookups are those that are in the same domain as the server
+// remote lookups are those that are in different domains
+// it also checks if all the email addresses are valid
+func getLocalAndRemoteRecipients(lookups []*types.DIDLookup) ([]*types.DIDLookup, map[string][]*types.DIDLookup, error) {
+	localDomainMap := make(map[string]string)
+	for _, localDomain := range global.Conf.Mailio.DomainConfig {
+		localDomainMap[localDomain.Domain] = ""
+	}
+
+	localLookups := []*types.DIDLookup{}
+	remoteLookups := map[string][]*types.DIDLookup{}
+	for _, lookup := range lookups {
+		lookupEmailParsed, lepErr := mail.ParseAddress(lookup.Email)
+		if lepErr != nil {
+			global.Logger.Log("msg", "failed to parse email address", "err", lepErr)
+			return nil, nil, lepErr
+		}
+		lookupEmailParsed.Address = strings.ToLower(lookupEmailParsed.Address)
+		lookup.Email = lookupEmailParsed.Address
+		lookupDomain := strings.Split(lookupEmailParsed.Address, "@")[1]
+		// check if local or remote
+		if _, ok := localDomainMap[lookupDomain]; ok {
+			localLookups = append(localLookups, lookup)
+		} else {
+			// remote domain
+			remoteLookups[lookupDomain] = append(remoteLookups[lookupDomain], lookup)
+		}
+	}
+	return localLookups, remoteLookups, nil
 }

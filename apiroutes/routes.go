@@ -1,6 +1,9 @@
 package apiroutes
 
 import (
+	"time"
+
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/hibiken/asynq"
 	"github.com/mailio/go-mailio-server/api"
@@ -27,6 +30,19 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 		authorized.GET("", gin.WrapH(promhttp.Handler()))
 	}
 
+	corsConfig := cors.Config{
+		AllowAllOrigins:     false,
+		AllowOrigins:        []string{"http://localhost:4200", "https://" + global.Conf.Host, "https://" + global.Conf.Mailio.ServerDomain, "http://localhost:8080", "https://c4eb-2605-a601-f3fe-2701-28f0-7c2c-dea3-1478.ngrok-free.app"},
+		AllowMethods:        []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"},
+		AllowWildcard:       true,
+		AllowPrivateNetwork: true,
+		AllowHeaders:        []string{"Origin", "Content-Type", "Content-Length", "Authorization", " Access-Control-Allow-Headers"},
+		ExposeHeaders:       []string{"Content-Length", "Set-Cookie"},
+		AllowCredentials:    true,
+		MaxAge:              24 * time.Hour * 30, // 30 days is max
+	}
+	router.Use(cors.New(corsConfig))
+
 	// SERVICE definitions
 	userService := services.NewUserService(dbSelector, environment)
 	nonceService := services.NewNonceService(dbSelector)
@@ -35,14 +51,19 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 	mtpService := services.NewMtpService(dbSelector)
 	userProfileService := services.NewUserProfileService(dbSelector, environment)
 	domainService := services.NewDomainService(dbSelector)
+	webAuthnService := services.NewWebAuthnService(dbSelector, environment)
+	smartKeyService := services.NewSmartKeyService(dbSelector)
+	s3Service := services.NewS3Service(environment)
 
 	// API definitions
 	handshakeApi := api.NewHandshakeApi(handshakeService, nonceService, mtpService, userProfileService)
-	accountApi := api.NewUserAccountApi(userService, userProfileService, nonceService, ssiService)
-	didApi := api.NewDIDApi(ssiService)
+	accountApi := api.NewUserAccountApi(userService, userProfileService, nonceService, ssiService, smartKeyService)
+	didApi := api.NewDIDApi(ssiService, mtpService)
 	vcApi := api.NewVCApi(ssiService)
 	messageApi := api.NewMessagingApi(ssiService, userService, userProfileService, environment)
 	domainApi := api.NewDomainApi(domainService)
+	webauthnApi := api.NewWebAuthnApi(nonceService, webAuthnService, userService, userProfileService, smartKeyService, ssiService, environment)
+	s3Api := api.NewS3Api(s3Service, environment)
 
 	// WEBHOOK API definitions
 	webhookApi := api.NewMailReceiveWebhook(handshakeService, userService, userProfileService, environment)
@@ -50,6 +71,7 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 	// MTP API definitions
 	handshakeMTPApi := api.NewHandshakeMTPApi(handshakeService, mtpService, environment)
 	messageMTPApi := api.NewMessagingMTPApi(handshakeService, mtpService, environment)
+	didMtpApi := api.NewDIDMtpApi(handshakeService, mtpService, environment)
 
 	// PUBLIC ROOT API
 	rootPublicApi := router.Group("/", restinterceptors.RateLimitMiddleware(), metrics.MetricsMiddleware())
@@ -62,11 +84,18 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 	// PUBLIC API
 	publicApi := router.Group("/api", restinterceptors.RateLimitMiddleware(), metrics.MetricsMiddleware())
 	{
+		// regular login
 		publicApi.POST("/v1/register", accountApi.Register)
 		publicApi.POST("/v1/login", accountApi.Login)
 		publicApi.GET("/v1/nonce", accountApi.ChallengeNonce)
 		publicApi.GET("/v1/findaddress", accountApi.FindUsersAddressByEmail)
 		publicApi.GET("/v1/domains", domainApi.List)
+
+		// webauthn login
+		publicApi.GET("/v1/webauthn/registration_options", webauthnApi.RegistrationOptions)
+		publicApi.POST("/v1/webauthn/registration_verify", webauthnApi.VerifyRegistration)
+		publicApi.GET("/v1/webauthn/login_options", webauthnApi.LoginOptions)
+		publicApi.POST("/v1/webauthn/login_verify", webauthnApi.LoginVerify)
 	}
 
 	rootApi := router.Group("/api", metrics.MetricsMiddleware(), restinterceptors.RateLimitMiddleware(), restinterceptors.JWSMiddleware(userProfileService))
@@ -80,8 +109,8 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 		rootApi.POST("/v1/handshakefetch", handshakeApi.HandshakeFetch)
 
 		// Messaging
-		rootApi.POST("/v1/didmessage", messageApi.SendDIDMessage)
-		rootApi.POST("/v1/smtp", messageApi.SendSmtpMessage)
+		rootApi.POST("/v1/senddid", messageApi.SendDIDMessage)
+		rootApi.POST("/v1/sendsmtp", messageApi.SendSmtpMessage)
 
 		// VCs
 		rootApi.GET("/v1/credentials/list/:address", vcApi.ListVCs)
@@ -94,6 +123,18 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 
 		// resolve domain
 		rootApi.GET("/v1/resolve/domain", domainApi.ResolveDomainForEmail)
+
+		// cookie validator
+		// return smartkey based on cookie (checkin if user logged in, to skip login if cookie value)
+		rootApi.GET("/v1/verify_cookie", accountApi.VerifyCookie)
+		rootApi.GET("/v1/logout", accountApi.Logout)
+
+		// s3
+		rootApi.GET("/v1/s3presign", s3Api.GetPresignedUrlPut)
+		rootApi.DELETE("/v1/s3", s3Api.DeleteObject)
+
+		// did documents
+		rootApi.POST("/v1/resolve/did", didApi.FetchDIDDocuments)
 	}
 
 	// server-to-server communication (aka MTP - Mailio Transfer Protocol)
@@ -102,6 +143,7 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 		// Handshakes MTP
 		mtpRootApi.POST("/v1/mtp/handshake", handshakeMTPApi.GetLocalHandshakes)
 		mtpRootApi.POST("/v1/mtp/message", messageMTPApi.ReceiveMessage)
+		mtpRootApi.POST("/v1/mtp/did", didMtpApi.GetLocalDIDDocuments)
 	}
 
 	// SMTP email receiving (multiple providers possible)

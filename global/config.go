@@ -43,14 +43,13 @@ type CouchDBConfig struct {
 }
 
 type MailioConfig struct {
+	DailySmtpSentLimit       int                           `yaml:"dailySmtpSentLimit"`
 	DiskSpace                int64                         `yaml:"diskSpace"`
 	AuthenticationPath       string                        `yaml:"authenticationPath"`
 	MessagingPath            string                        `yaml:"messagingPath"`
 	ServerDomain             string                        `yaml:"serverDomain"`
 	ServerSubdomainQueryList []*MailioServerSubdomainQuery `yaml:"serverSubdomainQueryList"`
-	EmailSaltHex             string                        `yaml:"emailSaltHex"`
 	ServerKeysPath           string                        `yaml:"serverKeysPath"`
-	RecaptchaV3SiteKey       string                        `yaml:"recaptchaV3SiteKey"`
 	ServerHanshake           ServerHandshakeConfig         `yaml:"serverHandshake"`
 	ReadVsReceived           int                           `yaml:"readVsReceived"`
 	DomainConfig             []MailioDomainConfig          `yaml:"domains"`

@@ -1,7 +1,6 @@
 package services
 
 import (
-	"bytes"
 	"context"
 	"encoding/hex"
 	"errors"
@@ -9,20 +8,23 @@ import (
 	"math"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/go-resty/resty/v2"
+	"github.com/mailio/go-mailio-did/did"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/repository"
 	"github.com/mailio/go-mailio-server/types"
+	"github.com/mailio/go-mailio-server/util"
 )
 
 type UserService struct {
-	repoSelector *repository.CouchDBSelector
-	restyClient  *resty.Client
-	env          *types.Environment
+	repoSelector       *repository.CouchDBSelector
+	restyClient        *resty.Client
+	env                *types.Environment
+	userProfileService *UserProfileService
+	ssiService         *SelfSovereignService
 }
 
 func NewUserService(repoSelector *repository.CouchDBSelector, env *types.Environment) *UserService {
@@ -41,25 +43,53 @@ func NewUserService(repoSelector *repository.CouchDBSelector, env *types.Environ
 		SetBaseURL(repoUrl).
 		SetDebug(false)
 
+	upService := NewUserProfileService(repoSelector, env)
+	ssiService := NewSelfSovereignService(repoSelector)
+
 	return &UserService{
-		repoSelector: repoSelector,
-		restyClient:  client,
-		env:          env,
+		repoSelector:       repoSelector,
+		restyClient:        client,
+		env:                env,
+		userProfileService: upService,
+		ssiService:         ssiService,
 	}
 }
 
 // CreateUser creates a new user with the given email and password.
 // It returns a pointer to an InputEmailPassword struct and an error (if any).
-func (us *UserService) CreateUser(user *types.User, databasePassword string) (*types.User, error) {
+func (us *UserService) CreateUser(user *types.User, mk *did.MailioKey, databasePassword string) (*types.User, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+
+	// map sacrypt (encrryped email) address to mailio address
+	_, errMu := us.MapEmailToMailioAddress(user)
+	if errMu != nil {
+		if errMu == types.ErrUserExists {
+			return user, errMu
+		}
+		return nil, errMu
+	}
+
+	// validate if the domain is supported
+	userDomain := strings.Split(user.Email, "@")[1]
+	if !util.IsSupportedMailioDomain(userDomain) {
+		return nil, types.ErrDomainNotFound
+	}
 
 	userRepo, rErr := us.repoSelector.ChooseDB(repository.User)
 	if rErr != nil {
 		return nil, rErr
 	}
 
-	err := userRepo.Save(ctx, fmt.Sprintf("%s:%s", "org.couchdb.user", user.MailioAddress), map[string]interface{}{"name": user.MailioAddress, "password": databasePassword, "roles": []string{}, "type": "user", "encryptedEmail": user.EncryptedEmail, "created": user.Created})
+	err := userRepo.Save(ctx,
+		fmt.Sprintf("%s:%s", "org.couchdb.user", user.MailioAddress),
+		map[string]interface{}{
+			"name":           user.MailioAddress,
+			"password":       databasePassword,
+			"roles":          []string{},
+			"type":           "user",
+			"encryptedEmail": user.EncryptedEmail,
+			"created":        user.Created})
 	if err != nil {
 		global.Logger.Log(err, "Failed to register user")
 		return nil, err
@@ -97,6 +127,24 @@ func (us *UserService) CreateUser(user *types.User, databasePassword string) (*t
 	arErr := repository.CreateDesign_CountFromAddressRead(hexUser, "count-read", "from-address-read")
 	if errors.Join(iErr, aErr, arErr, xErr) != nil {
 		return nil, errors.Join(iErr, aErr, arErr, xErr)
+	}
+
+	_, upErr := us.userProfileService.Save(user.MailioAddress, &types.UserProfile{
+		Enabled:   true,
+		DiskSpace: global.Conf.Mailio.DiskSpace,
+		Domain:    userDomain,
+		Created:   time.Now().UTC().UnixMilli(),
+		Modified:  time.Now().UTC().UnixMilli(),
+	})
+	if upErr != nil {
+		global.Logger.Log(upErr, "failed to save user profile")
+		return nil, upErr
+	}
+
+	ssiErr := us.ssiService.StoreRegistrationSSI(mk)
+	if ssiErr != nil {
+		global.Logger.Log(ssiErr, "failed to store registration SSI")
+		return nil, ssiErr
 	}
 
 	return user, nil
@@ -142,36 +190,11 @@ func (us *UserService) MapEmailToMailioAddress(user *types.User) (*types.EmailTo
 func (us *UserService) FindUserByScryptEmail(scryptEmail string) (*types.EmailToMailioMapping, error) {
 	repo, err := us.repoSelector.ChooseDB(repository.MailioMapping)
 	if err != nil {
+		global.Logger.Log(err, "failed to choose repository")
 		return nil, err
 	}
 	return getUserByScryptEmail(repo, scryptEmail)
 }
-
-// Retrieves mailio message from users database by ID
-// func (us *UserService) GetMessage(address string, ID string) (*types.MailioMessage, error) {
-// 	if ID == "" {
-// 		return nil, types.ErrBadRequest
-// 	}
-// 	hexUser := "userdb-" + hex.EncodeToString([]byte(address))
-// 	url := fmt.Sprintf("%s/%s", hexUser, ID)
-
-// 	var mailioMessage types.MailioMessage
-// 	var couchError types.CouchDBError
-// 	response, rErr := us.restyClient.R().SetResult(&mailioMessage).SetError(&couchError).Get(url)
-// 	if rErr != nil {
-// 		global.Logger.Log(rErr.Error(), "failed to get message", hexUser)
-// 		return nil, rErr
-// 	}
-// 	if response.IsError() {
-// 		if response.StatusCode() == 404 {
-// 			return nil, types.ErrNotFound
-// 		}
-// 		global.Logger.Log(response.String(), "failed to get message", hexUser, couchError.Error, couchError.Reason)
-// 		return nil, fmt.Errorf("code: %s, reason: %s", couchError.Error, couchError.Reason)
-// 	}
-
-// 	return &mailioMessage, nil
-// }
 
 // Stores mailio message to users database
 func (us *UserService) SaveMessage(userAddress string, mailioMessage *types.MailioMessage) (*types.MailioMessage, error) {
@@ -305,41 +328,3 @@ func (us *UserService) CountNumberOfMessages(address string, from string, folder
 	}
 	return &response, nil
 }
-
-// upload attachment to s3
-func (us *UserService) UploadAttachment(bucket, path string, content []byte) (string, error) {
-	if len(content) == 0 {
-		return "", types.ErrBadRequest
-	}
-	ioReader := bytes.NewReader(content)
-	_, uErr := us.env.S3Uploader.Upload(&s3manager.UploadInput{
-		Bucket: aws.String(bucket),
-		Key:    aws.String(path),
-		Body:   ioReader,
-	})
-	if uErr != nil {
-		global.Logger.Log(uErr.Error(), "failed to upload attachment", path)
-		return "", uErr
-	}
-	return fmt.Sprintf("s3://%s%s", global.Conf.Storage.Bucket, path), nil
-}
-
-// download attachment from s3
-// func (us *UserService) DownloadAttachment(attachmentUrl string) ([]byte, error) {
-// 	if attachmentUrl == "" {
-// 		return nil, types.ErrBadRequest
-// 	}
-// 	splitted := strings.Split(attachmentUrl, "s3://"+global.Conf.Storage.Bucket+"/")
-// 	if len(splitted) != 2 {
-// 		return nil, types.ErrBadRequest
-// 	}
-// 	buf := aws.NewWriteAtBuffer([]byte{})
-// 	_, err := us.env.S3Downloader.Download(buf, &s3manager.DownloadInput{
-// 		Bucket: aws.String(global.Conf.Storage.Bucket),
-// 		Key:    aws.String(attachmentUrl),
-// 	})
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	return buf.Bytes(), nil
-// }

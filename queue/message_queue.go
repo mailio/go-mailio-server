@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-resty/resty/v2"
 	"github.com/hibiken/asynq"
+	"github.com/mailio/go-mailio-did/did"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/repository"
 	"github.com/mailio/go-mailio-server/services"
@@ -21,6 +22,8 @@ type MessageQueue struct {
 	mtpService         *services.MtpService
 	handshakeService   *services.HandshakeService
 	deliveryService    *services.MessageDeliveryService
+	s3Service          *services.S3Service
+	malwareService     *services.MalwareService
 	restyClient        *resty.Client
 	env                *types.Environment
 }
@@ -34,8 +37,21 @@ func NewMessageQueue(dbSelector *repository.CouchDBSelector, env *types.Environm
 	handshakeService := services.NewHandshakeService(dbSelector)
 	deliveryService := services.NewMessageDeliveryService(dbSelector)
 	userProfileService := services.NewUserProfileService(dbSelector, env)
+	malwareService := services.NewMalwareService()
+	s3Service := services.NewS3Service(env)
 
-	return &MessageQueue{ssiService: ssiService, userService: userService, mtpService: mtpService, handshakeService: handshakeService, deliveryService: deliveryService, restyClient: rcClient, env: env, userProfileService: userProfileService}
+	return &MessageQueue{
+		ssiService:         ssiService,
+		userService:        userService,
+		mtpService:         mtpService,
+		handshakeService:   handshakeService,
+		deliveryService:    deliveryService,
+		malwareService:     malwareService,
+		restyClient:        rcClient,
+		env:                env,
+		userProfileService: userProfileService,
+		s3Service:          s3Service,
+	}
 }
 
 // Processing of SMTP tasks
@@ -102,7 +118,21 @@ func (msq *MessageQueue) DIDCommSendMessage(userAddress string, message *types.D
 	}
 
 	//validate recipients (checks if they are valid DIDs and if they are reachable via HTTP/HTTPS)
-	recipientDidMap, mtpStatusErrors := msq.validateRecipientDIDs(message)
+	// alternatively validateRecipientDIDFromEmails can be used to validate recipients from emails
+	recipientDidMap := map[string]did.Document{}
+	mtpStatusErrors := []*types.MTPStatusCode{}
+	if len(message.To) > 0 {
+		recMap, mtpErrors := msq.validateRecipientDIDs(message)
+		recipientDidMap = recMap
+		mtpStatusErrors = mtpErrors
+	}
+	if len(message.ToEmails) > 0 {
+		recMap, mtpErrors := msq.validateRecipientDIDFromEmails(message)
+		for k, v := range recMap {
+			recipientDidMap[k] = v
+		}
+		mtpStatusErrors = append(mtpStatusErrors, mtpErrors...)
+	}
 
 	// collect endpoints
 	endpointMap := make(map[string]string)

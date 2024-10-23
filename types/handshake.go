@@ -10,6 +10,7 @@ const (
 	// Possible handshake statuses
 	HANDSHAKE_STATUS_ACCEPTED = "accepted"
 	HANDSHAKE_STATUS_REVOKED  = "revoked"
+	HANDSHAKE_STATUS_NOTFOUND = "notfound"
 
 	// Possbile handshake signup sub types
 	HANDSHAKE_SIGNUP_SUBTYPE_TRANSACTIONAL = "transactional"
@@ -39,7 +40,7 @@ type Handshake struct {
 	CborPayloadBase64 string           `json:"cborPayloadBase64"` // payload in cbor format of handshake Content
 }
 
-type HandshakeOriginServer struct {
+type OriginServer struct {
 	Domain string `json:"domain" validate:"required"` // required
 	IP     string `json:"ip,omitempty"`               // optional
 }
@@ -51,7 +52,7 @@ type HandshakeSignupRules struct {
 // Handshake is a struct that represents a handshake between two Mailio users or a Mailio user and a Mailio server
 type HandshakeContent struct {
 	HandshakeID          string                `json:"handshakeId,omitempty"`     // handshake ID
-	OriginServer         HandshakeOriginServer `json:"originServer,omitempty"`    // origin server
+	OriginServer         OriginServer          `json:"originServer,omitempty"`    // origin server
 	SignupSubType        *int                  `json:"signupSubType,omitempty"`   // handshake signup sub type
 	SignupRules          *HandshakeSignupRules `json:"signupRules,omitempty"`     // handshake signup rules
 	Status               string                `json:"status"`                    // handshake status
@@ -93,21 +94,22 @@ const (
 	Signature_Scheme_EdDSA_X25519                 = "EdDSA_X25519"
 )
 
-type HandshakeHeader struct {
+type LookupHeader struct {
 	SignatureScheme       string `json:"signatureScheme" validate:"required,oneof=EdDSA_X25519"`
 	EmailLookupHashScheme string `json:"emailLookupHashScheme,omitempty"`
 	Timestamp             int64  `json:"timestamp" validate:"required"`
 }
 
 type HandshakeLookup struct {
-	ID          string                `json:"id,omitempty"`
-	Address     string                `json:"address,omitempty"`
-	EmailHash   string                `json:"emailHash,omitempty"` // scrypt hash of the email address
-	OriginSever HandshakeOriginServer `json:"originServer" validate:"required"`
+	ID          string       `json:"id,omitempty"`
+	Address     string       `json:"address,omitempty"`
+	EmailHash   string       `json:"emailHash,omitempty"`       // scrypt hash of the email address
+	Email       string       `json:"email" validate:"required"` // email address
+	OriginSever OriginServer `json:"originServer" validate:"required"`
 }
 
 type HandshakeRequest struct {
-	HandshakeHeader              HandshakeHeader   `json:"handshakeHeader" validate:"required"`
+	HandshakeHeader              LookupHeader      `json:"lookupHeader" validate:"required"`
 	HandshakeLookups             []HandshakeLookup `json:"handshakeLookups" validate:"required"`
 	ReturnDefaultServerHandshake bool              `json:"returnDefaultServerHandshake"`      // default false
 	SenderAddress                string            `json:"senderAddress" validate:"required"` // intended senders Mailio address
@@ -121,7 +123,7 @@ type HandshakeSignedRequest struct {
 }
 
 type HandshakeResponse struct {
-	HandshakeHeader HandshakeHeader     `json:"handshakeHeader" validate:"required"`
+	HandshakeHeader LookupHeader        `json:"lookupHeader" validate:"required"`
 	Handshakes      []*HandshakeContent `json:"handshakes" validate:"required"`
 }
 
@@ -129,4 +131,9 @@ type HandshakeSignedResponse struct {
 	HandshakeResponse HandshakeResponse `json:"handshakeResponse" validate:"required"`
 	SignatureBase64   string            `json:"signatureBase64" validate:"required,base64"`
 	CborPayloadBase64 string            `json:"cborPayloadBase64" validate:"required,base64"`
+}
+
+type HandshakeLookupResponse struct {
+	Found    []*HandshakeContent `json:"found,omitempty"`
+	NotFound []*HandshakeLookup  `json:"notFound,omitempty"`
 }

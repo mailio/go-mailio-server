@@ -1,14 +1,19 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"net"
 	"strconv"
+	"strings"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
 	diskusagehandler "github.com/mailio/go-mailio-diskusage-handler"
 	mailgunhandler "github.com/mailio/go-mailio-mailgun-smtp-handler"
@@ -60,11 +65,13 @@ func ConfigDBSelector() repository.DBSelector {
 	domainRepo, dErr := repository.NewCouchDBRepository(repoUrl, repository.Domain, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
 	messageDeliveryRepo, mdErr := repository.NewCouchDBRepository(repoUrl, repository.MessageDelivery, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
 	userProfileRepo, upErr := repository.NewCouchDBRepository(repoUrl, repository.UserProfile, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
+	webauthnUser, wErr := repository.NewCouchDBRepository(repoUrl, repository.WebAuthnUser, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
+	smartKey, smrtkErr := repository.NewCouchDBRepository(repoUrl, repository.SmartKey, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
 
 	// ensure _users exist
 	users_Err := repository.CreateUsers_IfNotExists(userRepo, repoUrl)
 
-	repoErr := errors.Join(handshakeRepoErr, nonceRepoErr, userRepoErr, mappingRepoErr, didRErr, vscrErr, dErr, mdErr, upErr, users_Err)
+	repoErr := errors.Join(handshakeRepoErr, nonceRepoErr, userRepoErr, mappingRepoErr, didRErr, vscrErr, dErr, mdErr, upErr, users_Err, wErr, smrtkErr)
 	if repoErr != nil {
 		global.Logger.Log("error", "Failed to create repositories", "error", repoErr.Error())
 		panic(repoErr)
@@ -81,8 +88,25 @@ func ConfigDBSelector() repository.DBSelector {
 	dbSelector.AddDB(domainRepo)
 	dbSelector.AddDB(messageDeliveryRepo)
 	dbSelector.AddDB(userProfileRepo)
+	dbSelector.AddDB(webauthnUser)
+	dbSelector.AddDB(smartKey)
 
 	return dbSelector
+}
+
+func loadMalwareList() {
+	malwareService := services.NewMalwareService()
+	err := malwareService.LoadInMemoryMalwareList()
+	if err != nil {
+		global.Logger.Log("error", "Failed to load malware list", "error", err.Error())
+		panic(err)
+	}
+}
+
+func ConfigMalwareScanner(conf *global.Config, environment *types.Environment) {
+	loadMalwareList()                                       // load malware list on startup
+	environment.Cron.AddFunc("@every 24h", loadMalwareList) // re-load malware list every 24 hours
+	environment.Cron.Start()
 }
 
 func ConfigDBIndexing(dbSelector *repository.CouchDBSelector, environment *types.Environment) {
@@ -115,22 +139,43 @@ func ConfigDBIndexing(dbSelector *repository.CouchDBSelector, environment *types
 
 func ConfigS3Storage(conf *global.Config, env *types.Environment) {
 	// configure S3 storage
-	session := session.Must(session.NewSession(&aws.Config{
-		Region:      aws.String(conf.Storage.Region),
-		Credentials: credentials.NewStaticCredentials(conf.Storage.Key, conf.Storage.Secret, ""),
-	}))
-	uploader := s3manager.NewUploader(session)
-	downloader := s3manager.NewDownloader(session)
+	credentials := aws.NewCredentialsCache(credentials.NewStaticCredentialsProvider(conf.Storage.Key, conf.Storage.Secret, ""))
+	awsConf, err := config.LoadDefaultConfig(context.TODO(), config.WithCredentialsProvider(credentials), config.WithRegion(conf.Storage.Region))
+	if err != nil {
+		panic(err)
+	}
+	s3Client := s3.NewFromConfig(awsConf)
+	uploader := manager.NewUploader(s3Client)
+	downloader := manager.NewDownloader(s3Client)
 	env.AddS3Uploader(uploader)
 	env.AddS3Downloader(downloader)
+
+	env.S3Client = s3Client
+	env.S3PresignClient = s3.NewPresignClient(s3Client)
 }
 
 func ConfigWebAuthN(conf *global.Config, env *types.Environment) {
 	// configure WebAuthN
+	host, _, err := net.SplitHostPort(global.Conf.Mailio.ServerDomain)
+	if err != nil {
+		if strings.Contains(err.Error(), "missing port in address") {
+			host = global.Conf.Mailio.ServerDomain
+		} else {
+			fmt.Printf("failed to parse server domain: %v", err)
+			panic(err)
+		}
+	}
+	requireResidentKey := true
 	wconfig := &webauthn.Config{
 		RPDisplayName: conf.Mailio.ServerDomain,
-		RPID:          conf.Mailio.ServerDomain,
-		RPOrigins:     []string{conf.Mailio.ServerDomain, "localhost:8080"},
+		RPID:          host,
+		RPOrigins:     []string{"https://" + conf.Mailio.ServerDomain, "localhost", "http://localhost:4200"},
+		Debug:         true,
+		AuthenticatorSelection: protocol.AuthenticatorSelection{
+			UserVerification:        protocol.VerificationRequired,
+			RequireResidentKey:      &requireResidentKey,
+			AuthenticatorAttachment: protocol.Platform,
+		},
 	}
 	webAuthn, err := webauthn.New(wconfig)
 	if err != nil {

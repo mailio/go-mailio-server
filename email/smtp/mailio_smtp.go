@@ -82,7 +82,7 @@ func GetHandler(name string) SmtpHandler {
 	return nil
 }
 
-func htmlToText(html string) string {
+func HtmlToText(html string) string {
 	p := bluemonday.NewPolicy()
 	p.AllowStandardURLs()
 
@@ -135,7 +135,7 @@ func ToMime(msg *mailiosmtp.Mail, rfc2822MessageID string) ([]byte, error) {
 	// convert html to text (remove unwanted tags)
 	text := msg.BodyText
 	if msg.BodyText == "" {
-		text = htmlToText(msg.BodyHTML)
+		text = HtmlToText(msg.BodyHTML)
 	}
 
 	cleanHtml := msg.BodyHTML
@@ -505,9 +505,8 @@ func ParseMime(mime []byte) (*mailiosmtp.Mail, error) {
 	}
 
 	// body (plain, html, html cleaned)
-	email.BodyHTML = msg.HTML
+	email.BodyHTML = cleanupUGCHtml(msg.HTML)
 	email.BodyText = msg.Text
-	email.BodyHTMLWithoutUnsafeTags = cleanupUGCHtml(email.BodyHTML)
 
 	// mime.Inlines is a slice of inlined attacments. These are typically images that are embedded in the HTML body
 	totalInlineSize := int64(0)
