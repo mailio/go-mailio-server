@@ -12,12 +12,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-playground/validator/v10"
 	"github.com/hibiken/asynq"
 	diskusagehandler "github.com/mailio/go-mailio-diskusage-handler"
 	"github.com/mailio/go-mailio-server/diskusage"
 	mailiosmtp "github.com/mailio/go-mailio-server/email/smtp"
 	smtptypes "github.com/mailio/go-mailio-server/email/smtp/types"
+	smtpvalidator "github.com/mailio/go-mailio-server/email/smtp/validator"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/types"
 	"github.com/mailio/go-mailio-server/util"
@@ -36,7 +36,7 @@ func (msq *MessageQueue) SendSMTPMessage(fromMailioAddress string, email *smtpty
 	securityStatus := "clean" // default
 
 	//TODO: SMTP validation handler
-	smtpValidatorHandlers := validator.Handlers()
+	smtpValidatorHandlers := smtpvalidator.Handlers()
 	if len(smtpValidatorHandlers) > 0 {
 		// call each validator handler
 	}
