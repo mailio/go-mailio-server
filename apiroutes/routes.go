@@ -60,7 +60,7 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 	accountApi := api.NewUserAccountApi(userService, userProfileService, nonceService, ssiService, smartKeyService)
 	didApi := api.NewDIDApi(ssiService, mtpService)
 	vcApi := api.NewVCApi(ssiService)
-	messageApi := api.NewMessagingApi(ssiService, userService, userProfileService, environment)
+	messageApi := api.NewMessagingApi(ssiService, userService, userProfileService, domainService, environment)
 	domainApi := api.NewDomainApi(domainService)
 	webauthnApi := api.NewWebAuthnApi(nonceService, webAuthnService, userService, userProfileService, smartKeyService, ssiService, environment)
 	s3Api := api.NewS3Api(s3Service, environment)

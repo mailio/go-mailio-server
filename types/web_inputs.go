@@ -48,6 +48,6 @@ type SmtpEmailInput struct {
 }
 
 type DIDCommMessageInput struct {
-	DIDCommMessage    DIDCommMessage `json:",inline" validate:"required"`
+	DIDCommMessage    DIDCommMessage `json:"didCommMessage" validate:"required"`
 	DeleteAttachments []string       `json:"deleteAttachments,omitempty"` // The IDs of attachments to be deleted (the decision is left to client to make: if only encrypted then plaint attachment should be deleted, if both types of recipients then no attachments shhould be deleted, ... ).
 }

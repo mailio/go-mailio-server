@@ -43,7 +43,7 @@ type ToEmail struct {
 
 type DIDCommMessage struct {
 	Type            string              `json:"type" validate:"required,oneof=application/didcomm-encrypted+json application/didcomm-signed+json application/mailio-smtp+json"` // a valid message type URI (MUST be: application/didcomm-encrypted+json or application/didcomm-signed+json or application/mailio-smtp+json)
-	ID              string              `json:"id" validate:"required"`                                                                                                         // globally unique message identifier UUID (RFC 4122) recommended
+	ID              string              `json:"id,omitempty"`                                                                                                                   // globally unique message identifier UUID (RFC 4122) recommended
 	From            string              `json:"from" validate:"required"`                                                                                                       // sender DID required because all mailio messages are encrypted
 	To              []string            `json:"to,omitempty"`                                                                                                                   // in format: did:web:mail.io:0xabc -> recipient DIDs
 	ToEmails        []*ToEmail          `json:"toEmails,omitempty"`                                                                                                             // recipient email addresses (email and hash as alternative to To field with DID addresses)
@@ -75,12 +75,12 @@ type DIDCommSignedRequest struct {
 
 // EncryptedMailioBody is a struct that represents an encrypted message according to JWE standard
 type EncryptedBody struct {
+	Aad        string      `json:"aad" validate:"required"`              // additional authenticated data
 	Ciphertext string      `json:"ciphertext" validate:"required"`       // the encrypted message
 	IV         string      `json:"iv" validate:"required"`               // the initialization vector (nonce)
 	Recipients []Recipient `json:"recipients" validate:"required,min=1"` // the recipients of the message (at least one)
 	Tag        string      `json:"tag" validate:"required"`              // integrity check on the encrypted message
 	Protected  string      `json:"protected" validate:"required"`        // the protected header
-	Signature  Signature   `json:"signature" validate:"required"`        // JWS digital signature
 }
 
 // Delivery message (successfull or failed)
@@ -122,14 +122,4 @@ type Epk struct {
 	X   string `json:"x" validate:"required"`   // The X coordinate for the elliptic curve point
 	Crv string `json:"crv" validate:"required"` // The curve parameter used for the key
 	Kty string `json:"kty" validate:"required"` // Key Type, indicating the type of key used, such as an elliptic curve key ("OKP" for Octet Key Pair).
-}
-
-type Signature struct {
-	Signatures []SignatureDetail `json:"signatures"`
-	Payload    string            `json:"payload"` // The payload that was signed, which is base64URL encoded.
-}
-
-type SignatureDetail struct {
-	Signature string `json:"signature"`
-	Protected string `json:"protected"` // Base64URL encoded JSON string containing the header parameters used for the signature
 }

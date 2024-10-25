@@ -13,6 +13,7 @@ import (
 	"github.com/mailio/go-mailio-server/repository"
 	"github.com/mailio/go-mailio-server/services"
 	"github.com/mailio/go-mailio-server/types"
+	"github.com/mailio/go-mailio-server/util"
 )
 
 type MessageQueue struct {
@@ -125,13 +126,15 @@ func (msq *MessageQueue) DIDCommSendMessage(userAddress string, message *types.D
 		recMap, mtpErrors := msq.validateRecipientDIDs(message)
 		recipientDidMap = recMap
 		mtpStatusErrors = mtpErrors
-	}
-	if len(message.ToEmails) > 0 {
+	} else if len(message.ToEmails) > 0 {
 		recMap, mtpErrors := msq.validateRecipientDIDFromEmails(message)
 		for k, v := range recMap {
 			recipientDidMap[k] = v
 		}
 		mtpStatusErrors = append(mtpStatusErrors, mtpErrors...)
+	} else {
+		// no recipients
+		mtpStatusErrors = append(mtpStatusErrors, types.NewMTPStatusCode(5, 1, 1, "no recipients"))
 	}
 
 	// collect endpoints
@@ -141,7 +144,7 @@ func (msq *MessageQueue) DIDCommSendMessage(userAddress string, message *types.D
 	for _, didDoc := range recipientDidMap {
 		// didDoc ID has format e.g. did:mailio:0xabc, while from has web format (e.g. did:web:mail.io#0xabc)
 		// find a service endpoint for a recipient from DID Document
-		endpoint := msq.extractDIDMessageEndpoint(&didDoc)
+		endpoint := util.ExtractDIDMessageEndpoint(&didDoc)
 		if endpoint == "" {
 			// Bad destination address syntax
 			mtpStatusErrors = append(mtpStatusErrors, types.NewMTPStatusCode(5, 1, 3, fmt.Sprintf("unable to route message to %s for %s", endpoint, didDoc.ID.String())))

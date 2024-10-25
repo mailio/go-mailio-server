@@ -117,7 +117,7 @@ func (pa *S3Api) DeleteObject(c *gin.Context) {
 		ApiErrorf(c, http.StatusBadRequest, "not authorized")
 		return
 	}
-	objectKey := strings.ToLower(c.Query("objectKey"))
+	objectKey := c.Query("objectKey")
 	if objectKey == "" {
 		ApiErrorf(c, http.StatusBadRequest, "objectKey is required")
 		return

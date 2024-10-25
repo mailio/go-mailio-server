@@ -15,27 +15,6 @@ import (
 	"github.com/mailio/go-mailio-server/util"
 )
 
-// Extracts the message endpoint from DID document
-// in case localhost/127.0.0.1 schema is http, otherwise default schema is https
-func (msq *MessageQueue) extractDIDMessageEndpoint(didDoc *did.Document) string {
-	// find a service endpoint for a recipient from DID Document
-	endpoint := ""
-	for _, service := range didDoc.Service {
-		if service.Type == "DIDCommMessaging" {
-			endpoint = strings.TrimSuffix(service.ServiceEndpoint, "/")
-			scheme := "https"
-			if !strings.HasPrefix(endpoint, "http") {
-				if strings.Contains(endpoint, "localhost") || strings.Contains(endpoint, "127.0.0.1") {
-					scheme = "http"
-				}
-				endpoint = fmt.Sprintf("%s://%s", scheme, endpoint)
-			}
-			break
-		}
-	}
-	return endpoint
-}
-
 // validateRecipientDIDFromEmails validates the recipient DIDs from emails and collect valid DIDs in a recipientDidMap
 // this is alternative to validateRecipientDIDs (which requires To field to have all DIDs)
 func (msq *MessageQueue) validateRecipientDIDFromEmails(message *types.DIDCommMessage) (map[string]did.Document, []*types.MTPStatusCode) {
@@ -204,10 +183,14 @@ func (msq *MessageQueue) httpSend(message *types.DIDCommMessage,
 	}
 
 	// get public key from the recipients serv er
-	discovery, dErr := msq.mtpService.ResolveDomain(endpoint, false)
-	if dErr != nil {
-		global.Logger.Log(dErr.Error(), "failed to get public key for", endpoint)
-		return types.NewMTPStatusCode(5, 4, 4, fmt.Sprintf("failed to get public key for endpoint %s", endpoint)), types.ErrContinue
+	discovery := &types.Domain{SupportsMailio: true, MailioPublicKey: base64.StdEncoding.EncodeToString(global.PublicKey)}
+	if !strings.Contains(endpoint, "localhost") {
+		d, dErr := msq.mtpService.ResolveDomain(endpoint, false)
+		if dErr != nil {
+			global.Logger.Log(dErr.Error(), "failed to get public key for", endpoint)
+			return types.NewMTPStatusCode(5, 4, 4, fmt.Sprintf("failed to get public key for endpoint %s", endpoint)), types.ErrContinue
+		}
+		discovery = d
 	}
 	isValid, vErr := util.Verify(cbor, signature, discovery.MailioPublicKey)
 	if vErr != nil {

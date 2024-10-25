@@ -3,6 +3,7 @@ package interceptors
 import (
 	"encoding/base64"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -36,22 +37,36 @@ func SignatureMiddleware(env *types.Environment, mtpService *services.MtpService
 			return
 		}
 		// IDNA encode the domain
-		domain := commonSignature.SenderDomain
-		host, err := idna.Lookup.ToASCII(domain)
-		if err != nil {
-			level.Error(global.Logger).Log("invalid domain", err.Error())
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid domain"})
-			c.Abort()
-			return
+		host := commonSignature.SenderDomain
+		if !strings.Contains(host, "localhost") {
+			h, err := idna.Lookup.ToASCII(host)
+			if err != nil {
+				level.Error(global.Logger).Log("invalid domain", err.Error())
+				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid domain"})
+				c.Abort()
+				return
+			}
+			host = h
 		}
 		// DNS check the host for (extracting the public key)
-		resolvedDomain, dErr := mtpService.ResolveDomain(host, false)
-		if dErr != nil {
-			level.Error(global.Logger).Log("no Mailio DNS record", dErr.Error())
-			c.JSON(http.StatusBadRequest, gin.H{"error": "no Mailio DNS record found"})
-			c.Abort()
-			return
+		//TODO: handle localhost
+		resolvedDomain := &types.Domain{
+			SupportsMailio:  true,
+			MailioPublicKey: base64.StdEncoding.EncodeToString(global.PublicKey),
+			Name:            host,
+			Timestamp:       0,
 		}
+		if !strings.Contains(host, "localhost") {
+			rd, dErr := mtpService.ResolveDomain(host, false)
+			if dErr != nil {
+				level.Error(global.Logger).Log("no Mailio DNS record", dErr.Error())
+				c.JSON(http.StatusBadRequest, gin.H{"error": "no Mailio DNS record found"})
+				c.Abort()
+				return
+			}
+			resolvedDomain = rd
+		}
+
 		cborPayload, _ := base64.StdEncoding.DecodeString(commonSignature.CborPayloadBase64)
 		signature, _ := base64.StdEncoding.DecodeString(commonSignature.SignatureBase64)
 		isValid, sigErr := util.Verify(cborPayload, signature, resolvedDomain.MailioPublicKey)

@@ -83,14 +83,11 @@ func (msq *MessageQueue) selectMailFolder(fromDID did.DID, recipientAddress stri
 }
 
 // handleReceivedDIDCommMessage handles received DIDComm messages
+// 1. Extracts the sender's DID and gets the service endpoint where the message was sent from
+// 2. Collects local recipients of the message
+// 3. Collects delivery status codes
+// 4. Sends delivery message to the sender
 func (msq *MessageQueue) handleReceivedDIDCommMessage(message *types.DIDCommMessage) error {
-	/**
-	0. Check if message with same ID already exists for the recipient
-	1. Get the senders DID document to extract the service endpoint
-	2. Check if the message already exists in the local database (it shouldn't exist but if it does, add MTP codes to it)
-	3. Check if at least one recipient exists on this server and if it matches the recipient in the message
-	3. if everything checks out store message to intended recipients and send confirmation back
-	**/
 
 	// get the senders DID and get the service endpoint where message was sent from
 	fromDID, fdErr := did.ParseDID(message.From)
@@ -106,7 +103,7 @@ func (msq *MessageQueue) handleReceivedDIDCommMessage(message *types.DIDCommMess
 		global.Logger.Log(didErr.Error(), "failed retrieving Mailio DID document", domain)
 		return fmt.Errorf("failed retrieving Mailio DID document: %v: %w", didErr, asynq.SkipRetry)
 	}
-	endpoint := msq.extractDIDMessageEndpoint(serverDID)
+	endpoint := util.ExtractDIDMessageEndpoint(serverDID)
 	if endpoint == "" {
 		// Bad destination address syntax
 		return fmt.Errorf("unable to route message to %s for %s: %w", endpoint, serverDID.ID.String(), asynq.SkipRetry)

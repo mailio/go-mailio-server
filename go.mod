@@ -1,6 +1,6 @@
 module github.com/mailio/go-mailio-server
 
-go 1.22.1
+go 1.23.2
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.30.3
@@ -27,7 +27,8 @@ require (
 	github.com/mailio/go-mailio-diskusage-handler v1.0.0
 	github.com/mailio/go-mailio-mailgun-smtp-handler v1.0.4
 	github.com/mailio/go-mailio-server/diskusage v0.0.0-20240531204144-2069ccd8b024
-	github.com/mailio/go-mailio-server/email/smtp v0.0.0-20240603202341-a693f069999e
+	github.com/mailio/go-mailio-server/email/smtp v0.0.0-20240618164609-bad0c892b0ec
+	github.com/mailio/go-mailio-server/email/validator v0.0.0-20241023192129-f8719177b347
 	github.com/mailio/go-web3-kit v0.0.0-20230302165532-057a45112b37
 	github.com/prometheus/client_golang v1.15.0
 	github.com/redis/go-redis/v9 v9.0.5

@@ -146,7 +146,7 @@ func NewMTPStatusCode(clazz int, subject int, detail int, description string, op
 		Subject:     subject,
 		Detail:      detail,
 		Description: description,
-		Timestamp:   time.Now().UnixMilli(),
+		Timestamp:   time.Now().UTC().UnixMilli(),
 	}
 	for _, opt := range opts {
 		opt(c)

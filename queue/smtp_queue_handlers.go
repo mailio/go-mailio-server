@@ -17,7 +17,7 @@ import (
 	"github.com/mailio/go-mailio-server/diskusage"
 	mailiosmtp "github.com/mailio/go-mailio-server/email/smtp"
 	smtptypes "github.com/mailio/go-mailio-server/email/smtp/types"
-	smtpvalidator "github.com/mailio/go-mailio-server/email/smtp/validator"
+	smtpvalidator "github.com/mailio/go-mailio-server/email/validator"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/types"
 	"github.com/mailio/go-mailio-server/util"
@@ -35,18 +35,27 @@ func (msq *MessageQueue) SendSMTPMessage(fromMailioAddress string, email *smtpty
 
 	securityStatus := "clean" // default
 
-	//TODO: SMTP validation handler
+	// SMTP validation handler (no validators registered at this time)
 	smtpValidatorHandlers := smtpvalidator.Handlers()
 	if len(smtpValidatorHandlers) > 0 {
 		// call each validator handler
+		for _, name := range smtpValidatorHandlers {
+			smtpVErr := smtpvalidator.GetHandler(name).Validate(email)
+			if smtpVErr != nil {
+				global.Logger.Log(smtpVErr.Error(), "failed to validate email")
+				return fmt.Errorf("failed validating email: %v: %w", smtpVErr, asynq.SkipRetry)
+			}
+		}
 	}
 
+	// check if the user canceled the email sending
 	taskCanceled, tsErr := msq.env.RedisClient.Get(ctx, fmt.Sprintf("cancel:%s", taskId)).Result()
 	if tsErr != nil {
 		if tsErr != redis.Nil {
 			global.Logger.Log(tsErr.Error(), "failed to retrieve task status", taskId)
 		}
 	}
+	// if the user canceled the email sending, terminate function
 	if taskCanceled != "" {
 		_, tcdErr := msq.env.RedisClient.Del(ctx, fmt.Sprintf("cancel:%s", taskId)).Result()
 		if tcdErr != nil {
@@ -62,6 +71,7 @@ func (msq *MessageQueue) SendSMTPMessage(fromMailioAddress string, email *smtpty
 		global.Logger.Log("unsupported domain", domain)
 		return fmt.Errorf("unsupported domain: %w", asynq.SkipRetry)
 	}
+	// finding the supported SMTP email handler from the senders email domain
 	mgHandler := mailiosmtp.GetHandler(domain)
 	if mgHandler == nil {
 		global.Logger.Log("failed retrieving an smtp handler")

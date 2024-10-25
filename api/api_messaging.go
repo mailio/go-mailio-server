@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -24,9 +25,10 @@ type MessagingApi struct {
 	env                *types.Environment
 	userService        *services.UserService
 	userProfileService *services.UserProfileService
+	domainService      *services.DomainService
 }
 
-func NewMessagingApi(ssiService *services.SelfSovereignService, userService *services.UserService, userProfileService *services.UserProfileService, env *types.Environment) *MessagingApi {
+func NewMessagingApi(ssiService *services.SelfSovereignService, userService *services.UserService, userProfileService *services.UserProfileService, domainService *services.DomainService, env *types.Environment) *MessagingApi {
 	validate := validator.New()
 
 	return &MessagingApi{
@@ -35,6 +37,7 @@ func NewMessagingApi(ssiService *services.SelfSovereignService, userService *ser
 		env:                env,
 		userService:        userService,
 		userProfileService: userProfileService,
+		domainService:      domainService,
 	}
 }
 
@@ -109,10 +112,15 @@ func (ma *MessagingApi) SendSmtpMessage(c *gin.Context) {
 	// get user profile
 	userProfile, exists := c.Get("userProfile")
 	if !exists {
-		ApiErrorf(c, http.StatusForbidden, "jwt invalid")
+		ApiErrorf(c, http.StatusForbidden, "JWT invalid")
 		return
 	}
 	up := userProfile.(*types.UserProfile)
+
+	if !up.Enabled {
+		ApiErrorf(c, http.StatusForbidden, "User disabled")
+		return
+	}
 
 	// convert to smtptypes.Mail
 	mailEmail, meErr := convertToSmtpEmail(mail)
@@ -247,11 +255,36 @@ func (ma *MessagingApi) sendDIDCommMessage(senderAddress string, input types.DID
 		input.DIDCommMessage.Intent = types.DIDCommIntentMessage
 	}
 
-	// Ensure the 'from' field is set to the subject address and it's coming from this server
-	from := fmt.Sprintf("did:web:%s#%s", global.Conf.Mailio.ServerDomain, senderAddress)
-	if input.DIDCommMessage.From != from {
+	// get the user profile
+	userProfile, upErr := ma.userProfileService.Get(senderAddress)
+	if upErr != nil {
+		global.Logger.Log(upErr.Error(), "failed to get user profile")
+		return nil, types.ErrInternal
+	}
+	if !userProfile.Enabled {
 		return nil, types.ErrNotAuthorized
 	}
+
+	// get the senders domain (which should in the database already, so no resolving needed)
+	senderDidDoc, sndDidErr := ma.ssiService.GetDIDDocument(senderAddress)
+	if sndDidErr != nil {
+		global.Logger.Log(sndDidErr.Error(), "failed to get sender DID document")
+		return nil, types.ErrInternal
+	}
+	senderDomain := util.ExtractDIDMessageEndpoint(senderDidDoc)
+	if senderDomain == "" {
+		global.Logger.Log("sender domain is empty", "failed to get sender domain")
+		return nil, types.ErrInternal
+	}
+	parsedSenderUrl, pUrlErr := url.Parse(senderDomain)
+	if pUrlErr != nil {
+		global.Logger.Log(pUrlErr.Error(), "failed to parse sender domain")
+		return nil, types.ErrInternal
+	}
+	// host, port, _ := net.SplitHostPort(parsedSenderUrl.Host)
+
+	// enforce the from address to be a web DID
+	input.DIDCommMessage.From = fmt.Sprintf("did:web:%s#%s", parsedSenderUrl.Host, senderAddress)
 
 	// intended folder for sender is "sent"
 	id, idErr := util.DIDDocumentToUniqueID(&input.DIDCommMessage, types.MailioFolderSent)
@@ -293,19 +326,19 @@ func (ma *MessagingApi) handleSendMessageApiError(c *gin.Context, err error) {
 	}
 	switch err {
 	case types.ErrNoRecipient:
-		ApiErrorf(c, http.StatusUnprocessableEntity, "no recipient")
+		ApiErrorf(c, http.StatusUnprocessableEntity, "No recipient")
 	case types.ErrNotAuthorized:
-		ApiErrorf(c, http.StatusForbidden, "not authorized to send from this email address")
+		ApiErrorf(c, http.StatusForbidden, "Not authorized to send from this email address")
 	case types.ErrMessageTooLarge:
-		ApiErrorf(c, http.StatusRequestEntityTooLarge, "message too large")
+		ApiErrorf(c, http.StatusRequestEntityTooLarge, "Message too large")
 	case types.ErrTooManyAttachments:
-		ApiErrorf(c, http.StatusUnprocessableEntity, "too many attachments")
+		ApiErrorf(c, http.StatusUnprocessableEntity, "Too many attachments")
 	case types.ErrTooManyRecipients:
-		ApiErrorf(c, http.StatusUnprocessableEntity, "too many recipients")
+		ApiErrorf(c, http.StatusUnprocessableEntity, "Too many recipients")
 	case types.ErrBadRequestMissingSubjectOrBody:
-		ApiErrorf(c, http.StatusUnprocessableEntity, "missing subject or body")
+		ApiErrorf(c, http.StatusUnprocessableEntity, "Missing subject or body")
 	default:
-		ApiErrorf(c, http.StatusInternalServerError, "failed to send message")
+		ApiErrorf(c, http.StatusInternalServerError, "Failed to send message")
 	}
-	global.Logger.Log(err.Error(), "failed to send message")
+	global.Logger.Log(err.Error(), "Failed to send message")
 }

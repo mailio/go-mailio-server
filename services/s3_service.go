@@ -52,7 +52,7 @@ func (s3s *S3Service) UploadAttachment(bucket, path string, content []byte) (str
 // Delete attachment at specific bucket and path
 func (s3s *S3Service) DeleteAttachment(bucket, path string) error {
 	input := &s3Service.DeleteObjectInput{
-		Bucket: aws.String(global.Conf.Storage.Bucket),
+		Bucket: aws.String(bucket),
 		Key:    aws.String(path),
 	}
 
@@ -76,6 +76,7 @@ func (s3s *S3Service) DeleteAttachment(bucket, path string) error {
 			return err
 		}
 	}
+	global.Logger.Log("info", "object deleted", "objectKey", path)
 	return nil
 }
 
