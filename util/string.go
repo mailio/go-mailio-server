@@ -32,3 +32,7 @@ func FixAndDecodeURLBase64(base64String string) ([]byte, error) {
 
 	return base64.URLEncoding.DecodeString(base64String)
 }
+
+func IsNilOrEmpty(s *string) bool {
+	return s == nil || *s == ""
+}

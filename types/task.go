@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 
 	"github.com/hibiken/asynq"
-	smtptypes "github.com/mailio/go-mailio-server/email/smtp/types"
 )
 
 var (
@@ -16,12 +15,12 @@ var (
 
 // Task is a queue process for incoming and outgoing DIDComm messages
 type Task struct {
-	Address        string          `json:"address,omitempty"`           // Authenticated user address
-	DIDCommMessage *DIDCommMessage `json:"message" validate:"required"` // the message to be processed
+	Address             string               `json:"address,omitempty"`           // Authenticated user address
+	DIDCommMessageInput *DIDCommMessageInput `json:"message" validate:"required"` // the message to be processed
 }
 
 type SmtpTask struct {
-	Mail    *smtptypes.Mail `json:"mail" validate:"required"`
+	Mail    *SmtpEmailInput `json:"mail" validate:"required"`
 	Address string          `json:"address,omitempty"` // sender/receiver mailio address
 	// SmtpProvider string          `json:"smtpProvider,omitempty"` // smtp email provider (e.g. mailgun)
 }

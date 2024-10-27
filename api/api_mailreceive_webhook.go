@@ -125,10 +125,23 @@ func (m *MailReceiveWebhook) ReceiveMail(c *gin.Context) {
 		}
 	}
 
+	mailInput, inputErr := util.ConvertFromSmtpEmail(email)
+	if inputErr != nil {
+		if inputErr == types.ErrInvalidFormat {
+			global.Logger.Log("error converting email, invalid format", inputErr.Error())
+			sendBounce(email, c, smtpHandler, "5.6.0", "Error converting email")
+		} else if inputErr == types.ErrInvaidRecipient {
+			global.Logger.Log("error converting email, invalid recipient", inputErr.Error())
+			sendBounce(email, c, smtpHandler, "5.6.0", "Error converting email")
+		} else {
+			global.Logger.Log("error converting email", inputErr.Error())
+			sendBounce(email, c, smtpHandler, "5.6.0", "Error converting email")
+		}
+		return
+	}
 	// add to queue
 	task := &types.SmtpTask{
-		Mail: email,
-		// SmtpProvider: provider,
+		Mail: mailInput,
 	}
 	receiveTask, tErr := types.NewSmtpCommReceiveTask(task)
 	if tErr != nil {
@@ -136,17 +149,12 @@ func (m *MailReceiveWebhook) ReceiveMail(c *gin.Context) {
 		return
 	}
 	email.Timestamp = time.Now().UTC().UnixMilli()
-	id, idErr := util.SmtpMailToUniqueID(email, types.MailioFolderInbox)
-	if idErr != nil {
-		ApiErrorf(c, http.StatusBadRequest, idErr.Error())
-		return
-	}
 
 	// add to task queue
 	taskInfo, tqErr := m.env.TaskClient.Enqueue(receiveTask,
 		asynq.MaxRetry(3),              // max number of times to retry the task
 		asynq.Timeout(600*time.Second), // max time to process the task
-		asynq.TaskID(id),               // unique task id
+		asynq.TaskID(email.MessageId),  // unique task id
 		asynq.Unique(time.Second*10))   // unique for 10 seconds (preventing multiple equal messages in the queue)
 	if tqErr != nil {
 		global.Logger.Log(tqErr.Error(), "failed to receive message")

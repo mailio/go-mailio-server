@@ -10,7 +10,6 @@ import (
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
 	"github.com/hibiken/asynq"
-	smtptypes "github.com/mailio/go-mailio-server/email/smtp/types"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/services"
 	"github.com/mailio/go-mailio-server/types"
@@ -122,18 +121,7 @@ func (ma *MessagingApi) SendSmtpMessage(c *gin.Context) {
 		return
 	}
 
-	// convert to smtptypes.Mail
-	mailEmail, meErr := convertToSmtpEmail(mail)
-	if meErr != nil {
-		if meErr == types.ErrInvalidFormat {
-			ApiErrorf(c, http.StatusBadRequest, "Invalid sender email address")
-		} else if meErr == types.ErrInvaidRecipient {
-			ApiErrorf(c, http.StatusBadRequest, "Please check the recipient email addresses")
-		}
-		return
-	}
-
-	id, err := ma.sendSMTPMessage(c, mailEmail, up)
+	id, err := ma.sendSMTPMessage(c, &mail, up)
 	if err != nil {
 		ma.handleSendMessageApiError(c, err)
 	}
@@ -165,7 +153,8 @@ func (ma *MessagingApi) validateSmtpSender(c *gin.Context, fromEmailAddress stri
 }
 
 // sendSMTPMessage sends an email message via SMTP protocol
-func (ma *MessagingApi) sendSMTPMessage(c *gin.Context, mail *smtptypes.Mail, up *types.UserProfile) (*string, error) {
+// func (ma *MessagingApi) sendSMTPMessage(c *gin.Context, mail *smtptypes.Mail, up *types.UserProfile) (*string, error) {
+func (ma *MessagingApi) sendSMTPMessage(c *gin.Context, mailInput *types.SmtpEmailInput, up *types.UserProfile) (*string, error) {
 	// send email
 	// check daily sent limit (default = 10)
 	fromTimestamp := time.Now().UTC().AddDate(0, 0, -1).UnixMilli()
@@ -181,41 +170,48 @@ func (ma *MessagingApi) sendSMTPMessage(c *gin.Context, mail *smtptypes.Mail, up
 
 	// validate if sender can send emails
 	//TODO: Add a check if domain is a valid domain to be sent from
-	vsErr := ma.validateSmtpSender(c, mail.From.Address)
+	vsErr := ma.validateSmtpSender(c, mailInput.From)
 	if vsErr != nil {
 		return nil, types.ErrNotAuthorized
 	}
 	// validate input
-	if len(mail.To) == 0 {
+	if len(mailInput.To) == 0 {
 		return nil, types.ErrNoRecipient
 	}
-	if mail.SizeBytes > 3*1024*1024 { // maximum total allowed size
+	// asses email size (max 3MB)
+	sizeBytes := 0
+	if mailInput.BodyHTML != nil {
+		sizeBytes += len(*mailInput.BodyHTML)
+	}
+	if mailInput.BodyText != nil {
+		sizeBytes += len(*mailInput.BodyText)
+	}
+	if sizeBytes > 7*1024*1024 { // maximum total allowed size
 		ApiErrorf(c, http.StatusBadRequest, "message too large")
 		return nil, types.ErrMessageTooLarge
 	}
-	if len(mail.Attachments) > 50 { // maximum allowed attachments
+	if len(mailInput.Attachments) > 50 { // maximum allowed attachments
 		ApiErrorf(c, http.StatusBadRequest, "too many attachments")
 		return nil, types.ErrTooManyAttachments
 	}
-	if len(mail.To) > 50 { // maximum allowed recipients
+	if len(mailInput.To) > 50 { // maximum allowed recipients
 		return nil, types.ErrTooManyRecipients
 	}
-	if mail.Subject == "" && mail.BodyHTML == "" && mail.BodyText == "" {
+	if util.IsNilOrEmpty(mailInput.Subject) && util.IsNilOrEmpty(mailInput.BodyHTML) && util.IsNilOrEmpty(mailInput.BodyText) {
 		// ApiErrorf(c, http.StatusBadRequest, "no subject or body")
 		return nil, types.ErrBadRequestMissingSubjectOrBody
 	}
 	// add to queue
 	task := &types.SmtpTask{
-		Mail:    mail,
+		Mail:    mailInput,
 		Address: up.ID,
 	}
 	sendTask, tErr := types.NewSmtpCommSendTask(task)
 	if tErr != nil {
 		return nil, tErr
 	}
-	mail.Timestamp = time.Now().UTC().UnixMilli()
 
-	id, idErr := util.SmtpMailToUniqueID(mail, types.MailioFolderSent)
+	id, idErr := util.SmtpMailToUniqueID(mailInput, types.MailioFolderSent)
 	if idErr != nil {
 		return nil, idErr
 	}
@@ -296,8 +292,8 @@ func (ma *MessagingApi) sendDIDCommMessage(senderAddress string, input types.DID
 	input.DIDCommMessage.CreatedTime = time.Now().UTC().UnixMilli()
 
 	task := &types.Task{
-		Address:        senderAddress,
-		DIDCommMessage: &input.DIDCommMessage,
+		Address:             senderAddress,
+		DIDCommMessageInput: &input,
 	}
 	sendTask, tErr := types.NewDIDCommSendTask(task)
 	if tErr != nil {

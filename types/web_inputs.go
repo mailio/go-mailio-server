@@ -43,6 +43,7 @@ type SmtpEmailInput struct {
 	Subject           *string                     `json:"subject,omitempty"`
 	BodyText          *string                     `json:"bodyText,omitempty"` // The text version of the email.
 	BodyHTML          *string                     `json:"bodyHtml,omitempty"` // The HTML version of the email.
+	Timestamp         int64                       `json:"timestamp"`          // The time the email was sent.
 	Attachments       []*smtptypes.SmtpAttachment `json:"attachments,omitempty"`
 	DeleteAttachments []string                    `json:"deleteAttachments,omitempty"` // The IDs of attachments to be deleted (the decision is left to client to make: if only encrypted then plaint attachment should be deleted, if both types of recipients then no attachments shhould be deleted, ... ).
 }

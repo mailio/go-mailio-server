@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/go-resty/resty/v2"
@@ -61,6 +63,13 @@ func (mqs *MessageQueue) ProcessSMTPTask(ctx context.Context, t *asynq.Task) err
 	if err := json.Unmarshal(t.Payload(), &task); err != nil {
 		return fmt.Errorf("json.Unmarshal failed: %v: %w", err, asynq.SkipRetry)
 	}
+
+	email, meErr := util.ConvertToSmtpEmail(*task.Mail)
+	if meErr != nil {
+		global.Logger.Log(meErr.Error(), "failed to convert to smtp email", task.Mail)
+		return fmt.Errorf("failed to convert to smtp email: %v: %w", meErr, asynq.SkipRetry)
+	}
+
 	taskId := t.ResultWriter().TaskID()
 	switch t.Type() {
 	case types.QueueTypeSMTPCommSend:
@@ -68,7 +77,7 @@ func (mqs *MessageQueue) ProcessSMTPTask(ctx context.Context, t *asynq.Task) err
 		mqs.SendSMTPMessage(task.Address, task.Mail, taskId)
 	case types.QueueTypeSMTPCommReceive:
 		// receive the message
-		mqs.ReceiveSMTPMessage(task.Mail, taskId)
+		mqs.ReceiveSMTPMessage(email, taskId)
 	default:
 		return fmt.Errorf("unexpected task type: %s, %w", t.Type(), asynq.SkipRetry)
 	}
@@ -88,10 +97,13 @@ func (mqs *MessageQueue) ProcessDIDCommTask(ctx context.Context, t *asynq.Task) 
 	switch t.Type() {
 	case types.QueueTypeDIDCommSend:
 		// send the message
-		mqs.DIDCommSendMessage(task.Address, task.DIDCommMessage)
+		mqs.DIDCommSendMessage(task.Address, task.DIDCommMessageInput)
 	case types.QueueTypeDIDCommRecv:
 		// receive the message
-		mqs.DidCommReceiveMessage(task.DIDCommMessage)
+		if task.DIDCommMessageInput == nil {
+			return fmt.Errorf("DIDCommMessageInput is nil: %w", asynq.SkipRetry)
+		}
+		mqs.DidCommReceiveMessage(&task.DIDCommMessageInput.DIDCommMessage)
 	default:
 		// no responses on unrecognized messages
 		return fmt.Errorf("unexpected task type: %s, %w", t.Type(), asynq.SkipRetry)
@@ -101,7 +113,8 @@ func (mqs *MessageQueue) ProcessDIDCommTask(ctx context.Context, t *asynq.Task) 
 }
 
 // SendMessage sends encrypted DIDComm message to recipient
-func (msq *MessageQueue) DIDCommSendMessage(userAddress string, message *types.DIDCommMessage) error {
+func (msq *MessageQueue) DIDCommSendMessage(userAddress string, input *types.DIDCommMessageInput) error {
+	message := input.DIDCommMessage
 	global.Logger.Log("sending from", userAddress, "intent", message.Intent)
 
 	if message.Thid == "" {
@@ -112,7 +125,7 @@ func (msq *MessageQueue) DIDCommSendMessage(userAddress string, message *types.D
 	mailioMessage := types.MailioMessage{
 		ID:             message.ID,
 		From:           message.From,
-		DIDCommMessage: message,
+		DIDCommMessage: &message,
 		Created:        time.Now().UnixMilli(),
 		Folder:         types.MailioFolderSent,
 		IsRead:         true, // sent messages are by default read
@@ -123,11 +136,11 @@ func (msq *MessageQueue) DIDCommSendMessage(userAddress string, message *types.D
 	recipientDidMap := map[string]did.Document{}
 	mtpStatusErrors := []*types.MTPStatusCode{}
 	if len(message.To) > 0 {
-		recMap, mtpErrors := msq.validateRecipientDIDs(message)
+		recMap, mtpErrors := msq.validateRecipientDIDs(&message)
 		recipientDidMap = recMap
 		mtpStatusErrors = mtpErrors
 	} else if len(message.ToEmails) > 0 {
-		recMap, mtpErrors := msq.validateRecipientDIDFromEmails(message)
+		recMap, mtpErrors := msq.validateRecipientDIDFromEmails(&message)
 		for k, v := range recMap {
 			recipientDidMap[k] = v
 		}
@@ -154,7 +167,7 @@ func (msq *MessageQueue) DIDCommSendMessage(userAddress string, message *types.D
 	}
 	// send message to each endpoint extracted from DID documents
 	for _, ep := range endpointMap {
-		code, sendErr := msq.httpSend(message, ep)
+		code, sendErr := msq.httpSend(&message, ep)
 		if sendErr != nil {
 			if sendErr == types.ErrContinue {
 				// on to the next message if this one failed
@@ -175,6 +188,28 @@ func (msq *MessageQueue) DIDCommSendMessage(userAddress string, message *types.D
 		return sErr
 	}
 	msq.deliveryService.SaveBulkMtpStatusCodes(message.ID, mtpStatusErrors)
+
+	// delete attachments that client wants to delete
+	// remove possible attachments to be removed (the cientt reports those when only 1 type of recipient is present, but both encrypted and plain attachments is uploaded)
+	for _, att := range input.DeleteAttachments {
+		// delete attachment
+		link, lpErr := url.Parse(att)
+		if lpErr != nil {
+			global.Logger.Log(lpErr.Error(), "failed to parse attachment link", att)
+			continue
+		}
+		// extract bucket and path (the path is not completely trusted. So only in userSender folder can it be deleted)
+		parts := strings.Split(link.Path, "/")
+		fileKey := userAddress + "/" + parts[len(parts)-1]
+		if fileKey == "" {
+			global.Logger.Log("error", "invalid attachment url", "attachmentUrl", att)
+			return fmt.Errorf("invalid attachment url: %v: %w", lpErr, asynq.SkipRetry)
+		}
+		dErr := msq.s3Service.DeleteAttachment(global.Conf.Storage.Bucket, fileKey)
+		if dErr != nil {
+			global.Logger.Log(dErr.Error(), "failed to delete attachment", att)
+		}
+	}
 	return nil
 }
 

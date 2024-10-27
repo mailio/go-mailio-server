@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	smtptypes "github.com/mailio/go-mailio-server/email/smtp/types"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/types"
 )
@@ -30,11 +29,8 @@ func DIDDocumentToUniqueID(message *types.DIDCommMessage, optionalSuffix string)
 	return hex, nil
 }
 
-func SmtpMailToUniqueID(email *smtptypes.Mail, optionalSuffix string) (string, error) {
+func SmtpMailToUniqueID(email *types.SmtpEmailInput, optionalSuffix string) (string, error) {
 	if email == nil {
-		return "", types.ErrBadRequest
-	}
-	if email.Timestamp == 0 {
 		return "", types.ErrBadRequest
 	}
 	m, mErr := json.Marshal(email)

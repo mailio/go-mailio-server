@@ -88,8 +88,13 @@ func (ms *MessagingMTPApi) ReceiveMessage(c *gin.Context) {
 	resp.SignatureBase64 = base64.StdEncoding.EncodeToString(signature)
 
 	// create a receive task with DIDCommMessage
+	didInput := &types.DIDCommMessageInput{
+		DIDCommMessage:    *input.DIDCommRequest.DIDCommMessage,
+		DeleteAttachments: []string{},
+	}
+
 	task := &types.Task{
-		DIDCommMessage: input.DIDCommRequest.DIDCommMessage,
+		DIDCommMessageInput: didInput,
 	}
 
 	receiveTask, tErr := types.NewDIDCommReceiveTask(task)

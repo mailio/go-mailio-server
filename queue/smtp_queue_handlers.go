@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"net/mail"
+	"net/url"
 	"strings"
 	"time"
 
@@ -27,20 +28,25 @@ import (
 // Sending email message using SMTP
 // 1. Checks if user canceled the email sending
 // 2. deletes the draft message per message ID
-func (msq *MessageQueue) SendSMTPMessage(fromMailioAddress string, email *smtptypes.Mail, taskId string) error {
+func (msq *MessageQueue) SendSMTPMessage(fromMailioAddress string, email *types.SmtpEmailInput, taskId string) error {
 	// check if the user canceled the email sending
 	// if the user canceled the email sending, delete the draft message per message ID
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	securityStatus := "clean" // default
+	smtpEmail, smtpConvErr := util.ConvertToSmtpEmail(*email)
+	if smtpConvErr != nil {
+		global.Logger.Log(smtpConvErr.Error(), "failed to convert email")
+		return fmt.Errorf("failed converting email: %v: %w", smtpConvErr, asynq.SkipRetry)
+	}
 
 	// SMTP validation handler (no validators registered at this time)
 	smtpValidatorHandlers := smtpvalidator.Handlers()
 	if len(smtpValidatorHandlers) > 0 {
 		// call each validator handler
 		for _, name := range smtpValidatorHandlers {
-			smtpVErr := smtpvalidator.GetHandler(name).Validate(email)
+			smtpVErr := smtpvalidator.GetHandler(name).Validate(smtpEmail)
 			if smtpVErr != nil {
 				global.Logger.Log(smtpVErr.Error(), "failed to validate email")
 				return fmt.Errorf("failed validating email: %v: %w", smtpVErr, asynq.SkipRetry)
@@ -66,7 +72,7 @@ func (msq *MessageQueue) SendSMTPMessage(fromMailioAddress string, email *smtpty
 	}
 
 	// support multiple domains (based on the FROM domain use the handler for instance)
-	domain := strings.Split(email.From.Address, "@")[1]
+	domain := strings.Split(smtpEmail.From.Address, "@")[1]
 	if !util.IsSupportedSmtpDomain(domain) {
 		global.Logger.Log("unsupported domain", domain)
 		return fmt.Errorf("unsupported domain: %w", asynq.SkipRetry)
@@ -85,18 +91,18 @@ func (msq *MessageQueue) SendSMTPMessage(fromMailioAddress string, email *smtpty
 		return fmt.Errorf("failed generating message ID: %v: %w", idErr, asynq.SkipRetry)
 	}
 	// set the message ID
-	email.MessageId = rfc2822MessageID
+	smtpEmail.MessageId = rfc2822MessageID
 	//TODO: check if message is reply to another message (In-Reply-To or References headers)
 
 	// download attachments from s3 and store in the email object
-	paErr := msq.processSendAttachments(email)
+	paErr := msq.processSendAttachments(smtpEmail)
 	if paErr != nil {
 		global.Logger.Log(paErr.Error(), "failed processing attachments")
 		return fmt.Errorf("failed processing attachments: %v: %w", paErr, asynq.SkipRetry)
 	}
 
 	// convert email to mime
-	mime, mErr := mailiosmtp.ToMime(email, rfc2822MessageID)
+	mime, mErr := mailiosmtp.ToMime(smtpEmail, rfc2822MessageID)
 	if mErr != nil {
 		global.Logger.Log(mErr.Error(), "failed to create mime")
 		return fmt.Errorf("failed converting email to mime: %v: %w", mErr, asynq.SkipRetry)
@@ -120,7 +126,7 @@ func (msq *MessageQueue) SendSMTPMessage(fromMailioAddress string, email *smtpty
 
 	// store into the users database the message
 	tos := []string{}
-	for _, to := range email.To {
+	for _, to := range smtpEmail.To {
 		tos = append(tos, to.String())
 	}
 
@@ -130,14 +136,14 @@ func (msq *MessageQueue) SendSMTPMessage(fromMailioAddress string, email *smtpty
 			ID: rfc2822MessageID,
 		},
 		ID:      taskId,
-		From:    email.From.Address,
+		From:    smtpEmail.From.Address,
 		Folder:  types.MailioFolderSent,
 		Created: time.Now().UTC().UnixMilli(),
 		IsRead:  true, // send messages are read by default
 		DIDCommMessage: &types.DIDCommMessage{
 			Type:            "application/mailio-smtp+json",
 			ID:              rfc2822MessageID,
-			From:            email.From.String(),
+			From:            smtpEmail.From.String(),
 			To:              tos,
 			Thid:            rfc2822MessageID, // TODO!: check the reply fields and such
 			CreatedTime:     time.Now().UTC().UnixMilli(),
@@ -152,13 +158,37 @@ func (msq *MessageQueue) SendSMTPMessage(fromMailioAddress string, email *smtpty
 		return fmt.Errorf("failed saving message: %v: %w", msErr, asynq.SkipRetry)
 	}
 
-	docID, err := mgHandler.SendMimeMail(email.From, mime, email.To)
+	docID, err := mgHandler.SendMimeMail(smtpEmail.From, mime, smtpEmail.To)
 	if err != nil {
 		global.Logger.Log(err.Error(), "failed to send smtp email")
 		//TODO: store the email in the inbox folder if sending fails
 		return fmt.Errorf("failed sending smtp email: %v: %w", err, asynq.SkipRetry)
 	}
 	global.Logger.Log(fmt.Sprintf("smtp message sent: %s", docID), "message sent")
+
+	// remove possible attachments to be removed (the cient reports those when only 1 type of recipient is present, but both encrypted and plain attachments is uploaded)
+	for _, att := range email.DeleteAttachments {
+		// delete the attachment
+		global.Logger.Log("deleting attachment", att)
+		parsedURL, pErr := url.Parse(att)
+		if pErr != nil {
+			global.Logger.Log(pErr.Error(), "failed to parse attachment url")
+			continue
+		}
+		// Extract the file key from the path (after the first "/")
+		split := strings.Split(parsedURL.Path, "/")
+		fileKey := fromMailioAddress + "/" + split[len(split)-1]
+		if fileKey == "" {
+			global.Logger.Log("error", "invalid attachment url", "attachmentUrl", att)
+			continue
+		}
+		fileKey = strings.ReplaceAll(fileKey, "?enc=1", "")
+		dErr := msq.s3Service.DeleteAttachment(global.Conf.Storage.Bucket, fileKey)
+		if dErr != nil {
+			global.Logger.Log(dErr.Error(), "failed to delete attachment", att)
+			continue
+		}
+	}
 
 	return nil
 }

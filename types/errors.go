@@ -62,6 +62,9 @@ var (
 	// ErrInvaidRecipient - invalid recipient
 	ErrInvaidRecipient = errors.New("invalid recipient")
 
+	// ErrInvalidSender - invalid sender
+	ErrInvalidSender = errors.New("invalid sender")
+
 	// ErrMessageTooLarge - message too large
 	ErrMessageTooLarge = errors.New("message too large")
 
