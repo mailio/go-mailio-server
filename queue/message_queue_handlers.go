@@ -97,6 +97,13 @@ func (msq *MessageQueue) handleReceivedDIDCommMessage(message *types.DIDCommMess
 		return fmt.Errorf("failed to parse sender DID: %v: %w", fdErr, asynq.SkipRetry)
 	}
 
+	// get and cache the senders DID document
+	_, cErr := msq.ssiService.FetchDIDByWebDID(fromDID)
+	if cErr != nil {
+		global.Logger.Log(cErr.Error(), "failed to cache sender DID document", message.From)
+		// continue processing the message regardless of the error. Client can get the missing did document later
+	}
+
 	domain := fromDID.Value()
 	serverDID, didErr := msq.mtpService.GetServerDIDDocument(domain)
 	if didErr != nil {
@@ -164,6 +171,30 @@ func (msq *MessageQueue) handleReceivedDIDCommMessage(message *types.DIDCommMess
 		if message.Pthid != "" {
 			isReplied = true
 		}
+
+		// handle attachment by decupting the links and downloading the content
+		if len(message.Attachments) > 0 {
+			for _, att := range message.Attachments {
+				content, dErr := base64.StdEncoding.DecodeString(att.Data.Base64)
+				if dErr != nil {
+					global.Logger.Log(dErr.Error(), "failed to decode attachment")
+					// TODO: store message_delivery error?
+				}
+				now := time.Now().UTC().Format("20061010T150405Z")
+				path := "/" + recAddress + "/" + att.Data.Hash + "_" + now + "?enc=1"
+				link, uErr := msq.s3Service.UploadAttachment(global.Conf.Storage.Bucket, path, content)
+				if uErr != nil {
+					global.Logger.Log(uErr.Error(), "failed to upload attachment")
+					//TODO: store message_delivery error?
+				}
+				if att.Data.Links == nil {
+					att.Data.Links = []string{}
+				}
+				att.Data.Links = append(att.Data.Links, link) // link attachment to the storage
+				att.Data.Base64 = ""                          // remove the attachment from the message itself
+			}
+		}
+
 		uniqueID, _ := util.DIDDocumentToUniqueID(message, folder)
 		mailioMessage := &types.MailioMessage{
 			ID:             uniqueID,

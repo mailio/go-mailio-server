@@ -138,19 +138,20 @@ func (did *DIDApi) GetDIDDocument(c *gin.Context) {
 	c.JSON(http.StatusOK, resolved)
 }
 
-// @Summary Fetch all DID documents (local and remote)
-// @Description Fetch all DID documents (local and remote)
+// @Summary Fetch all DID documents by email hash (local and remote)
+// @Description Fetch all DID documents by email hash (local and remote)
 // @Security Bearer
 // @Tags Messaging
 // @Accept json
 // @Produce json
 // @Param lookups body types.InputDIDLookup true "InputDIDLookup"
 // @Success 200 {object} types.OutputDIDLookup
+// @Failure 404 {object} api.ApiError "DID not found"
 // @Failure 429 {object} api.ApiError "rate limit exceeded"
 // @Failure 400 {object} api.ApiError "invalid email address"
 // @Failure 500 {object} api.ApiError "error fetching did documents"
 // @Router /api/v1/resolve/did [post]
-func (da *DIDApi) FetchDIDDocuments(c *gin.Context) {
+func (da *DIDApi) FetchDIDDocumentsByEmailHash(c *gin.Context) {
 	address, exists := c.Get("subjectAddress")
 	if !exists {
 		ApiErrorf(c, http.StatusUnauthorized, "not authorized to create personal handshake")
@@ -177,8 +178,70 @@ func (da *DIDApi) FetchDIDDocuments(c *gin.Context) {
 		ApiErrorf(c, http.StatusInternalServerError, "error fetching did documents")
 		return
 	}
+
 	c.JSON(http.StatusOK, types.OutputDIDLookup{
 		Found:    found,
 		NotFound: notFound,
 	})
+}
+
+// @Summary Fetch all DID documents by Web DID (local and remote)
+// @Description Fetch all DID documents by Web DID (local and remote)
+// @Security Bearer
+// @Tags Messaging
+// @Accept json
+// @Produce json
+// @Param webdid body types.InputDID true "InputDID"
+// @Success 200 {object} did.Document
+// @Failure 404 {object} api.ApiError "DID not found"
+// @Failure 429 {object} api.ApiError "rate limit exceeded"
+// @Failure 400 {object} api.ApiError "invalid DID resolution"
+// @Failure 500 {object} api.ApiError "server error"
+// @Router /api/v1/resolve/webdid [post]
+func (da *DIDApi) FetchDIDByWebDID(c *gin.Context) {
+	_, exists := c.Get("subjectAddress")
+	if !exists {
+		ApiErrorf(c, http.StatusUnauthorized, "not authorized to create personal handshake")
+		return
+	}
+	var input types.InputDID
+	if err := c.ShouldBindJSON(&input); err != nil {
+		ApiErrorf(c, http.StatusBadRequest, "invalid format")
+		return
+	}
+	err := da.validate.Struct(input)
+	if err != nil {
+		msg := util.ValidationErrorToMessage(err)
+		ApiErrorf(c, http.StatusBadRequest, msg)
+		return
+	}
+
+	// get the senders DID and get the service endpoint where message was sent from
+	fromDID, fdErr := did.ParseDID(input.DID)
+	if fdErr != nil {
+		//the sender cannot be validated, no retryies are allowed. Message fails permanently
+		global.Logger.Log(fdErr.Error(), "failed to parse sender DID", input.DID)
+		ApiErrorf(c, http.StatusBadRequest, "invalid DID")
+		return
+	}
+
+	didDoc, err := da.ssiService.FetchDIDByWebDID(fromDID)
+	if err != nil {
+		if err == types.ErrNotFound {
+			ApiErrorf(c, http.StatusNotFound, "did not found")
+			return
+		}
+		if err == types.ErrConflict {
+			ApiErrorf(c, http.StatusConflict, "Rate limit exceeded. Try again later")
+			return
+		}
+		if err == types.ErrBadRequest {
+			ApiErrorf(c, http.StatusBadRequest, "error resolving did")
+			return
+		}
+		ApiErrorf(c, http.StatusInternalServerError, "error resolving did")
+		return
+	}
+
+	c.JSON(http.StatusOK, didDoc)
 }

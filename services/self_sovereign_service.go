@@ -16,6 +16,7 @@ import (
 	"github.com/mailio/go-mailio-server/repository"
 	"github.com/mailio/go-mailio-server/types"
 	"github.com/mailio/go-mailio-server/util"
+	"github.com/redis/go-redis/v9"
 )
 
 type SelfSovereignService struct {
@@ -24,10 +25,11 @@ type SelfSovereignService struct {
 	handshakeMappingRepo repository.Repository
 	domainRepo           repository.Repository
 	restyClient          *resty.Client
+	env                  *types.Environment
 }
 
 // Self Sovereign Service operates over Mailios DID and VC documents
-func NewSelfSovereignService(dbSelector repository.DBSelector) *SelfSovereignService {
+func NewSelfSovereignService(dbSelector repository.DBSelector, env *types.Environment) *SelfSovereignService {
 	initialWaitTime := 1 * time.Second
 	maxWaitTime := 20 * time.Second
 	restyClient := resty.New().
@@ -79,6 +81,7 @@ func NewSelfSovereignService(dbSelector repository.DBSelector) *SelfSovereignSer
 		handshakeMappingRepo: mappingRepo,
 		domainRepo:           domainRepo,
 		restyClient:          restyClient,
+		env:                  env,
 	}
 }
 
@@ -309,5 +312,68 @@ func (ssi *SelfSovereignService) FetchRemoteDID(remoteDid *did.DID) (*did.Docume
 		return nil, types.ErrBadRequest
 	}
 
+	return &didDoc, nil
+}
+
+// cacheSenderDIDDocument caches the sender DID document (if not already cached)
+func (ssi *SelfSovereignService) FetchDIDByWebDID(fromDID did.DID) (*did.Document, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
+	host := global.Conf.Mailio.ServerDomain
+
+	key := fmt.Sprintf("cached_did:%s", fromDID)
+	didBytes, err := ssi.env.RedisClient.Get(ctx, key).Result()
+	if err != nil {
+		if err == redis.Nil {
+			// cache the DID document
+			var result did.Document
+
+			// check if local server (don't query it over network due to "rate limits")
+			if fromDID.Value() == host {
+				r, rErr := ssi.GetDIDDocument(fromDID.Fragment())
+				if rErr != nil {
+					global.Logger.Log(rErr.Error(), "failed to validate recipient", fromDID.Fragment())
+					return nil, rErr
+				} else {
+					result = *r
+				}
+			} else {
+				// remote fetch did
+				r, rErr := ssi.FetchRemoteDID(&fromDID)
+				if rErr != nil {
+					global.Logger.Log(rErr.Error(), "failed to validate remote recipient", fromDID.Fragment())
+					return nil, rErr
+				} else {
+					result = *r
+				}
+			}
+			// cache the DID document
+			didBytes, mErr := json.Marshal(result)
+			if mErr != nil {
+				global.Logger.Log(mErr.Error(), "failed to marshal DID document for caching")
+				return nil, mErr
+			}
+			// cache for 24 hours
+			_, cErr := ssi.env.RedisClient.Set(ctx, key, didBytes, time.Hour*24).Result()
+			if cErr != nil {
+				global.Logger.Log(cErr.Error(), "failed to cache DID document for caching")
+				return nil, cErr
+			}
+			return &result, nil
+		}
+	}
+	// document already cached, no need to cache, but just extend the expiration time
+	_, cErr := ssi.env.RedisClient.Expire(ctx, key, time.Hour*24).Result()
+	if cErr != nil {
+		global.Logger.Log(cErr.Error(), "failed to extend expiration time for cached DID document")
+		return nil, cErr
+	}
+	var didDoc did.Document
+	uErr := json.Unmarshal([]byte(didBytes), &didDoc)
+	if uErr != nil {
+		global.Logger.Log(uErr.Error(), "failed to unmarshal cached DID document")
+		return nil, uErr
+	}
 	return &didDoc, nil
 }

@@ -203,30 +203,3 @@ func (msq *MessageQueue) httpSend(message *types.DIDCommMessage,
 	}
 	return nil, nil
 }
-
-// checks if user already recieved a message with given messageID
-// func (msq *MessageQueue) hasAlreadyReceivedMessage(messageID string, did did.DID) bool {
-// 	userAddress := did.Fragment()
-// 	if userAddress == "" {
-// 		userAddress = did.Value()
-// 	}
-// 	if userAddress == "" {
-// 		global.Logger.Log("user address is empty", "failed to check if message exists", did.String())
-// 		return true
-// 	}
-
-// 	// msg, exErr := msq.userService.GetMessage(userAddress, messageID)
-// 	// if exErr != nil {
-// 	// 	if exErr != types.ErrNotFound {
-// 	// 		global.Logger.Log(exErr.Error(), "failed to check if message exists", userAddress)
-// 	// 		return false
-// 	// 	} else if exErr == types.ErrNotFound {
-// 	// 		return false
-// 	// 	}
-// 	// }
-// 	// // received messages must not be in sent folder
-// 	// if msg != nil && msg.Folder == types.MailioFolderSent {
-// 	// 	return false
-// 	// }
-// 	return true
-// }

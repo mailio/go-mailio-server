@@ -2,6 +2,7 @@ package queue
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/url"
@@ -34,9 +35,9 @@ type MessageQueue struct {
 func NewMessageQueue(dbSelector *repository.CouchDBSelector, env *types.Environment) *MessageQueue {
 
 	rcClient := resty.New()
-	ssiService := services.NewSelfSovereignService(dbSelector)
+	ssiService := services.NewSelfSovereignService(dbSelector, env)
 	userService := services.NewUserService(dbSelector, env)
-	mtpService := services.NewMtpService(dbSelector)
+	mtpService := services.NewMtpService(dbSelector, env)
 	handshakeService := services.NewHandshakeService(dbSelector)
 	deliveryService := services.NewMessageDeliveryService(dbSelector)
 	userProfileService := services.NewUserProfileService(dbSelector, env)
@@ -165,6 +166,26 @@ func (msq *MessageQueue) DIDCommSendMessage(userAddress string, input *types.DID
 		}
 		endpointMap[endpoint] = endpoint
 	}
+
+	// download attachment data from s3
+	for _, att := range message.Attachments {
+		if len(att.Data.Links) > 0 {
+			for _, link := range att.Data.Links {
+				if strings.Contains(link, "?enc=1") {
+					url := strings.Replace(link, "?enc=1", "", 1)
+					content, dErr := msq.s3Service.DownloadAttachment(url)
+					if dErr != nil {
+						global.Logger.Log(dErr.Error(), "failed to download attachment")
+						// TODO: store message_delivery error?
+						return fmt.Errorf("failed downloading attachment: %v: %w", dErr, asynq.SkipRetry)
+					}
+					att.Data.Base64 = base64.StdEncoding.EncodeToString(content)
+				}
+			}
+			att.Data.Links = nil
+		}
+	}
+
 	// send message to each endpoint extracted from DID documents
 	for _, ep := range endpointMap {
 		code, sendErr := msq.httpSend(&message, ep)

@@ -388,10 +388,18 @@ func (ua *UserAccountApi) GetUserAddress(c *gin.Context) {
 		return
 	}
 	output := &types.OutputBasicUserInfo{
-		Address:   address,
-		TotalDisk: up.DiskSpace,
-		UsedDisk:  totalDiskUsageFromHandlers + stats.ActiveSize,
-		Created:   up.Created,
+		Address:     address,
+		TotalDisk:   up.DiskSpace,
+		UsedDisk:    totalDiskUsageFromHandlers + stats.ActiveSize,
+		Created:     up.Created,
+		DisplayName: up.DisplayName,
+		Picture:     up.Picture,
+		Phone:       up.Phone,
+		JobTitle:    up.JobTitle,
+		Company:     up.Company,
+		Description: up.Description,
+		Social:      up.Social,
+		WhatToShare: up.WhatToShare,
 	}
 	c.JSON(http.StatusOK, output)
 }

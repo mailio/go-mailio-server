@@ -1062,7 +1062,7 @@ const docTemplate = `{
                         "Bearer": []
                     }
                 ],
-                "description": "Fetch all DID documents (local and remote)",
+                "description": "Fetch all DID documents by email hash (local and remote)",
                 "consumes": [
                     "application/json"
                 ],
@@ -1072,7 +1072,7 @@ const docTemplate = `{
                 "tags": [
                     "Messaging"
                 ],
-                "summary": "Fetch all DID documents (local and remote)",
+                "summary": "Fetch all DID documents by email hash (local and remote)",
                 "parameters": [
                     {
                         "description": "InputDIDLookup",
@@ -1093,6 +1093,12 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "invalid email address",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "404": {
+                        "description": "DID not found",
                         "schema": {
                             "$ref": "#/definitions/api.ApiError"
                         }
@@ -1167,6 +1173,69 @@ const docTemplate = `{
                     },
                     "429": {
                         "description": "rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/resolve/webdid": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Fetch all DID documents by Web DID (local and remote)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Messaging"
+                ],
+                "summary": "Fetch all DID documents by Web DID (local and remote)",
+                "parameters": [
+                    {
+                        "description": "InputDID",
+                        "name": "webdid",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.InputDID"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/did.Document"
+                        }
+                    },
+                    "400": {
+                        "description": "invalid DID resolution",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "404": {
+                        "description": "DID not found",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "429": {
+                        "description": "rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "500": {
+                        "description": "server error",
                         "schema": {
                             "$ref": "#/definitions/api.ApiError"
                         }
@@ -2528,7 +2597,6 @@ const docTemplate = `{
             "type": "object",
             "required": [
                 "from",
-                "id",
                 "type"
             ],
             "properties": {
@@ -2536,7 +2604,7 @@ const docTemplate = `{
                     "description": "attachments to the message                                                // MTP status message",
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/types.EncryptedAttachment"
+                        "$ref": "#/definitions/types.MailioAttachment"
                     }
                 },
                 "body": {
@@ -2831,50 +2899,6 @@ const docTemplate = `{
                 }
             }
         },
-        "types.EncryptedAttachment": {
-            "type": "object",
-            "required": [
-                "data",
-                "id",
-                "mediaType",
-                "name",
-                "size"
-            ],
-            "properties": {
-                "contentType": {
-                    "description": "the content type of the attachment",
-                    "type": "string"
-                },
-                "data": {
-                    "description": "the encrypted message body",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/types.EncryptedAttachmentData"
-                        }
-                    ]
-                },
-                "id": {
-                    "description": "a globally unique identifier for the attachment",
-                    "type": "string"
-                },
-                "lastModTime": {
-                    "description": "the last modification time of the attachment in UTC milliseconds since epoch",
-                    "type": "integer"
-                },
-                "mediaType": {
-                    "description": "the media type of the attachment",
-                    "type": "string"
-                },
-                "name": {
-                    "description": "the name of the attachment",
-                    "type": "string"
-                },
-                "size": {
-                    "description": "the size of the attachment in bytes",
-                    "type": "integer"
-                }
-            }
-        },
         "types.EncryptedAttachmentData": {
             "type": "object",
             "required": [
@@ -2902,14 +2926,18 @@ const docTemplate = `{
         "types.EncryptedBody": {
             "type": "object",
             "required": [
+                "aad",
                 "ciphertext",
                 "iv",
                 "protected",
                 "recipients",
-                "signature",
                 "tag"
             ],
             "properties": {
+                "aad": {
+                    "description": "additional authenticated data",
+                    "type": "string"
+                },
                 "ciphertext": {
                     "description": "the encrypted message",
                     "type": "string"
@@ -2929,14 +2957,6 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/types.Recipient"
                     }
-                },
-                "signature": {
-                    "description": "JWS digital signature",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/types.Signature"
-                        }
-                    ]
                 },
                 "tag": {
                     "description": "integrity check on the encrypted message",
@@ -3219,6 +3239,17 @@ const docTemplate = `{
                 }
             }
         },
+        "types.InputDID": {
+            "type": "object",
+            "required": [
+                "did"
+            ],
+            "properties": {
+                "did": {
+                    "type": "string"
+                }
+            }
+        },
         "types.InputDIDLookup": {
             "type": "object",
             "properties": {
@@ -3408,6 +3439,103 @@ const docTemplate = `{
                 }
             }
         },
+        "types.MailioAttachment": {
+            "type": "object",
+            "required": [
+                "data",
+                "id",
+                "mediaType",
+                "name",
+                "size"
+            ],
+            "properties": {
+                "contentType": {
+                    "description": "the content type of the attachment",
+                    "type": "string"
+                },
+                "data": {
+                    "description": "the encrypted message body",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/types.EncryptedAttachmentData"
+                        }
+                    ]
+                },
+                "id": {
+                    "description": "a globally unique identifier for the attachment",
+                    "type": "string"
+                },
+                "lastModTime": {
+                    "description": "the last modification time of the attachment in UTC milliseconds since epoch",
+                    "type": "integer"
+                },
+                "mediaType": {
+                    "description": "the media type of the attachment",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "the name of the attachment",
+                    "type": "string"
+                },
+                "size": {
+                    "description": "the size of the attachment in bytes",
+                    "type": "integer"
+                }
+            }
+        },
+        "types.MailioSocial": {
+            "type": "object",
+            "properties": {
+                "clubhouse": {
+                    "type": "string"
+                },
+                "discord": {
+                    "type": "string"
+                },
+                "facebook": {
+                    "type": "string"
+                },
+                "github": {
+                    "type": "string"
+                },
+                "instagram": {
+                    "type": "string"
+                },
+                "linkedin": {
+                    "type": "string"
+                },
+                "other": {
+                    "type": "string"
+                },
+                "signal": {
+                    "type": "string"
+                },
+                "skype": {
+                    "type": "string"
+                },
+                "slack": {
+                    "type": "string"
+                },
+                "snapchat": {
+                    "type": "string"
+                },
+                "telegram": {
+                    "type": "string"
+                },
+                "tiktok": {
+                    "type": "string"
+                },
+                "twitter": {
+                    "type": "string"
+                },
+                "whatsapp": {
+                    "type": "string"
+                },
+                "zoom": {
+                    "type": "string"
+                }
+            }
+        },
         "types.NonceResponse": {
             "type": "object",
             "properties": {
@@ -3438,8 +3566,32 @@ const docTemplate = `{
                 "address": {
                     "type": "string"
                 },
+                "company": {
+                    "description": "company of the requester",
+                    "type": "string"
+                },
                 "created": {
                     "type": "integer"
+                },
+                "description": {
+                    "description": "description of the request",
+                    "type": "string"
+                },
+                "displayName": {
+                    "type": "string"
+                },
+                "jobTitle": {
+                    "description": "job title of the requester",
+                    "type": "string"
+                },
+                "phone": {
+                    "type": "string"
+                },
+                "picture": {
+                    "type": "string"
+                },
+                "social": {
+                    "$ref": "#/definitions/types.MailioSocial"
                 },
                 "totalDisk": {
                     "type": "integer"
@@ -3524,33 +3676,6 @@ const docTemplate = `{
                 },
                 "emailHash": {
                     "description": "scrypt hash of the email address",
-                    "type": "string"
-                }
-            }
-        },
-        "types.Signature": {
-            "type": "object",
-            "properties": {
-                "payload": {
-                    "description": "The payload that was signed, which is base64URL encoded.",
-                    "type": "string"
-                },
-                "signatures": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/types.SignatureDetail"
-                    }
-                }
-            }
-        },
-        "types.SignatureDetail": {
-            "type": "object",
-            "properties": {
-                "protected": {
-                    "description": "Base64URL encoded JSON string containing the header parameters used for the signature",
-                    "type": "string"
-                },
-                "signature": {
                     "type": "string"
                 }
             }

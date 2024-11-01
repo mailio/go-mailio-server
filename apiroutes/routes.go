@@ -46,9 +46,9 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 	// SERVICE definitions
 	userService := services.NewUserService(dbSelector, environment)
 	nonceService := services.NewNonceService(dbSelector)
-	ssiService := services.NewSelfSovereignService(dbSelector)
+	ssiService := services.NewSelfSovereignService(dbSelector, environment)
 	handshakeService := services.NewHandshakeService(dbSelector)
-	mtpService := services.NewMtpService(dbSelector)
+	mtpService := services.NewMtpService(dbSelector, environment)
 	userProfileService := services.NewUserProfileService(dbSelector, environment)
 	domainService := services.NewDomainService(dbSelector)
 	webAuthnService := services.NewWebAuthnService(dbSelector, environment)
@@ -134,7 +134,8 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 		rootApi.DELETE("/v1/s3", s3Api.DeleteObject)
 
 		// did documents
-		rootApi.POST("/v1/resolve/did", didApi.FetchDIDDocuments)
+		rootApi.POST("/v1/resolve/did", didApi.FetchDIDDocumentsByEmailHash)
+		rootApi.POST("/v1/resolve/webdid", didApi.FetchDIDByWebDID)
 	}
 
 	// server-to-server communication (aka MTP - Mailio Transfer Protocol)

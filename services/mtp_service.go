@@ -25,7 +25,7 @@ type MtpService struct {
 	ssiService    *SelfSovereignService
 }
 
-func NewMtpService(dbSelector repository.DBSelector) *MtpService {
+func NewMtpService(dbSelector repository.DBSelector, env *types.Environment) *MtpService {
 	domainRepo, err := dbSelector.ChooseDB(repository.Domain)
 	if err != nil {
 		level.Error(global.Logger).Log("msg", "error while choosing db", "err", err)
@@ -41,7 +41,7 @@ func NewMtpService(dbSelector repository.DBSelector) *MtpService {
 		level.Error(global.Logger).Log("msg", "error while choosing db", "err", err)
 		panic(err)
 	}
-	ssiService := NewSelfSovereignService(dbSelector)
+	ssiService := NewSelfSovereignService(dbSelector, env)
 	restyClient := resty.New().SetRetryCount(3).SetRetryWaitTime(5 * time.Second)
 	return &MtpService{domainRepo: domainRepo, handshakeRepo: handshakeRepo, mappingRepo: mappingRepo, ssiService: ssiService, restyClient: restyClient}
 }
