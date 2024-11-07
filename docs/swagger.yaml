@@ -828,8 +828,8 @@ definitions:
     type: object
   types.EncryptedAttachmentData:
     properties:
-      decryptionKey:
-        description: the key used to decrypt the ciphertext
+      base64:
+        description: the base64 encoded attachment
         type: string
       hash:
         description: the hash of the attachment
@@ -1063,13 +1063,6 @@ definitions:
     - epk
     - kid
     type: object
-  types.InputDID:
-    properties:
-      did:
-        type: string
-    required:
-    - did
-    type: object
   types.InputDIDLookup:
     properties:
       lookups:
@@ -1135,6 +1128,16 @@ definitions:
     - nonce
     - signatureBase64
     - x25519PublicKeyBase64
+    type: object
+  types.InputWebDIDLookup:
+    properties:
+      dids:
+        items:
+          type: string
+        minItems: 1
+        type: array
+    required:
+    - dids
     type: object
   types.JwsToken:
     properties:
@@ -1207,9 +1210,6 @@ definitions:
     type: object
   types.MailioAttachment:
     properties:
-      contentType:
-        description: the content type of the attachment
-        type: string
       data:
         allOf:
         - $ref: '#/definitions/types.EncryptedAttachmentData'
@@ -1217,25 +1217,9 @@ definitions:
       id:
         description: a globally unique identifier for the attachment
         type: string
-      lastModTime:
-        description: the last modification time of the attachment in UTC milliseconds
-          since epoch
-        type: integer
-      mediaType:
-        description: the media type of the attachment
-        type: string
-      name:
-        description: the name of the attachment
-        type: string
-      size:
-        description: the size of the attachment in bytes
-        type: integer
     required:
     - data
     - id
-    - mediaType
-    - name
-    - size
     type: object
   types.MailioSocial:
     properties:
@@ -1296,6 +1280,7 @@ definitions:
         description: company of the requester
         type: string
       created:
+        description: creation time
         type: integer
       description:
         description: description of the request
@@ -1310,11 +1295,16 @@ definitions:
       picture:
         type: string
       social:
-        $ref: '#/definitions/types.MailioSocial'
+        allOf:
+        - $ref: '#/definitions/types.MailioSocial'
+        description: social media links of the requester
       totalDisk:
         type: integer
       usedDisk:
         type: integer
+      whatToShare:
+        description: what the user wants to share from their personal data
+        type: string
     type: object
   types.OutputDIDLookup:
     properties:
@@ -2312,19 +2302,19 @@ paths:
       - application/json
       description: Fetch all DID documents by Web DID (local and remote)
       parameters:
-      - description: InputDID
+      - description: InputWebDIDLookup
         in: body
         name: webdid
         required: true
         schema:
-          $ref: '#/definitions/types.InputDID'
+          $ref: '#/definitions/types.InputWebDIDLookup'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/did.Document'
+            $ref: '#/definitions/types.OutputDIDLookup'
         "400":
           description: invalid DID resolution
           schema:

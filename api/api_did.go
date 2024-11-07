@@ -191,8 +191,8 @@ func (da *DIDApi) FetchDIDDocumentsByEmailHash(c *gin.Context) {
 // @Tags Messaging
 // @Accept json
 // @Produce json
-// @Param webdid body types.InputDID true "InputDID"
-// @Success 200 {object} did.Document
+// @Param webdid body types.InputWebDIDLookup true "InputWebDIDLookup"
+// @Success 200 {object} types.OutputDIDLookup
 // @Failure 404 {object} api.ApiError "DID not found"
 // @Failure 429 {object} api.ApiError "rate limit exceeded"
 // @Failure 400 {object} api.ApiError "invalid DID resolution"
@@ -204,7 +204,7 @@ func (da *DIDApi) FetchDIDByWebDID(c *gin.Context) {
 		ApiErrorf(c, http.StatusUnauthorized, "not authorized to create personal handshake")
 		return
 	}
-	var input types.InputDID
+	var input types.InputWebDIDLookup
 	if err := c.ShouldBindJSON(&input); err != nil {
 		ApiErrorf(c, http.StatusBadRequest, "invalid format")
 		return
@@ -215,33 +215,111 @@ func (da *DIDApi) FetchDIDByWebDID(c *gin.Context) {
 		ApiErrorf(c, http.StatusBadRequest, msg)
 		return
 	}
+	found := make([]*types.DIDLookup, 0)
+	notFound := make([]*types.DIDLookup, 0)
+	for _, webDid := range input.DIDs {
 
-	// get the senders DID and get the service endpoint where message was sent from
-	fromDID, fdErr := did.ParseDID(input.DID)
-	if fdErr != nil {
-		//the sender cannot be validated, no retryies are allowed. Message fails permanently
-		global.Logger.Log(fdErr.Error(), "failed to parse sender DID", input.DID)
-		ApiErrorf(c, http.StatusBadRequest, "invalid DID")
-		return
+		// get the senders DID and get the service endpoint where message was sent from
+		fromDID, fdErr := did.ParseDID(webDid)
+		if fdErr != nil {
+			//the sender cannot be validated, no retryies are allowed. Message fails permanently
+			global.Logger.Log(fdErr.Error(), "failed to parse sender DID", webDid)
+			ApiErrorf(c, http.StatusBadRequest, "invalid DID")
+			return
+		}
+
+		didDoc, err := da.ssiService.FetchDIDByWebDID(fromDID)
+		if err != nil {
+			if err == types.ErrNotFound {
+				notFound = append(notFound, &types.DIDLookup{
+					SupportsMailio: false,
+					DIDDocument:    didDoc,
+					MTPStatusCode: &types.MTPStatusCode{
+						Class:       1,
+						Subject:     1,
+						Detail:      1,
+						Description: "DID not found",
+						Timestamp:   time.Now().UnixMilli(),
+						Address:     fromDID.Fragment(),
+					},
+				})
+				continue
+			}
+			if err == types.ErrInvalidFormat {
+				notFound = append(notFound, &types.DIDLookup{
+					SupportsMailio: false,
+					DIDDocument:    didDoc,
+					MTPStatusCode: &types.MTPStatusCode{
+						Class:       1,
+						Subject:     1,
+						Detail:      7,
+						Description: "Invalid DID format",
+						Timestamp:   time.Now().UnixMilli(),
+						Address:     fromDID.String(),
+					},
+				})
+				continue
+			}
+			if err == types.ErrConflict {
+				notFound = append(notFound, &types.DIDLookup{
+					SupportsMailio: true,
+					DIDDocument:    didDoc,
+					MTPStatusCode: &types.MTPStatusCode{
+						Class:       4,
+						Subject:     4,
+						Detail:      5,
+						Description: "Rate limit exceeded on destination server",
+						Timestamp:   time.Now().UnixMilli(),
+						Address:     fromDID.String(),
+					},
+				})
+				continue
+			}
+			if err == types.ErrBadRequest {
+				notFound = append(notFound, &types.DIDLookup{
+					SupportsMailio: true,
+					DIDDocument:    didDoc,
+					MTPStatusCode: &types.MTPStatusCode{
+						Class:       4,
+						Subject:     4,
+						Detail:      0,
+						Description: "Invalid DID resolution",
+						Timestamp:   time.Now().UnixMilli(),
+						Address:     fromDID.String(),
+					},
+				})
+				continue
+			}
+			notFound = append(notFound, &types.DIDLookup{
+				SupportsMailio: false,
+				DIDDocument:    didDoc,
+				MTPStatusCode: &types.MTPStatusCode{
+					Class:       4,
+					Subject:     4,
+					Detail:      0,
+					Description: "Server error",
+					Timestamp:   time.Now().UnixMilli(),
+					Address:     fromDID.String(),
+				},
+			})
+		}
+		found = append(found, &types.DIDLookup{
+			SupportsMailio: true,
+			DIDDocument:    didDoc,
+			MTPStatusCode: &types.MTPStatusCode{
+				Class:       2,
+				Subject:     0,
+				Detail:      0,
+				Description: "DID found",
+				Timestamp:   time.Now().UnixMilli(),
+				Address:     fromDID.String(),
+			},
+		})
+	}
+	outputDIDLookup := &types.OutputDIDLookup{
+		Found:    found,
+		NotFound: notFound,
 	}
 
-	didDoc, err := da.ssiService.FetchDIDByWebDID(fromDID)
-	if err != nil {
-		if err == types.ErrNotFound {
-			ApiErrorf(c, http.StatusNotFound, "did not found")
-			return
-		}
-		if err == types.ErrConflict {
-			ApiErrorf(c, http.StatusConflict, "Rate limit exceeded. Try again later")
-			return
-		}
-		if err == types.ErrBadRequest {
-			ApiErrorf(c, http.StatusBadRequest, "error resolving did")
-			return
-		}
-		ApiErrorf(c, http.StatusInternalServerError, "error resolving did")
-		return
-	}
-
-	c.JSON(http.StatusOK, didDoc)
+	c.JSON(http.StatusOK, outputDIDLookup)
 }

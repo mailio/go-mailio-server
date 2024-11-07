@@ -1200,12 +1200,12 @@ const docTemplate = `{
                 "summary": "Fetch all DID documents by Web DID (local and remote)",
                 "parameters": [
                     {
-                        "description": "InputDID",
+                        "description": "InputWebDIDLookup",
                         "name": "webdid",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/types.InputDID"
+                            "$ref": "#/definitions/types.InputWebDIDLookup"
                         }
                     }
                 ],
@@ -1213,7 +1213,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/did.Document"
+                            "$ref": "#/definitions/types.OutputDIDLookup"
                         }
                     },
                     "400": {
@@ -2905,8 +2905,8 @@ const docTemplate = `{
                 "links"
             ],
             "properties": {
-                "decryptionKey": {
-                    "description": "the key used to decrypt the ciphertext",
+                "base64": {
+                    "description": "the base64 encoded attachment",
                     "type": "string"
                 },
                 "hash": {
@@ -3239,17 +3239,6 @@ const docTemplate = `{
                 }
             }
         },
-        "types.InputDID": {
-            "type": "object",
-            "required": [
-                "did"
-            ],
-            "properties": {
-                "did": {
-                    "type": "string"
-                }
-            }
-        },
         "types.InputDIDLookup": {
             "type": "object",
             "properties": {
@@ -3339,6 +3328,21 @@ const docTemplate = `{
                 "x25519PublicKeyBase64": {
                     "description": "public encryption key",
                     "type": "string"
+                }
+            }
+        },
+        "types.InputWebDIDLookup": {
+            "type": "object",
+            "required": [
+                "dids"
+            ],
+            "properties": {
+                "dids": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },
@@ -3443,16 +3447,9 @@ const docTemplate = `{
             "type": "object",
             "required": [
                 "data",
-                "id",
-                "mediaType",
-                "name",
-                "size"
+                "id"
             ],
             "properties": {
-                "contentType": {
-                    "description": "the content type of the attachment",
-                    "type": "string"
-                },
                 "data": {
                     "description": "the encrypted message body",
                     "allOf": [
@@ -3464,22 +3461,6 @@ const docTemplate = `{
                 "id": {
                     "description": "a globally unique identifier for the attachment",
                     "type": "string"
-                },
-                "lastModTime": {
-                    "description": "the last modification time of the attachment in UTC milliseconds since epoch",
-                    "type": "integer"
-                },
-                "mediaType": {
-                    "description": "the media type of the attachment",
-                    "type": "string"
-                },
-                "name": {
-                    "description": "the name of the attachment",
-                    "type": "string"
-                },
-                "size": {
-                    "description": "the size of the attachment in bytes",
-                    "type": "integer"
                 }
             }
         },
@@ -3571,6 +3552,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "created": {
+                    "description": "creation time",
                     "type": "integer"
                 },
                 "description": {
@@ -3591,13 +3573,22 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "social": {
-                    "$ref": "#/definitions/types.MailioSocial"
+                    "description": "social media links of the requester",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/types.MailioSocial"
+                        }
+                    ]
                 },
                 "totalDisk": {
                     "type": "integer"
                 },
                 "usedDisk": {
                     "type": "integer"
+                },
+                "whatToShare": {
+                    "description": "what the user wants to share from their personal data",
+                    "type": "string"
                 }
             }
         },
