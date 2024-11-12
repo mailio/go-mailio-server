@@ -322,7 +322,7 @@ func (ssi *SelfSovereignService) FetchDIDByWebDID(fromDID did.DID) (*did.Documen
 
 	host := global.Conf.Mailio.ServerDomain
 
-	key := fmt.Sprintf("cached_did:%s", fromDID)
+	key := fmt.Sprintf("%s%s", global.REDIS_DID_CACHE_PREFIX, fromDID)
 	didBytes, err := ssi.env.RedisClient.Get(ctx, key).Result()
 	if err != nil {
 		if err == redis.Nil {
@@ -355,7 +355,7 @@ func (ssi *SelfSovereignService) FetchDIDByWebDID(fromDID did.DID) (*did.Documen
 				return nil, mErr
 			}
 			// cache for 24 hours
-			_, cErr := ssi.env.RedisClient.Set(ctx, key, didBytes, time.Hour*24).Result()
+			_, cErr := ssi.env.RedisClient.Set(ctx, key, didBytes, global.REDIS_DID_CACHE_TTL).Result()
 			if cErr != nil {
 				global.Logger.Log(cErr.Error(), "failed to cache DID document for caching")
 				return nil, cErr
@@ -364,7 +364,7 @@ func (ssi *SelfSovereignService) FetchDIDByWebDID(fromDID did.DID) (*did.Documen
 		}
 	}
 	// document already cached, no need to cache, but just extend the expiration time
-	_, cErr := ssi.env.RedisClient.Expire(ctx, key, time.Hour*24).Result()
+	_, cErr := ssi.env.RedisClient.Expire(ctx, key, global.REDIS_DID_CACHE_TTL).Result()
 	if cErr != nil {
 		global.Logger.Log(cErr.Error(), "failed to extend expiration time for cached DID document")
 		return nil, cErr

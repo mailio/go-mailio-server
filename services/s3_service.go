@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -43,6 +44,8 @@ func (s3s *S3Service) UploadAttachment(bucket, path string, content []byte) (str
 		Body:   ioReader,
 	})
 	if uErr != nil {
+		fmt.Printf("Error uploading to S3: %v\n", uErr)
+		debug.PrintStack()
 		global.Logger.Log(uErr.Error(), "failed to upload attachment", path)
 		return "", uErr
 	}
