@@ -1,6 +1,7 @@
 package queue
 
 import (
+	"crypto/md5"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -180,13 +181,20 @@ func (msq *MessageQueue) handleReceivedDIDCommMessage(message *types.DIDCommMess
 					global.Logger.Log(dErr.Error(), "failed to decode attachment")
 					// TODO: store message_delivery error?
 				}
-				now := time.Now().UTC().Format("20061010T150405Z")
-				path := "/" + recAddress + "/" + att.Data.Hash + "_" + now + "?enc=1"
+				// calc the hash
+				md5Hash := md5.New()
+				md5Hash.Write(content)
+				att.Data.Hash = fmt.Sprintf("%x", md5Hash.Sum(nil))
+
+				now := time.Now().UTC().Format("20061010t150405")
+				path := recAddress + "/" + att.Data.Hash + "_" + now
+
 				link, uErr := msq.s3Service.UploadAttachment(global.Conf.Storage.Bucket, path, content)
 				if uErr != nil {
 					global.Logger.Log(uErr.Error(), "failed to upload attachment")
 					//TODO: store message_delivery error?
 				}
+				fmt.Printf("Attachment uploaded to %s\n", link)
 				if att.Data.Links == nil {
 					att.Data.Links = []string{}
 				}

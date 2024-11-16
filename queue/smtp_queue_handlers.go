@@ -551,7 +551,7 @@ func (msq *MessageQueue) processReceiveAttachments(email *smtptypes.Mail, recipi
 				m5 := md5.New()
 				m5.Write(att.Content)
 				m5Sum := m5.Sum(nil)
-				now := time.Now().UTC().Format("20061010T150405Z")
+				now := time.Now().UTC().Format("20061010t150405")
 				fileMd5 := hex.EncodeToString(m5Sum)
 				// check for malware of the attachment
 				if msq.malwareService.IsMalware(fileMd5) {
@@ -559,7 +559,7 @@ func (msq *MessageQueue) processReceiveAttachments(email *smtptypes.Mail, recipi
 					global.Logger.Log("malware detected", "filename", att.Filename, "md5", fileMd5)
 					return fmt.Errorf("malware detected: %w", asynq.SkipRetry)
 				}
-				path := "/" + recipientAddress + "/" + fileMd5 + "_" + now
+				path := recipientAddress + "/" + fileMd5 + "_" + now
 				p, err := msq.s3Service.UploadAttachment(global.Conf.Storage.Bucket, path, att.Content)
 				if err != nil {
 					fmt.Printf("Error uploading to S3: %v\n", err)

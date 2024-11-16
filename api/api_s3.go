@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/gin-gonic/gin"
@@ -65,26 +66,27 @@ func (pa *S3Api) GetPresignedUrlPut(c *gin.Context) {
 	var request v4.PresignedHTTPRequest
 	var err error
 
-	currentTime := time.Now().Format("20060102T150405")
-
-	m5 := md5.New()
-	m5.Write([]byte(objectKey))
-	m5Sum := m5.Sum(nil)
-	path := address.(string) + "/" + hex.EncodeToString(m5Sum) + "_" + currentTime
-
 	if method == "put" {
+		currentTime := time.Now().Format("20060102t150405")
+
+		m5 := md5.New()
+		m5.Write([]byte(objectKey))
+		m5Sum := m5.Sum(nil)
+		path := address.(string) + "/" + hex.EncodeToString(m5Sum) + "_" + currentTime
+
 		r, e := pa.env.S3PresignClient.PresignPutObject(ctx, &s3.PutObjectInput{
-			Bucket: &global.Conf.Storage.Bucket,
-			Key:    &path,
+			Bucket: aws.String(global.Conf.Storage.Bucket),
+			Key:    aws.String(path),
 		}, func(opts *s3.PresignOptions) {
 			opts.Expires = time.Duration(lifetimeSecs * int64(time.Second))
 		})
 		request = *r
 		err = e
 	} else {
+		filepath := address.(string) + "/" + objectKey
 		r, e := pa.env.S3PresignClient.PresignGetObject(ctx, &s3.GetObjectInput{
-			Bucket: &global.Conf.Storage.Bucket,
-			Key:    &objectKey,
+			Bucket: aws.String(global.Conf.Storage.Bucket),
+			Key:    aws.String(filepath),
 		}, func(opts *s3.PresignOptions) {
 			opts.Expires = time.Duration(lifetimeSecs * int64(time.Second))
 		})
