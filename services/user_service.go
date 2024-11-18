@@ -44,7 +44,7 @@ func NewUserService(repoSelector *repository.CouchDBSelector, env *types.Environ
 		SetDebug(false)
 
 	upService := NewUserProfileService(repoSelector, env)
-	ssiService := NewSelfSovereignService(repoSelector)
+	ssiService := NewSelfSovereignService(repoSelector, env)
 
 	return &UserService{
 		repoSelector:       repoSelector,

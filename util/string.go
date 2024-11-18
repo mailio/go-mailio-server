@@ -3,6 +3,7 @@ package util
 import (
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"strconv"
 	"strings"
 )
@@ -35,4 +36,12 @@ func FixAndDecodeURLBase64(base64String string) ([]byte, error) {
 
 func IsNilOrEmpty(s *string) bool {
 	return s == nil || *s == ""
+}
+
+func DeepCopy(src, dest interface{}) error {
+	data, err := json.Marshal(src)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(data, dest)
 }

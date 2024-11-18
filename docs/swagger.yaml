@@ -600,7 +600,7 @@ definitions:
         description: attachments to the message                                                //
           MTP status message
         items:
-          $ref: '#/definitions/types.EncryptedAttachment'
+          $ref: '#/definitions/types.MailioAttachment'
         type: array
       body:
         allOf:
@@ -670,7 +670,6 @@ definitions:
         type: string
     required:
     - from
-    - id
     - type
     type: object
   types.DIDCommRequest:
@@ -827,42 +826,10 @@ definitions:
       timestamp:
         type: integer
     type: object
-  types.EncryptedAttachment:
-    properties:
-      contentType:
-        description: the content type of the attachment
-        type: string
-      data:
-        allOf:
-        - $ref: '#/definitions/types.EncryptedAttachmentData'
-        description: the encrypted message body
-      id:
-        description: a globally unique identifier for the attachment
-        type: string
-      lastModTime:
-        description: the last modification time of the attachment in UTC milliseconds
-          since epoch
-        type: integer
-      mediaType:
-        description: the media type of the attachment
-        type: string
-      name:
-        description: the name of the attachment
-        type: string
-      size:
-        description: the size of the attachment in bytes
-        type: integer
-    required:
-    - data
-    - id
-    - mediaType
-    - name
-    - size
-    type: object
   types.EncryptedAttachmentData:
     properties:
-      decryptionKey:
-        description: the key used to decrypt the ciphertext
+      base64:
+        description: the base64 encoded attachment
         type: string
       hash:
         description: the hash of the attachment
@@ -878,6 +845,9 @@ definitions:
     type: object
   types.EncryptedBody:
     properties:
+      aad:
+        description: additional authenticated data
+        type: string
       ciphertext:
         description: the encrypted message
         type: string
@@ -893,19 +863,15 @@ definitions:
           $ref: '#/definitions/types.Recipient'
         minItems: 1
         type: array
-      signature:
-        allOf:
-        - $ref: '#/definitions/types.Signature'
-        description: JWS digital signature
       tag:
         description: integrity check on the encrypted message
         type: string
     required:
+    - aad
     - ciphertext
     - iv
     - protected
     - recipients
-    - signature
     - tag
     type: object
   types.Epk:
@@ -1163,6 +1129,16 @@ definitions:
     - signatureBase64
     - x25519PublicKeyBase64
     type: object
+  types.InputWebDIDLookup:
+    properties:
+      dids:
+        items:
+          type: string
+        minItems: 1
+        type: array
+    required:
+    - dids
+    type: object
   types.JwsToken:
     properties:
       token:
@@ -1232,6 +1208,54 @@ definitions:
     - detail
     - subject
     type: object
+  types.MailioAttachment:
+    properties:
+      data:
+        allOf:
+        - $ref: '#/definitions/types.EncryptedAttachmentData'
+        description: the encrypted message body
+      id:
+        description: a globally unique identifier for the attachment
+        type: string
+    required:
+    - data
+    - id
+    type: object
+  types.MailioSocial:
+    properties:
+      clubhouse:
+        type: string
+      discord:
+        type: string
+      facebook:
+        type: string
+      github:
+        type: string
+      instagram:
+        type: string
+      linkedin:
+        type: string
+      other:
+        type: string
+      signal:
+        type: string
+      skype:
+        type: string
+      slack:
+        type: string
+      snapchat:
+        type: string
+      telegram:
+        type: string
+      tiktok:
+        type: string
+      twitter:
+        type: string
+      whatsapp:
+        type: string
+      zoom:
+        type: string
+    type: object
   types.NonceResponse:
     properties:
       nonce:
@@ -1252,12 +1276,35 @@ definitions:
     properties:
       address:
         type: string
+      company:
+        description: company of the requester
+        type: string
       created:
+        description: creation time
         type: integer
+      description:
+        description: description of the request
+        type: string
+      displayName:
+        type: string
+      jobTitle:
+        description: job title of the requester
+        type: string
+      phone:
+        type: string
+      picture:
+        type: string
+      social:
+        allOf:
+        - $ref: '#/definitions/types.MailioSocial'
+        description: social media links of the requester
       totalDisk:
         type: integer
       usedDisk:
         type: integer
+      whatToShare:
+        description: what the user wants to share from their personal data
+        type: string
     type: object
   types.OutputDIDLookup:
     properties:
@@ -1309,25 +1356,6 @@ definitions:
         type: string
       emailHash:
         description: scrypt hash of the email address
-        type: string
-    type: object
-  types.Signature:
-    properties:
-      payload:
-        description: The payload that was signed, which is base64URL encoded.
-        type: string
-      signatures:
-        items:
-          $ref: '#/definitions/types.SignatureDetail'
-        type: array
-    type: object
-  types.SignatureDetail:
-    properties:
-      protected:
-        description: Base64URL encoded JSON string containing the header parameters
-          used for the signature
-        type: string
-      signature:
         type: string
     type: object
   types.SmartKeyPayload:
@@ -2191,7 +2219,7 @@ paths:
     post:
       consumes:
       - application/json
-      description: Fetch all DID documents (local and remote)
+      description: Fetch all DID documents by email hash (local and remote)
       parameters:
       - description: InputDIDLookup
         in: body
@@ -2210,6 +2238,10 @@ paths:
           description: invalid email address
           schema:
             $ref: '#/definitions/api.ApiError'
+        "404":
+          description: DID not found
+          schema:
+            $ref: '#/definitions/api.ApiError'
         "429":
           description: rate limit exceeded
           schema:
@@ -2220,7 +2252,7 @@ paths:
             $ref: '#/definitions/api.ApiError'
       security:
       - Bearer: []
-      summary: Fetch all DID documents (local and remote)
+      summary: Fetch all DID documents by email hash (local and remote)
       tags:
       - Messaging
   /api/v1/resolve/domain:
@@ -2262,6 +2294,46 @@ paths:
       security:
       - Bearer: []
       summary: Resolve domain from email address (smtp or mailio)
+      tags:
+      - Messaging
+  /api/v1/resolve/webdid:
+    post:
+      consumes:
+      - application/json
+      description: Fetch all DID documents by Web DID (local and remote)
+      parameters:
+      - description: InputWebDIDLookup
+        in: body
+        name: webdid
+        required: true
+        schema:
+          $ref: '#/definitions/types.InputWebDIDLookup'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.OutputDIDLookup'
+        "400":
+          description: invalid DID resolution
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "404":
+          description: DID not found
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "429":
+          description: rate limit exceeded
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "500":
+          description: server error
+          schema:
+            $ref: '#/definitions/api.ApiError'
+      security:
+      - Bearer: []
+      summary: Fetch all DID documents by Web DID (local and remote)
       tags:
       - Messaging
   /api/v1/s3:

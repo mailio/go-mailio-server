@@ -104,8 +104,8 @@ func ConvertFromSmtpEmail(email *smtptypes.Mail) (*types.SmtpEmailInput, error) 
 // ConvertSMTP converts the input email to the required format for the SMTP Mailio interface.
 // It takes an email as a parameter and returns the converted email format or an error.
 //
-// @param email - the email input to be converted
-// @return - converted email format or an error if conversion fails
+// param email - the email input to be converted
+// return - converted email format or an error if conversion fails
 // Errors:
 // - "invalid email address" if the FROM email address is invalid (ErrInvalidFormat)
 // - "no address" if any invalid addressess are provided for recipients (to, cc, bcc) (ErrInvalidRecipient)

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net/mail"
 	"net/url"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -320,7 +321,7 @@ func (msq *MessageQueue) ReceiveSMTPMessage(email *smtptypes.Mail, taskId string
 				securityStatus = "malware"
 			}
 			global.Logger.Log("error processing attachments", paErr.Error())
-			sendBounce(to, email, smtpHandler, "5.3.4", "Error processing attachments")
+			sendBounce(to, email, smtpHandler, "4.5.1", "Local error in processing")
 			continue
 		}
 
@@ -518,25 +519,39 @@ func isReply(email *smtptypes.Mail) bool {
 //	types.ErrMessageTooLarge - If an attachment is larger than 30MB, the function returns an error.
 func (msq *MessageQueue) processReceiveAttachments(email *smtptypes.Mail, recipientAddress string) error {
 	if len(email.Attachments) > 0 {
-		for i, att := range email.Attachments {
+		uploadedAttachments := make([]*smtptypes.SmtpAttachment, 0)
+		for _, att := range email.Attachments {
 			if att.Content == nil {
 				global.Logger.Log("attachment content is nil", att.ContentID, "filename:", att.Filename, "messageId", email.MessageId)
 				continue
 			}
 			if att.Content != nil {
-				if len(att.Content) < 30*1024*1024 {
+
+				if len(att.Content) > 30*1024*1024 {
 					global.Logger.Log("attachment content is too large", att.ContentID, "filename:", att.Filename, "messageId", email.MessageId, "size: ", len(att.Content))
 					// deny attachments larger than 30MB
 					return types.ErrMessageTooLarge
 				}
+				uploadedAttachment := &smtptypes.SmtpAttachment{
+					ContentType: att.ContentType,
+					ContentID:   att.ContentID,
+					Filename:    att.Filename,
+				}
+
 				if att.Filename == "" {
-					att.Filename = "attachmentunknown"
+					uploadedAttachment.Filename = "unknown"
+				}
+
+				if util.DetectInlineContentType(att.Filename) {
+					uploadedAttachment.ContentDisposition = fmt.Sprintf(`inline; filename="%s"`, att.Filename)
+				} else {
+					uploadedAttachment.ContentDisposition = fmt.Sprintf(`attachment; filename="%s"`, att.Filename)
 				}
 
 				m5 := md5.New()
 				m5.Write(att.Content)
 				m5Sum := m5.Sum(nil)
-				now := time.Now().UTC().Format("20061010T150405Z")
+				now := time.Now().UTC().Format("20061010t150405")
 				fileMd5 := hex.EncodeToString(m5Sum)
 				// check for malware of the attachment
 				if msq.malwareService.IsMalware(fileMd5) {
@@ -545,21 +560,18 @@ func (msq *MessageQueue) processReceiveAttachments(email *smtptypes.Mail, recipi
 					return fmt.Errorf("malware detected: %w", asynq.SkipRetry)
 				}
 				path := recipientAddress + "/" + fileMd5 + "_" + now
-
 				p, err := msq.s3Service.UploadAttachment(global.Conf.Storage.Bucket, path, att.Content)
 				if err != nil {
+					fmt.Printf("Error uploading to S3: %v\n", err)
+					debug.PrintStack()
 					global.Logger.Log(err.Error(), "failed to upload attachment", path)
 					return fmt.Errorf("failed uploading attachment: %v", err)
 				}
-				email.Attachments[i].ContentURL = &p
-				if util.DetectInlineContentType(att.Filename) {
-					att.ContentDisposition = fmt.Sprintf(`inline; filename="%s"`, att.Filename)
-				} else {
-					att.ContentDisposition = fmt.Sprintf(`attachment; filename="%s"`, att.Filename)
-				}
-				email.Attachments[i].Content = []byte{} // clear the content
+				uploadedAttachment.ContentURL = &p
+				uploadedAttachments = append(uploadedAttachments, uploadedAttachment)
 			}
 		}
+		email.Attachments = uploadedAttachments
 	}
 	return nil
 }

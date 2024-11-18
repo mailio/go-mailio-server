@@ -20,6 +20,10 @@ type InputRegister struct {
 	X25519PublicKeyBase64 string `json:"x25519PublicKeyBase64" validate:"required"` // public encryption key
 }
 
+type InputWebDIDLookup struct {
+	DIDs []string `json:"dids" validate:"required,min=1"`
+}
+
 // for DID resolution
 type InputDID struct {
 	DID string `json:"did" validate:"required"`

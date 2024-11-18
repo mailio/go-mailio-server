@@ -138,19 +138,20 @@ func (did *DIDApi) GetDIDDocument(c *gin.Context) {
 	c.JSON(http.StatusOK, resolved)
 }
 
-// @Summary Fetch all DID documents (local and remote)
-// @Description Fetch all DID documents (local and remote)
+// @Summary Fetch all DID documents by email hash (local and remote)
+// @Description Fetch all DID documents by email hash (local and remote)
 // @Security Bearer
 // @Tags Messaging
 // @Accept json
 // @Produce json
 // @Param lookups body types.InputDIDLookup true "InputDIDLookup"
 // @Success 200 {object} types.OutputDIDLookup
+// @Failure 404 {object} api.ApiError "DID not found"
 // @Failure 429 {object} api.ApiError "rate limit exceeded"
 // @Failure 400 {object} api.ApiError "invalid email address"
 // @Failure 500 {object} api.ApiError "error fetching did documents"
 // @Router /api/v1/resolve/did [post]
-func (da *DIDApi) FetchDIDDocuments(c *gin.Context) {
+func (da *DIDApi) FetchDIDDocumentsByEmailHash(c *gin.Context) {
 	address, exists := c.Get("subjectAddress")
 	if !exists {
 		ApiErrorf(c, http.StatusUnauthorized, "not authorized to create personal handshake")
@@ -177,8 +178,148 @@ func (da *DIDApi) FetchDIDDocuments(c *gin.Context) {
 		ApiErrorf(c, http.StatusInternalServerError, "error fetching did documents")
 		return
 	}
+
 	c.JSON(http.StatusOK, types.OutputDIDLookup{
 		Found:    found,
 		NotFound: notFound,
 	})
+}
+
+// @Summary Fetch all DID documents by Web DID (local and remote)
+// @Description Fetch all DID documents by Web DID (local and remote)
+// @Security Bearer
+// @Tags Messaging
+// @Accept json
+// @Produce json
+// @Param webdid body types.InputWebDIDLookup true "InputWebDIDLookup"
+// @Success 200 {object} types.OutputDIDLookup
+// @Failure 404 {object} api.ApiError "DID not found"
+// @Failure 429 {object} api.ApiError "rate limit exceeded"
+// @Failure 400 {object} api.ApiError "invalid DID resolution"
+// @Failure 500 {object} api.ApiError "server error"
+// @Router /api/v1/resolve/webdid [post]
+func (da *DIDApi) FetchDIDByWebDID(c *gin.Context) {
+	_, exists := c.Get("subjectAddress")
+	if !exists {
+		ApiErrorf(c, http.StatusUnauthorized, "not authorized to create personal handshake")
+		return
+	}
+	var input types.InputWebDIDLookup
+	if err := c.ShouldBindJSON(&input); err != nil {
+		ApiErrorf(c, http.StatusBadRequest, "invalid format")
+		return
+	}
+	err := da.validate.Struct(input)
+	if err != nil {
+		msg := util.ValidationErrorToMessage(err)
+		ApiErrorf(c, http.StatusBadRequest, msg)
+		return
+	}
+	found := make([]*types.DIDLookup, 0)
+	notFound := make([]*types.DIDLookup, 0)
+	for _, webDid := range input.DIDs {
+
+		// get the senders DID and get the service endpoint where message was sent from
+		fromDID, fdErr := did.ParseDID(webDid)
+		if fdErr != nil {
+			//the sender cannot be validated, no retryies are allowed. Message fails permanently
+			global.Logger.Log(fdErr.Error(), "failed to parse sender DID", webDid)
+			ApiErrorf(c, http.StatusBadRequest, "invalid DID")
+			return
+		}
+
+		didDoc, err := da.ssiService.FetchDIDByWebDID(fromDID)
+		if err != nil {
+			if err == types.ErrNotFound {
+				notFound = append(notFound, &types.DIDLookup{
+					SupportsMailio: false,
+					DIDDocument:    didDoc,
+					MTPStatusCode: &types.MTPStatusCode{
+						Class:       1,
+						Subject:     1,
+						Detail:      1,
+						Description: "DID not found",
+						Timestamp:   time.Now().UnixMilli(),
+						Address:     fromDID.Fragment(),
+					},
+				})
+				continue
+			}
+			if err == types.ErrInvalidFormat {
+				notFound = append(notFound, &types.DIDLookup{
+					SupportsMailio: false,
+					DIDDocument:    didDoc,
+					MTPStatusCode: &types.MTPStatusCode{
+						Class:       1,
+						Subject:     1,
+						Detail:      7,
+						Description: "Invalid DID format",
+						Timestamp:   time.Now().UnixMilli(),
+						Address:     fromDID.String(),
+					},
+				})
+				continue
+			}
+			if err == types.ErrConflict {
+				notFound = append(notFound, &types.DIDLookup{
+					SupportsMailio: true,
+					DIDDocument:    didDoc,
+					MTPStatusCode: &types.MTPStatusCode{
+						Class:       4,
+						Subject:     4,
+						Detail:      5,
+						Description: "Rate limit exceeded on destination server",
+						Timestamp:   time.Now().UnixMilli(),
+						Address:     fromDID.String(),
+					},
+				})
+				continue
+			}
+			if err == types.ErrBadRequest {
+				notFound = append(notFound, &types.DIDLookup{
+					SupportsMailio: true,
+					DIDDocument:    didDoc,
+					MTPStatusCode: &types.MTPStatusCode{
+						Class:       4,
+						Subject:     4,
+						Detail:      0,
+						Description: "Invalid DID resolution",
+						Timestamp:   time.Now().UnixMilli(),
+						Address:     fromDID.String(),
+					},
+				})
+				continue
+			}
+			notFound = append(notFound, &types.DIDLookup{
+				SupportsMailio: false,
+				DIDDocument:    didDoc,
+				MTPStatusCode: &types.MTPStatusCode{
+					Class:       4,
+					Subject:     4,
+					Detail:      0,
+					Description: "Server error",
+					Timestamp:   time.Now().UnixMilli(),
+					Address:     fromDID.String(),
+				},
+			})
+		}
+		found = append(found, &types.DIDLookup{
+			SupportsMailio: true,
+			DIDDocument:    didDoc,
+			MTPStatusCode: &types.MTPStatusCode{
+				Class:       2,
+				Subject:     0,
+				Detail:      0,
+				Description: "DID found",
+				Timestamp:   time.Now().UnixMilli(),
+				Address:     fromDID.String(),
+			},
+		})
+	}
+	outputDIDLookup := &types.OutputDIDLookup{
+		Found:    found,
+		NotFound: notFound,
+	}
+
+	c.JSON(http.StatusOK, outputDIDLookup)
 }

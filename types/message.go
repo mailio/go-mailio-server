@@ -22,18 +22,17 @@ var (
 // MailioMessage is a struct that is meant to be stored in the database
 type MailioMessage struct {
 	BaseDocument   `json:",inline"`
-	ID             string          `json:"id" validate:"required"`   // globally unique message identifier UUID (RFC 4122) recommended
-	From           string          `json:"from" validate:"required"` // either the sender's DID or the sender's email address
-	DIDCommMessage *DIDCommMessage `json:"didCommMessage,omitempty"` // the DIDComm message
-	// SmtpMessage    *SMTPMessage     `json:"smtpMessage,omitempty"`       // the SMTP message
-	Folder         string `json:"folder" validate:"required"`                                                      // the folder where the message is stored
-	Created        int64  `json:"created" validate:"required"`                                                     // time of message creation in UTC milliseconds since epoch
-	Modified       int64  `json:"modified,omitempty"`                                                              // time of message modification in UTC milliseconds since epoch
-	IsAutomated    bool   `json:"isAutomated,omitempty"`                                                           // true if the message is automated
-	IsForwarded    bool   `json:"isForwarded,omitempty"`                                                           // true if the message is forwarded
-	IsReplied      bool   `json:"isReplied,omitempty"`                                                             // true if the message is replied
-	IsRead         bool   `json:"isRead,omitempty"`                                                                // true if the message is read
-	SecurityStatus string `json:"securityStatus,omitempty" validate:"omitempty,oneof=clean malware spam phishing"` // the security status of the message (optional)
+	ID             string          `json:"id" validate:"required"`                                                          // globally unique message identifier UUID (RFC 4122) recommended
+	From           string          `json:"from" validate:"required"`                                                        // either the sender's DID or the sender's email address
+	DIDCommMessage *DIDCommMessage `json:"didCommMessage,omitempty"`                                                        // the DIDComm message
+	Folder         string          `json:"folder" validate:"required"`                                                      // the folder where the message is stored
+	Created        int64           `json:"created" validate:"required"`                                                     // time of message creation in UTC milliseconds since epoch
+	Modified       int64           `json:"modified,omitempty"`                                                              // time of message modification in UTC milliseconds since epoch
+	IsAutomated    bool            `json:"isAutomated,omitempty"`                                                           // true if the message is automated
+	IsForwarded    bool            `json:"isForwarded,omitempty"`                                                           // true if the message is forwarded
+	IsReplied      bool            `json:"isReplied,omitempty"`                                                             // true if the message is replied
+	IsRead         bool            `json:"isRead,omitempty"`                                                                // true if the message is read
+	SecurityStatus string          `json:"securityStatus,omitempty" validate:"omitempty,oneof=clean malware spam phishing"` // the security status of the message (optional)
 }
 
 type ToEmail struct {
@@ -90,20 +89,15 @@ type PlainBodyDelivery struct {
 
 // EncryptedMailioAttachment is a struct that represents an encrypted attachment according to JWE standard
 type MailioAttachment struct {
-	ID          string                   `json:"id" validate:"required"`                                              // a globally unique identifier for the attachment
-	MediaType   string                   `json:"mediaType" validate:"required,eq=application/didcomm-encrypted+json"` // the media type of the attachment
-	ContentType string                   `json:"contentType,omitempty"`                                               // the content type of the attachment
-	LastModTime int64                    `json:"lastModTime,omitempty"`                                               // the last modification time of the attachment in UTC milliseconds since epoch
-	Size        int64                    `json:"size" validate:"required"`                                            // the size of the attachment in bytes
-	Name        string                   `json:"name" validate:"required"`                                            // the name of the attachment
-	Data        *EncryptedAttachmentData `json:"data" validate:"required"`                                            // the encrypted message body
+	ID   string                   `json:"id" validate:"required"`   // a globally unique identifier for the attachment
+	Data *EncryptedAttachmentData `json:"data" validate:"required"` // the encrypted message body
 }
 
 // EncryptedAttachmentData JWE encrypted attachment data
 type EncryptedAttachmentData struct {
-	Hash          string   `json:"hash,omitempty"`                  // the hash of the attachment
-	DecryptionKey string   `json:"decryptionKey"`                   // the key used to decrypt the ciphertext
-	Links         []string `json:"links" validate:"required,min=1"` // the links to the attachment
+	Hash   string   `json:"hash,omitempty"`                  // the hash of the attachment
+	Base64 string   `json:"base64,omitempty"`                // the base64 encoded attachment
+	Links  []string `json:"links" validate:"required,min=1"` // the links to the attachment
 }
 
 // Recipient is a struct that represents a recipient of an encrypted message
