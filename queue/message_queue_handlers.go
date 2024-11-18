@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/hibiken/asynq"
@@ -280,5 +282,141 @@ func (msq *MessageQueue) handleDIDCommDelivery(message *types.DIDCommMessage) er
 		msq.deliveryService.SaveBulkMtpStatusCodes(message.ID, plainBody.StatusCodes)
 	}
 
+	return nil
+}
+
+/*
+*
+Sends an encrypted DIDComm message to the specified recipient(s).
+The message is validated, logged, and optionally saved in a local database.
+It handles attachments, validates recipient addresses, and routes the message to the appropriate endpoints.
+*
+*/
+func (msq *MessageQueue) DIDCommSendMessage(userAddress string, input *types.DIDCommMessageInput) error {
+	message := input.DIDCommMessage
+	global.Logger.Log("sending from", userAddress, "intent", message.Intent)
+
+	if message.Thid == "" {
+		message.Thid = message.ID // if there is no thid, use message id
+	}
+
+	// struct to store in local database
+	mailioMessage := types.MailioMessage{
+		ID:             message.ID,
+		From:           message.From,
+		DIDCommMessage: &message,
+		Created:        time.Now().UnixMilli(),
+		Folder:         types.MailioFolderSent,
+		IsRead:         true, // sent messages are by default read
+	}
+
+	//validate recipients (checks if they are valid DIDs and if they are reachable via HTTP/HTTPS)
+	// alternatively validateRecipientDIDFromEmails can be used to validate recipients from emails
+	recipientDidMap := map[string]did.Document{}
+	mtpStatusErrors := []*types.MTPStatusCode{}
+	if len(message.To) > 0 {
+		recMap, mtpErrors := msq.validateRecipientDIDs(&message)
+		recipientDidMap = recMap
+		mtpStatusErrors = mtpErrors
+	} else if len(message.ToEmails) > 0 {
+		recMap, mtpErrors := msq.validateRecipientDIDFromEmails(&message)
+		for k, v := range recMap {
+			recipientDidMap[k] = v
+		}
+		mtpStatusErrors = append(mtpStatusErrors, mtpErrors...)
+	} else {
+		// no recipients
+		mtpStatusErrors = append(mtpStatusErrors, types.NewMTPStatusCode(5, 1, 1, "no recipients"))
+	}
+
+	// collect endpoints
+	endpointMap := make(map[string]string)
+
+	// iterating over recipient map and sending messages
+	for _, didDoc := range recipientDidMap {
+		// didDoc ID has format e.g. did:mailio:0xabc, while from has web format (e.g. did:web:mail.io#0xabc)
+		// find a service endpoint for a recipient from DID Document
+		endpoint := util.ExtractDIDMessageEndpoint(&didDoc)
+		if endpoint == "" {
+			// Bad destination address syntax
+			mtpStatusErrors = append(mtpStatusErrors, types.NewMTPStatusCode(5, 1, 3, fmt.Sprintf("unable to route message to %s for %s", endpoint, didDoc.ID.String())))
+			continue
+		}
+		endpointMap[endpoint] = endpoint
+	}
+
+	// download attachment data from s3
+	// a deep copy of the sending object (message) is made to avoid modifying the original object
+	// this is due to the attachments are being attached to the original message instad reference to the local storage
+	var messageDeepCopy types.DIDCommMessage
+	cpErr := util.DeepCopy(&message, &messageDeepCopy)
+	if cpErr != nil {
+		global.Logger.Log(cpErr.Error(), "failed to copy message")
+		return fmt.Errorf("failed to copy message: %v: %w", cpErr, asynq.SkipRetry)
+	}
+	for _, att := range messageDeepCopy.Attachments {
+		if len(att.Data.Links) > 0 {
+			for _, link := range att.Data.Links {
+				if strings.Contains(link, "?enc=1") {
+					url := strings.Replace(link, "?enc=1", "", 1)
+					content, dErr := msq.s3Service.DownloadAttachment(url)
+					if dErr != nil {
+						global.Logger.Log(dErr.Error(), "failed to download attachment")
+						// TODO: store message_delivery error?
+						return fmt.Errorf("failed downloading attachment: %v: %w", dErr, asynq.SkipRetry)
+					}
+					att.Data.Base64 = base64.StdEncoding.EncodeToString(content)
+				}
+			}
+			att.Data.Links = nil
+		}
+	}
+
+	// send message to each endpoint extracted from DID documents
+	for _, ep := range endpointMap {
+		code, sendErr := msq.httpSend(&messageDeepCopy, ep)
+		if sendErr != nil {
+			if sendErr == types.ErrContinue {
+				// on to the next message if this one failed
+				mtpStatusErrors = append(mtpStatusErrors, code)
+				continue
+			}
+			return sendErr
+		}
+	}
+	// if no errors, append success message
+	if len(mtpStatusErrors) == 0 {
+		mtpStatusErrors = append(mtpStatusErrors, types.NewMTPStatusCode(2, 0, 0, "message sent"))
+	}
+	// store mailioMessage in database (sent folder of the sender)
+	_, sErr := msq.userService.SaveMessage(userAddress, &mailioMessage)
+	if sErr != nil {
+		global.Logger.Log(sErr.Error(), "(sendMessage) failed to save message", userAddress)
+		return sErr
+	}
+	msq.deliveryService.SaveBulkMtpStatusCodes(message.ID, mtpStatusErrors)
+
+	// delete attachments that client wants to delete
+	// remove possible attachments to be removed
+	// (the client reports those when only 1 type of recipient is present, but both encrypted and plain attachments are uploaded)
+	for _, att := range input.DeleteAttachments {
+		// delete attachment
+		link, lpErr := url.Parse(att)
+		if lpErr != nil {
+			global.Logger.Log(lpErr.Error(), "failed to parse attachment link", att)
+			continue
+		}
+		// extract bucket and path (the path is not completely trusted. So only in userSender folder can it be deleted)
+		parts := strings.Split(link.Path, "/")
+		fileKey := userAddress + "/" + parts[len(parts)-1]
+		if fileKey == "" {
+			global.Logger.Log("error", "invalid attachment url", "attachmentUrl", att)
+			return fmt.Errorf("invalid attachment url: %v: %w", lpErr, asynq.SkipRetry)
+		}
+		dErr := msq.s3Service.DeleteAttachment(global.Conf.Storage.Bucket, fileKey)
+		if dErr != nil {
+			global.Logger.Log(dErr.Error(), "failed to delete attachment", att)
+		}
+	}
 	return nil
 }
