@@ -35,6 +35,23 @@ func (msq *MessageQueue) SendSMTPMessage(fromMailioAddress string, email *types.
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
+	// check if the user canceled the email sending
+	taskCanceled, tsErr := msq.env.RedisClient.Get(ctx, fmt.Sprintf("cancel:%s", taskId)).Result()
+	if tsErr != nil {
+		if tsErr != redis.Nil {
+			global.Logger.Log(tsErr.Error(), "failed to retrieve task status", taskId)
+		}
+	}
+	// if the user canceled the email sending, terminate function
+	if taskCanceled != "" {
+		_, tcdErr := msq.env.RedisClient.Del(ctx, fmt.Sprintf("cancel:%s", taskId)).Result()
+		if tcdErr != nil {
+			global.Logger.Log(tcdErr.Error(), "failed to delete task status", taskId)
+		}
+		global.Logger.Log("task canceled", "task canceled", taskId)
+		return nil
+	}
+
 	securityStatus := "clean" // default
 	smtpEmail, smtpConvErr := util.ConvertToSmtpEmail(*email)
 	if smtpConvErr != nil {
@@ -55,24 +72,7 @@ func (msq *MessageQueue) SendSMTPMessage(fromMailioAddress string, email *types.
 		}
 	}
 
-	// check if the user canceled the email sending
-	taskCanceled, tsErr := msq.env.RedisClient.Get(ctx, fmt.Sprintf("cancel:%s", taskId)).Result()
-	if tsErr != nil {
-		if tsErr != redis.Nil {
-			global.Logger.Log(tsErr.Error(), "failed to retrieve task status", taskId)
-		}
-	}
-	// if the user canceled the email sending, terminate function
-	if taskCanceled != "" {
-		_, tcdErr := msq.env.RedisClient.Del(ctx, fmt.Sprintf("cancel:%s", taskId)).Result()
-		if tcdErr != nil {
-			global.Logger.Log(tcdErr.Error(), "failed to delete task status", taskId)
-		}
-		global.Logger.Log("task canceled", "task canceled", taskId)
-		return nil
-	}
-
-	// support multiple domains (based on the FROM domain use the handler for instance)
+	// support multiple emails domains (based on the FROM domain use the handler for instance)
 	domain := strings.Split(smtpEmail.From.Address, "@")[1]
 	if !util.IsSupportedSmtpDomain(domain) {
 		global.Logger.Log("unsupported domain", domain)
@@ -159,13 +159,15 @@ func (msq *MessageQueue) SendSMTPMessage(fromMailioAddress string, email *types.
 		return fmt.Errorf("failed saving message: %v: %w", msErr, asynq.SkipRetry)
 	}
 
-	docID, err := mgHandler.SendMimeMail(smtpEmail.From, mime, smtpEmail.To)
-	if err != nil {
-		global.Logger.Log(err.Error(), "failed to send smtp email")
-		//TODO: store the email in the inbox folder if sending fails
-		return fmt.Errorf("failed sending smtp email: %v: %w", err, asynq.SkipRetry)
-	}
-	global.Logger.Log(fmt.Sprintf("smtp message sent: %s", docID), "message sent")
+	//TODO: uncomment when the email sending is enabled
+	fmt.Printf("sending email: %s\n", mime)
+	// docID, err := mgHandler.SendMimeMail(smtpEmail.From, mime, smtpEmail.To)
+	// if err != nil {
+	// 	global.Logger.Log(err.Error(), "failed to send smtp email")
+	// 	//TODO: store the email in the inbox folder if sending fails
+	// 	return fmt.Errorf("failed sending smtp email: %v: %w", err, asynq.SkipRetry)
+	// }
+	// global.Logger.Log(fmt.Sprintf("smtp message sent: %s", docID), "message sent")
 
 	// remove possible attachments to be removed (the cient reports those when only 1 type of recipient is present, but both encrypted and plain attachments is uploaded)
 	for _, att := range email.DeleteAttachments {
@@ -586,24 +588,26 @@ func (msq *MessageQueue) processReceiveAttachments(email *smtptypes.Mail, recipi
 //	email - A pointer to the Mail object containing the email and its attachments.
 //	mailioAddress - A string representing the mailio address for constructing the attachment path.
 func (msq *MessageQueue) processSendAttachments(email *smtptypes.Mail) error {
+	var newAttachments []*smtptypes.SmtpAttachment
 	if len(email.Attachments) > 0 {
-		for i, att := range email.Attachments {
+		for _, att := range email.Attachments {
 			if att.ContentURL == nil {
 				continue
+			}
+			var newAtt smtptypes.SmtpAttachment
+			dcErr := util.DeepCopy(att, &newAtt)
+			if dcErr != nil {
+				global.Logger.Log(dcErr.Error(), "failed to copy attachment")
+				return fmt.Errorf("failed copying attachment: %v: %w", dcErr, asynq.SkipRetry)
 			}
 			content, dErr := msq.s3Service.DownloadAttachment(*att.ContentURL)
 			if dErr != nil {
 				global.Logger.Log(dErr.Error(), "failed to download attachment")
 				return fmt.Errorf("failed downloading attachment: %v: %w", dErr, asynq.SkipRetry)
 			}
-			email.Attachments[i].Content = content
-			isInlineContentDispositon := util.DetectInlineContentType(att.Filename)
-			if isInlineContentDispositon {
-				email.Attachments[i].ContentDisposition = fmt.Sprintf(`inline; filename="%s"`, att.Filename)
-			} else {
-				email.Attachments[i].ContentDisposition = fmt.Sprintf(`attachment; filename="%s"`, att.Filename)
-			}
+			newAtt.Content = content
 		}
 	}
+	email.Attachments = newAttachments
 	return nil
 }

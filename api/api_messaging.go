@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -127,6 +128,48 @@ func (ma *MessagingApi) SendSmtpMessage(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusAccepted, types.DIDCommApiResponse{SmtpID: *id})
+}
+
+// Cancel send (SMTP or DIDComm)
+// @Summary Cancel send (SMTP or DIDComm)
+// @Security Bearer
+// @Description Cancel send (SMTP or DIDComm)
+// @Tags Messaging
+// @Accept json
+// @Produce json
+// @Param email body types.DIDCommApiResponse true "task ids to cancel"
+// @Success 202 {object} types.DIDCommApiResponse
+// @Failure 400 {object} api.ApiError "bad request"
+// @Failure 401 {object} api.ApiError "invalid signature or unauthorized to cancel messages"
+// @Failure 403 {object} api.ApiError "user not authorized"
+// @Failure 429 {object} api.ApiError "rate limit exceeded"
+// @Router /api/v1/sendcancel [post]
+func (ma *MessagingApi) CancelSend(c *gin.Context) {
+	// get the task id
+	var msgIds types.DIDCommApiResponse
+	if err := c.ShouldBindJSON(&msgIds); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if msgIds.DIDCommID != "" {
+		// cancel DIDComm message
+		_, tsErr := ma.env.RedisClient.Set(ctx, fmt.Sprintf("cancel:%s", msgIds.DIDCommID), msgIds.DIDCommID, time.Second*30).Result()
+		if tsErr != nil {
+			ApiErrorf(c, http.StatusInternalServerError, "failed to cancel task")
+			return
+		}
+	}
+	if msgIds.SmtpID != "" {
+		_, tsErr := ma.env.RedisClient.Set(ctx, fmt.Sprintf("cancel:%s", msgIds.SmtpID), msgIds.SmtpID, time.Second*30).Result()
+		if tsErr != nil {
+			ApiErrorf(c, http.StatusInternalServerError, "failed to cancel task")
+			return
+		}
+	}
+	c.JSON(http.StatusAccepted, &msgIds)
 }
 
 // check if user is honest about the from email address

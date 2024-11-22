@@ -581,16 +581,26 @@ definitions:
     - VerificationRequired
     - VerificationPreferred
     - VerificationDiscouraged
+  types.ArrayOfStrings:
+    properties:
+      values:
+        items:
+          type: string
+        minItems: 1
+        type: array
+    required:
+    - values
+    type: object
   types.DIDCommApiResponse:
     properties:
       didCommId:
-        type: string
-      id:
         type: string
       mtpStatusCodes:
         items:
           $ref: '#/definitions/types.MTPStatusCode'
         type: array
+      smtpId:
+        type: string
       type:
         type: string
     type: object
@@ -2342,18 +2352,21 @@ paths:
       - application/json
       description: Delete object from s3 bucket (only in logged in users folder)
       parameters:
-      - description: objectKey
-        in: query
-        name: objectKey
+      - description: list of ObjectKeys
+        in: body
+        name: objectKeys
         required: true
-        type: string
+        schema:
+          $ref: '#/definitions/types.ArrayOfStrings'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/types.PresignedUrl'
+            items:
+              $ref: '#/definitions/types.PresignedUrl'
+            type: array
         "400":
           description: invalid api call
           schema:
@@ -2408,6 +2421,46 @@ paths:
         from a bucket.
       tags:
       - S3
+  /api/v1/sendcancel:
+    post:
+      consumes:
+      - application/json
+      description: Cancel send (SMTP or DIDComm)
+      parameters:
+      - description: task ids to cancel
+        in: body
+        name: email
+        required: true
+        schema:
+          $ref: '#/definitions/types.DIDCommApiResponse'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            $ref: '#/definitions/types.DIDCommApiResponse'
+        "400":
+          description: bad request
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "401":
+          description: invalid signature or unauthorized to cancel messages
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "403":
+          description: user not authorized
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "429":
+          description: rate limit exceeded
+          schema:
+            $ref: '#/definitions/api.ApiError'
+      security:
+      - Bearer: []
+      summary: Cancel send (SMTP or DIDComm)
+      tags:
+      - Messaging
   /api/v1/senddid:
     post:
       consumes:

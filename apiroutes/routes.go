@@ -111,6 +111,7 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 		// Messaging
 		rootApi.POST("/v1/senddid", messageApi.SendDIDMessage)
 		rootApi.POST("/v1/sendsmtp", messageApi.SendSmtpMessage)
+		rootApi.POST("/v1/sendcancel", messageApi.CancelSend)
 
 		// VCs
 		rootApi.GET("/v1/credentials/list/:address", vcApi.ListVCs)
@@ -131,7 +132,7 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 
 		// s3
 		rootApi.GET("/v1/s3presign", s3Api.GetPresignedUrlPut)
-		rootApi.DELETE("/v1/s3", s3Api.DeleteObject)
+		rootApi.DELETE("/v1/s3", s3Api.DeleteObjects)
 
 		// did documents
 		rootApi.POST("/v1/resolve/did", didApi.FetchDIDDocumentsByEmailHash)

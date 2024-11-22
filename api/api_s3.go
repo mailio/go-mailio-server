@@ -105,41 +105,46 @@ func (pa *S3Api) GetPresignedUrlPut(c *gin.Context) {
 // @Summary Delete object from s3 bucket
 // @Description Delete object from s3 bucket (only in logged in users folder)
 // @Tags S3
-// @Param objectKey query string true "objectKey"
-// @Success 200 {object} types.PresignedUrl
+// @Param objectKeys body types.ArrayOfStrings true "list of ObjectKeys"
+// @Success 200 {array} types.PresignedUrl
 // @Failure 400 {object} api.ApiError "invalid api call"
 // @Failure 429 {object} api.ApiError "rate limit exceeded"
 // @Failure 500 {object} api.ApiError "error deletin object"
 // @Accept json
 // @Produce json
 // @Router /api/v1/s3 [delete]
-func (pa *S3Api) DeleteObject(c *gin.Context) {
+func (pa *S3Api) DeleteObjects(c *gin.Context) {
 	address, exists := c.Get("subjectAddress")
 	if !exists {
 		ApiErrorf(c, http.StatusBadRequest, "not authorized")
 		return
 	}
-	objectKey := c.Query("objectKey")
-	if objectKey == "" {
-		ApiErrorf(c, http.StatusBadRequest, "objectKey is required")
-		return
-	}
-	path := address.(string) + "/" + objectKey
-
-	dErr := pa.s3Service.DeleteAttachment(global.Conf.Storage.Bucket, path)
-	if dErr != nil {
-		if dErr == types.ErrNotFound {
-			ApiErrorf(c, http.StatusNotFound, "file not found")
-			return
-		}
-		if dErr == types.ErrNotAuthorized {
-			ApiErrorf(c, http.StatusForbidden, "forbidden to delete")
-			return
-		}
-		global.Logger.Log("error", "failed to delete object")
-		ApiErrorf(c, http.StatusInternalServerError, "failed to delete object")
+	var objectKeys types.ArrayOfStrings
+	if err := c.ShouldBindJSON(&objectKeys); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, types.PresignedUrl{Url: path})
+	response := make([]types.PresignedUrl, 0)
+
+	for _, objectKey := range objectKeys.Values {
+		path := address.(string) + "/" + objectKey
+		dErr := pa.s3Service.DeleteAttachment(global.Conf.Storage.Bucket, path)
+		if dErr != nil {
+			if dErr == types.ErrNotFound {
+				ApiErrorf(c, http.StatusNotFound, "file not found")
+				return
+			}
+			if dErr == types.ErrNotAuthorized {
+				ApiErrorf(c, http.StatusForbidden, "forbidden to delete")
+				return
+			}
+			global.Logger.Log("error", "failed to delete object")
+			ApiErrorf(c, http.StatusInternalServerError, "failed to delete object")
+			return
+		}
+		response = append(response, types.PresignedUrl{Url: path})
+	}
+
+	c.JSON(http.StatusOK, response)
 }

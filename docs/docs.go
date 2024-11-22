@@ -1258,18 +1258,23 @@ const docTemplate = `{
                 "summary": "Delete object from s3 bucket",
                 "parameters": [
                     {
-                        "type": "string",
-                        "description": "objectKey",
-                        "name": "objectKey",
-                        "in": "query",
-                        "required": true
+                        "description": "list of ObjectKeys",
+                        "name": "objectKeys",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.ArrayOfStrings"
+                        }
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/types.PresignedUrl"
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/types.PresignedUrl"
+                            }
                         }
                     },
                     "400": {
@@ -1343,6 +1348,69 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "error creating presigned url",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/sendcancel": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Cancel send (SMTP or DIDComm)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Messaging"
+                ],
+                "summary": "Cancel send (SMTP or DIDComm)",
+                "parameters": [
+                    {
+                        "description": "task ids to cancel",
+                        "name": "email",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.DIDCommApiResponse"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "$ref": "#/definitions/types.DIDCommApiResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "bad request",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "401": {
+                        "description": "invalid signature or unauthorized to cancel messages",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "403": {
+                        "description": "user not authorized",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "429": {
+                        "description": "rate limit exceeded",
                         "schema": {
                             "$ref": "#/definitions/api.ApiError"
                         }
@@ -2573,13 +2641,25 @@ const docTemplate = `{
                 "VerificationDiscouraged"
             ]
         },
+        "types.ArrayOfStrings": {
+            "type": "object",
+            "required": [
+                "values"
+            ],
+            "properties": {
+                "values": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
         "types.DIDCommApiResponse": {
             "type": "object",
             "properties": {
                 "didCommId": {
-                    "type": "string"
-                },
-                "id": {
                     "type": "string"
                 },
                 "mtpStatusCodes": {
@@ -2587,6 +2667,9 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/types.MTPStatusCode"
                     }
+                },
+                "smtpId": {
+                    "type": "string"
                 },
                 "type": {
                     "type": "string"

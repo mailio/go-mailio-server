@@ -20,7 +20,7 @@ type OutputUserAddress struct {
 }
 
 type DIDCommApiResponse struct {
-	SmtpID         string           `json:"id"`
+	SmtpID         string           `json:"smtpId"`
 	DIDCommID      string           `json:"didCommId"`
 	Type           string           `json:"type,omitempty"`
 	MTPStatusCodes []*MTPStatusCode `json:"mtpStatusCodes,omitempty"`

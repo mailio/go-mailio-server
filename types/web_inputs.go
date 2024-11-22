@@ -56,3 +56,7 @@ type DIDCommMessageInput struct {
 	DIDCommMessage    DIDCommMessage `json:"didCommMessage" validate:"required"`
 	DeleteAttachments []string       `json:"deleteAttachments,omitempty"` // The IDs of attachments to be deleted (the decision is left to client to make: if only encrypted then plaint attachment should be deleted, if both types of recipients then no attachments shhould be deleted, ... ).
 }
+
+type ArrayOfStrings struct {
+	Values []string `json:"values" validate:"required,min=1"`
+}
