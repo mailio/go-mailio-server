@@ -289,6 +289,100 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/emailstatistics": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Returns number of sent emails, received emails and interest shown by the recipient",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Statistics"
+                ],
+                "summary": "Get Email statistics",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Sender email address or Mailio address",
+                        "name": "sender",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.OutputBasicUserInfo"
+                        }
+                    },
+                    "429": {
+                        "description": "rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/emailstatistics/interest": {
+            "put": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Report interest shown by the recipient (e.g. clicking on a link in the email, reading an email, archiving it, ...)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Statistics"
+                ],
+                "summary": "Report Interest",
+                "parameters": [
+                    {
+                        "description": "interest shown by the recipient",
+                        "name": "interest",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.InterestInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.InterestOuput"
+                        }
+                    },
+                    "400": {
+                        "description": "bad request",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "429": {
+                        "description": "rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/findaddress": {
             "get": {
                 "description": "Returns a mailio address",
@@ -316,246 +410,6 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/types.OutputUserAddress"
-                        }
-                    },
-                    "429": {
-                        "description": "rate limit exceeded",
-                        "schema": {
-                            "$ref": "#/definitions/api.ApiError"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/handshake": {
-            "get": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "List all handshakes",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Handshake"
-                ],
-                "summary": "List handshakes (default 10 results)",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "max number of results",
-                        "name": "limit",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "paging token",
-                        "name": "bookmark",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/types.PagingResults"
-                        }
-                    },
-                    "401": {
-                        "description": "not authorized",
-                        "schema": {
-                            "$ref": "#/definitions/api.ApiError"
-                        }
-                    },
-                    "429": {
-                        "description": "rate limit exceeded",
-                        "schema": {
-                            "$ref": "#/definitions/api.ApiError"
-                        }
-                    }
-                }
-            },
-            "post": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Create a new handshake",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Handshake"
-                ],
-                "summary": "Create a new handshake",
-                "parameters": [
-                    {
-                        "description": "Handshake",
-                        "name": "handshake",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/types.Handshake"
-                        }
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "schema": {
-                            "$ref": "#/definitions/types.Handshake"
-                        }
-                    },
-                    "400": {
-                        "description": "bad request",
-                        "schema": {
-                            "$ref": "#/definitions/api.ApiError"
-                        }
-                    },
-                    "401": {
-                        "description": "invalid signature/not authorized",
-                        "schema": {
-                            "$ref": "#/definitions/api.ApiError"
-                        }
-                    },
-                    "429": {
-                        "description": "rate limit exceeded",
-                        "schema": {
-                            "$ref": "#/definitions/api.ApiError"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/handshake/{id}": {
-            "get": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Returns a single handshake by id",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Handshake"
-                ],
-                "summary": "Get handshake by id",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Handshake ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/types.Handshake"
-                        }
-                    }
-                }
-            },
-            "put": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Update a handshake",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Handshake"
-                ],
-                "summary": "Update a handshake",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Handshake ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Handshake",
-                        "name": "handshake",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/types.Handshake"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/types.Handshake"
-                        }
-                    },
-                    "401": {
-                        "description": "not authorized",
-                        "schema": {
-                            "$ref": "#/definitions/api.ApiError"
-                        }
-                    },
-                    "429": {
-                        "description": "rate limit exceeded",
-                        "schema": {
-                            "$ref": "#/definitions/api.ApiError"
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Delete a handshake",
-                "tags": [
-                    "Handshake"
-                ],
-                "summary": "Delete a handshake",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Handshake ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "401": {
-                        "description": "not authorized",
-                        "schema": {
-                            "$ref": "#/definitions/api.ApiError"
                         }
                     },
                     "429": {
@@ -1539,6 +1393,49 @@ const docTemplate = `{
                         "description": "no recipient/no subject body/too many attachments",
                         "schema": {
                             "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "429": {
+                        "description": "rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/teststats": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Returns number of sent emails, received emails and interest shown by the recipient",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Statistics"
+                ],
+                "summary": "Get Email statistics",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Sender email address or Mailio address",
+                        "name": "sender",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.OutputBasicUserInfo"
                         }
                     },
                     "429": {
@@ -3069,21 +2966,6 @@ const docTemplate = `{
                 }
             }
         },
-        "types.Handshake": {
-            "type": "object",
-            "properties": {
-                "cborPayloadBase64": {
-                    "description": "payload in cbor format of handshake Content",
-                    "type": "string"
-                },
-                "content": {
-                    "$ref": "#/definitions/types.HandshakeContent"
-                },
-                "signatureBase64": {
-                    "type": "string"
-                }
-            }
-        },
         "types.HandshakeContent": {
             "type": "object",
             "properties": {
@@ -3429,6 +3311,29 @@ const docTemplate = `{
                 }
             }
         },
+        "types.InterestInput": {
+            "type": "object",
+            "required": [
+                "messageId",
+                "sender"
+            ],
+            "properties": {
+                "messageId": {
+                    "type": "string"
+                },
+                "sender": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.InterestOuput": {
+            "type": "object",
+            "properties": {
+                "messageId": {
+                    "type": "string"
+                }
+            }
+        },
         "types.JwsToken": {
             "type": "object",
             "properties": {
@@ -3697,18 +3602,6 @@ const docTemplate = `{
             "properties": {
                 "address": {
                     "type": "string"
-                }
-            }
-        },
-        "types.PagingResults": {
-            "type": "object",
-            "properties": {
-                "bookmark": {
-                    "type": "string"
-                },
-                "docs": {
-                    "type": "array",
-                    "items": {}
                 }
             }
         },

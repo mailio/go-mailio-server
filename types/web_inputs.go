@@ -60,3 +60,8 @@ type DIDCommMessageInput struct {
 type ArrayOfStrings struct {
 	Values []string `json:"values" validate:"required,min=1"`
 }
+
+type InterestInput struct {
+	Sender    string `json:"sender" validate:"required"`
+	MessageId string `json:"messageId" validate:"required"`
+}

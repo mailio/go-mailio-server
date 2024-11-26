@@ -193,7 +193,11 @@ func (ssi *SelfSovereignService) StoreRegistrationSSI(mk *did.MailioKey) error {
 	return nil
 }
 
-// Returns the DID document for the given mailio address
+/**
+ * Get the DID document for the given mailio address from local database
+ * @param mailioAddress
+ * @return DID document
+ */
 func (ssi *SelfSovereignService) GetDIDDocument(mailioAddress string) (*did.Document, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
