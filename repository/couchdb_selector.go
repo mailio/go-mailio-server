@@ -17,6 +17,7 @@ const (
 	UserProfile     = "user_profile"     // user profile (for system use only)
 	WebAuthnUser    = "webauthn_user"    // webauthn user
 	SmartKey        = "smart_key"        // smart keys
+	EmailStatistics = "email_statistics" // statistics
 )
 
 type CouchDBSelector struct {

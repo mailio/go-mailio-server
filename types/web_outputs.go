@@ -30,3 +30,7 @@ type OutputDIDLookup struct {
 	Found    []*DIDLookup `json:"found,omitempty"`
 	NotFound []*DIDLookup `json:"notFound,omitempty"`
 }
+
+type InterestOuput struct {
+	MessageId string `json:"messageId,omitempty"`
+}

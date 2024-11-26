@@ -54,9 +54,10 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 	webAuthnService := services.NewWebAuthnService(dbSelector, environment)
 	smartKeyService := services.NewSmartKeyService(dbSelector)
 	s3Service := services.NewS3Service(environment)
+	statsService := services.NewStatisticsService(dbSelector, environment)
 
 	// API definitions
-	handshakeApi := api.NewHandshakeApi(handshakeService, nonceService, mtpService, userProfileService)
+	handshakeApi := api.NewHandshakeApi(handshakeService, nonceService, mtpService, userService, userProfileService)
 	accountApi := api.NewUserAccountApi(userService, userProfileService, nonceService, ssiService, smartKeyService)
 	didApi := api.NewDIDApi(ssiService, mtpService)
 	vcApi := api.NewVCApi(ssiService)
@@ -64,6 +65,7 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 	domainApi := api.NewDomainApi(domainService)
 	webauthnApi := api.NewWebAuthnApi(nonceService, webAuthnService, userService, userProfileService, smartKeyService, ssiService, environment)
 	s3Api := api.NewS3Api(s3Service, environment)
+	statisticsApi := api.NewAPIStatistics(statsService)
 
 	// WEBHOOK API definitions
 	webhookApi := api.NewMailReceiveWebhook(handshakeService, userService, userProfileService, environment)
@@ -101,12 +103,13 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 	rootApi := router.Group("/api", metrics.MetricsMiddleware(), restinterceptors.RateLimitMiddleware(), restinterceptors.JWSMiddleware(userProfileService))
 	{
 		// Handshakes
-		rootApi.GET("/v1/handshake/:id", handshakeApi.GetHandshake)
-		rootApi.GET("/v1/handshake", handshakeApi.ListHandshakes)
-		rootApi.POST("/v1/handshake", handshakeApi.CreateHandshake)
-		rootApi.DELETE("/v1/handshake/:id", handshakeApi.DeleteHandshake)
+		// rootApi.GET("/v1/handshake/:id", handshakeApi.GetHandshake)
+		// rootApi.GET("/v1/handshake", handshakeApi.ListHandshakes)
+		// rootApi.POST("/v1/handshake", handshakeApi.CreateHandshake)
+		// rootApi.DELETE("/v1/handshake/:id", handshakeApi.DeleteHandshake)
 		rootApi.GET("/v1/handshakeoffer", handshakeApi.PersonalHandshakeLink)
 		rootApi.POST("/v1/handshakefetch", handshakeApi.HandshakeFetch)
+		// rootApi.GET("/v1/handshakestats", handshakeApi.GetHandshakeStats)
 
 		// Messaging
 		rootApi.POST("/v1/senddid", messageApi.SendDIDMessage)
@@ -137,6 +140,11 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 		// did documents
 		rootApi.POST("/v1/resolve/did", didApi.FetchDIDDocumentsByEmailHash)
 		rootApi.POST("/v1/resolve/webdid", didApi.FetchDIDByWebDID)
+
+		// statistics
+		rootApi.GET("/v1/emailstatistics", statisticsApi.GetEmailStatistics)
+		rootApi.PUT("/v1/emailstatistics/interest", statisticsApi.ReportInterest)
+		rootApi.GET("/v1/teststats", statisticsApi.TestEmailStatistics)
 	}
 
 	// server-to-server communication (aka MTP - Mailio Transfer Protocol)

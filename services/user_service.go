@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"net/url"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
@@ -215,8 +216,9 @@ func (us *UserService) SaveMessage(userAddress string, mailioMessage *types.Mail
 		return nil, httpErr
 	}
 	if httpResp.IsError() {
+		stackTrace := string(debug.Stack())
 		global.Logger.Log(httpResp.String(), "failed to save message", hexUser, postError.Error, postError.Reason)
-		return nil, fmt.Errorf("code: %s, reason: %s", postError.Error, postError.Reason)
+		return nil, fmt.Errorf("code: %s, reason: %s, trace: %v", postError.Error, postError.Reason, stackTrace)
 	}
 
 	return mailioMessage, nil
@@ -250,14 +252,23 @@ func (us *UserService) CountNumberOfSentByRecipientMessages(address string, reci
 }
 
 // counts the number of sent messages by user between two timestamps
+/**
+* Counts the number of messages sent by user between two timestamps
+* Counts number of messages seny from address to any recipient
+* @param address - mailio address of the user
+* @param from - start timestamp
+* @param to - end timestamp
+* @return - number of messages sent by user
+**/
 func (us *UserService) CountNumberOfSentMessages(address string, from int64, to int64) (*types.CouchDBCountDistinctFromResponse, error) {
 	viewPath := "_design/count/_view/from-address"
 	hexUser := "userdb-" + hex.EncodeToString([]byte(address))
 
 	// format: address, folder, timestamp
 	params := url.Values{}
-	params.Add("startkey", fmt.Sprintf("[\"%s\",\"%s\",%d]", address, "sent", from))
-	params.Add("endkey", fmt.Sprintf("[\"%s\",\"%s\",%d]", address, "sent", to))
+	params.Add("startkey", fmt.Sprintf("[\"%s\",\"%s\",%d]", address, "", from))
+	params.Add("endkey", fmt.Sprintf("[\"%s\",\"%s\",%d]", address, "", to))
+	params.Add("deleted", "true") // include deleted messages
 	params.Add("group_level", "2")
 
 	url := fmt.Sprintf("%s/%s?%s", hexUser, viewPath, params.Encode())
@@ -277,8 +288,17 @@ func (us *UserService) CountNumberOfSentMessages(address string, from int64, to 
 	return &response, nil
 }
 
-// address is the user's mailio address, from is a message sender (it can be Mailio address or ordinary email address)
-func (us *UserService) CountNumberOfMessages(address string, from string, folder string, isRead bool, fromTimestamp int64, toTimestamp int64) (*types.CouchDBCountDistinctFromResponse, error) {
+/**
+* Counts the number of messages received from a specific sender (from) between two timestamps
+* @param address - mailio address of the user
+* @param from - sender of the message
+* @param folder - folder where the message is stored (inbox, sent, trash)
+* @param isRead - if the message is read
+* @param fromTimestamp - start timestamp
+* @param toTimestamp - end timestamp
+* @return - number of messages received from the sender
+**/
+func (us *UserService) CountNumberOfMessages(address string, from string, folder string, isRead *bool, fromTimestamp int64, toTimestamp int64) (*types.CouchDBCountDistinctFromResponse, error) {
 	// query for couchdb statistics
 
 	//_design/count-from/_view/count-from-address (how many messages are received from user)
@@ -293,15 +313,20 @@ func (us *UserService) CountNumberOfMessages(address string, from string, folder
 		{"key":["sent"],"value":4}
 	]}
 	**/
+
+	//by default check all folders
 	folderFrom := ""
 	folderTo := "\uffff"
 	if folder != "" {
+		// unless single folder specified
 		folderFrom = folder
 		folderTo = folder
 	}
 	viewPath := "_design/count/_view/from-address"
-	if isRead {
-		viewPath = "_design/count-read/_view/from-address-read"
+	if isRead != nil {
+		if *isRead {
+			viewPath = "_design/count-read/_view/from-address-read"
+		}
 	}
 	hexUser := "userdb-" + hex.EncodeToString([]byte(address))
 

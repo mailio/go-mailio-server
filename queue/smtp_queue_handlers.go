@@ -442,8 +442,12 @@ func (msq *MessageQueue) getFolderByStats(mailioAddress, from string) string {
 		return types.MailioFolderInbox
 	}
 
-	countReceivedAll, crErr := msq.userService.CountNumberOfMessages(mailioAddress, from, "", false, fromTimestamp, toTimestamp)
-	countReceivedRead, crrErr := msq.userService.CountNumberOfMessages(mailioAddress, from, "", true, fromTimestamp, toTimestamp)
+	// count number of received messages from the sender
+	isReadCountReceivedAll := false
+	countReceivedAll, crErr := msq.userService.CountNumberOfMessages(mailioAddress, from, "", &isReadCountReceivedAll, fromTimestamp, toTimestamp)
+	// count number of received messages from the sender that are read
+	isReadCountReceivedRead := true
+	countReceivedRead, crrErr := msq.userService.CountNumberOfMessages(mailioAddress, from, "", &isReadCountReceivedRead, fromTimestamp, toTimestamp)
 	if errors.Join(crErr, crrErr) != nil {
 		global.Logger.Log("error counting number of received messages", errors.Join(crErr, crrErr).Error())
 	} else {
@@ -458,7 +462,10 @@ func (msq *MessageQueue) getFolderByStats(mailioAddress, from string) string {
 	readVsReceived := global.Conf.Mailio.ReadVsReceived
 
 	// ratio of read messages vs all received messages
-	ratio := float64(receivedRead) / float64(receivedAll)
+	ratio := 0.0
+	if receivedAll != 0 {
+		ratio = float64(receivedRead) / float64(receivedAll)
+	}
 	// if more than X% of the messages are read, then store in goodreads
 	ratioThreshold := float64(readVsReceived) / 100.0
 	if ratio >= ratioThreshold {

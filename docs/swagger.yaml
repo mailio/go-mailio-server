@@ -901,16 +901,6 @@ definitions:
     - kty
     - x
     type: object
-  types.Handshake:
-    properties:
-      cborPayloadBase64:
-        description: payload in cbor format of handshake Content
-        type: string
-      content:
-        $ref: '#/definitions/types.HandshakeContent'
-      signatureBase64:
-        type: string
-    type: object
   types.HandshakeContent:
     properties:
       created:
@@ -1149,6 +1139,21 @@ definitions:
     required:
     - dids
     type: object
+  types.InterestInput:
+    properties:
+      messageId:
+        type: string
+      sender:
+        type: string
+    required:
+    - messageId
+    - sender
+    type: object
+  types.InterestOuput:
+    properties:
+      messageId:
+        type: string
+    type: object
   types.JwsToken:
     properties:
       token:
@@ -1331,14 +1336,6 @@ definitions:
     properties:
       address:
         type: string
-    type: object
-  types.PagingResults:
-    properties:
-      bookmark:
-        type: string
-      docs:
-        items: {}
-        type: array
     type: object
   types.PresignedUrl:
     properties:
@@ -1726,6 +1723,67 @@ paths:
       summary: List all domains
       tags:
       - Domains
+  /api/v1/emailstatistics:
+    get:
+      consumes:
+      - application/json
+      description: Returns number of sent emails, received emails and interest shown
+        by the recipient
+      parameters:
+      - description: Sender email address or Mailio address
+        in: query
+        name: sender
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.OutputBasicUserInfo'
+        "429":
+          description: rate limit exceeded
+          schema:
+            $ref: '#/definitions/api.ApiError'
+      security:
+      - Bearer: []
+      summary: Get Email statistics
+      tags:
+      - Statistics
+  /api/v1/emailstatistics/interest:
+    put:
+      consumes:
+      - application/json
+      description: Report interest shown by the recipient (e.g. clicking on a link
+        in the email, reading an email, archiving it, ...)
+      parameters:
+      - description: interest shown by the recipient
+        in: body
+        name: interest
+        required: true
+        schema:
+          $ref: '#/definitions/types.InterestInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.InterestOuput'
+        "400":
+          description: bad request
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "429":
+          description: rate limit exceeded
+          schema:
+            $ref: '#/definitions/api.ApiError'
+      security:
+      - Bearer: []
+      summary: Report Interest
+      tags:
+      - Statistics
   /api/v1/findaddress:
     get:
       consumes:
@@ -1751,158 +1809,6 @@ paths:
       summary: Find user by base64 scrypt email address
       tags:
       - User Account
-  /api/v1/handshake:
-    get:
-      consumes:
-      - application/json
-      description: List all handshakes
-      parameters:
-      - description: max number of results
-        in: query
-        name: limit
-        type: integer
-      - description: paging token
-        in: query
-        name: bookmark
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/types.PagingResults'
-        "401":
-          description: not authorized
-          schema:
-            $ref: '#/definitions/api.ApiError'
-        "429":
-          description: rate limit exceeded
-          schema:
-            $ref: '#/definitions/api.ApiError'
-      security:
-      - Bearer: []
-      summary: List handshakes (default 10 results)
-      tags:
-      - Handshake
-    post:
-      consumes:
-      - application/json
-      description: Create a new handshake
-      parameters:
-      - description: Handshake
-        in: body
-        name: handshake
-        required: true
-        schema:
-          $ref: '#/definitions/types.Handshake'
-      produces:
-      - application/json
-      responses:
-        "201":
-          description: Created
-          schema:
-            $ref: '#/definitions/types.Handshake'
-        "400":
-          description: bad request
-          schema:
-            $ref: '#/definitions/api.ApiError'
-        "401":
-          description: invalid signature/not authorized
-          schema:
-            $ref: '#/definitions/api.ApiError'
-        "429":
-          description: rate limit exceeded
-          schema:
-            $ref: '#/definitions/api.ApiError'
-      security:
-      - Bearer: []
-      summary: Create a new handshake
-      tags:
-      - Handshake
-  /api/v1/handshake/{id}:
-    delete:
-      description: Delete a handshake
-      parameters:
-      - description: Handshake ID
-        in: path
-        name: id
-        required: true
-        type: string
-      responses:
-        "204":
-          description: No Content
-        "401":
-          description: not authorized
-          schema:
-            $ref: '#/definitions/api.ApiError'
-        "429":
-          description: rate limit exceeded
-          schema:
-            $ref: '#/definitions/api.ApiError'
-      security:
-      - Bearer: []
-      summary: Delete a handshake
-      tags:
-      - Handshake
-    get:
-      consumes:
-      - application/json
-      description: Returns a single handshake by id
-      parameters:
-      - description: Handshake ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/types.Handshake'
-      security:
-      - Bearer: []
-      summary: Get handshake by id
-      tags:
-      - Handshake
-    put:
-      consumes:
-      - application/json
-      description: Update a handshake
-      parameters:
-      - description: Handshake ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Handshake
-        in: body
-        name: handshake
-        required: true
-        schema:
-          $ref: '#/definitions/types.Handshake'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/types.Handshake'
-        "401":
-          description: not authorized
-          schema:
-            $ref: '#/definitions/api.ApiError'
-        "429":
-          description: rate limit exceeded
-          schema:
-            $ref: '#/definitions/api.ApiError'
-      security:
-      - Bearer: []
-      summary: Update a handshake
-      tags:
-      - Handshake
   /api/v1/handshakefetch:
     post:
       consumes:
@@ -2545,6 +2451,34 @@ paths:
       summary: Send SMTP email
       tags:
       - Messaging
+  /api/v1/teststats:
+    get:
+      consumes:
+      - application/json
+      description: Returns number of sent emails, received emails and interest shown
+        by the recipient
+      parameters:
+      - description: Sender email address or Mailio address
+        in: query
+        name: sender
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.OutputBasicUserInfo'
+        "429":
+          description: rate limit exceeded
+          schema:
+            $ref: '#/definitions/api.ApiError'
+      security:
+      - Bearer: []
+      summary: Get Email statistics
+      tags:
+      - Statistics
   /api/v1/user/me:
     get:
       consumes:
