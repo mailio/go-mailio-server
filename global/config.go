@@ -32,6 +32,7 @@ type Config struct {
 	SmtpServers       []*SmtpServerConfig  `yaml:"smtpservers"`
 	DiskUsageHandlers []*DiskUsageHandlers `yaml:"diskusagehandlers"`
 	Storage           StorageConfig        `yaml:"storage"`
+	EmailStatistics   EmailStatistics      `yaml:"emailstatistics"`
 }
 
 type CouchDBConfig struct {
@@ -116,4 +117,13 @@ type StorageConfig struct {
 type DiskUsageHandlers struct {
 	Provider string `yaml:"provider"`
 	Path     string `yaml:"path"`
+}
+
+type EmailStatistics struct {
+	SentKeyExpiry          int `yaml:"sentKeyExpiry"`          // in minutes
+	SentKeyFlush           int `yaml:"sentKeyFlush"`           // in minutes
+	InterestKeyExpiry      int `yaml:"interestKeyExpiry"`      // in minutes
+	InterestKeyFlush       int `yaml:"interestKeyFlush"`       // in minutes
+	SentRecvBySenderExpiry int `yaml:"sentRecvBySenderExpiry"` // in minutes
+	SentRecvBySenderFlush  int `yaml:"sentRecvBySenderFlush"`  // in minutes
 }

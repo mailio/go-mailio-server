@@ -137,12 +137,17 @@ func ConfigDBIndexing(dbSelector *repository.CouchDBSelector, environment *types
 	go nonceService.RemoveExpiredNonces() // run once on startup
 
 	// cron job for flushing email statistics into the database
-	environment.Cron.AddFunc("@every 5m", statisticService.FlushEmailInterests)
+	environment.Cron.AddFunc(fmt.Sprintf("@every %dm", global.Conf.EmailStatistics.InterestKeyFlush), statisticService.FlushEmailInterests)
 	environment.Cron.Start()
-	environment.Cron.AddFunc("@every 5m", statisticService.FlushEmailStatistics)
+	go statisticService.FlushEmailInterests() // run once on startup
+
+	environment.Cron.AddFunc(fmt.Sprintf("@every %dm", global.Conf.EmailStatistics.SentRecvBySenderFlush), statisticService.FlushEmailStatistics)
 	environment.Cron.Start()
-	environment.Cron.AddFunc("@every 1h", statisticService.FlushSentEmailStatistics)
+	go statisticService.FlushEmailStatistics() // run once on startup
+
+	environment.Cron.AddFunc(fmt.Sprintf("@every %dm", global.Conf.EmailStatistics.SentKeyFlush), statisticService.FlushSentEmailStatistics)
 	environment.Cron.Start()
+	go statisticService.FlushSentEmailStatistics() // run once on startup
 }
 
 func ConfigS3Storage(conf *global.Config, env *types.Environment) {

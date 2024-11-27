@@ -39,7 +39,7 @@ func NewStatisticsService(dbSelector *repository.CouchDBSelector, env *types.Env
 
 /**
  * GetEmailInterest returns the number of unique emails recipient showed some interested in
- * Interest can be that user read an email, stored into archived folder, etc (client defines what the interest might be)
+ * Interest can be that user read an email, stored into archived folder, clicked a link, etc (client defines what the interest might be)
  * @param sender string
  * @param recipient string
  */
@@ -98,6 +98,12 @@ func (s *StatisticsService) GetEmailInterest(ctx context.Context, sender string,
 	return count, nil
 }
 
+/**
+ * GetEmailStatistics returns the number of emails sent by a sender to a recipient
+ * It works in both ways (local user to outside user and vice versa)
+ * @param sender string
+ * @param recipient string
+ */
 func (s *StatisticsService) GetEmailStatistics(ctx context.Context, sender string, recipient string) (int64, error) {
 	recipientHash := xxhash.Sum64String(recipient)
 	senderHash := xxhash.Sum64String(sender)
@@ -118,6 +124,12 @@ func (s *StatisticsService) GetEmailStatistics(ctx context.Context, sender strin
 	return cnt, nil
 }
 
+/**
+ * getEmailStatisticsFromDB fetches the email statistics from the database
+ * @param ctx context.Context
+ * @param redisKeyPrefix string
+ * @param key string
+ */
 func (s *StatisticsService) getEmailStatisticsFromDB(ctx context.Context, redisKeyPrefix string, key string) (*types.EmailStatistics, error) {
 
 	senderRecipient := strings.TrimPrefix(key, redisKeyPrefix+":")
@@ -181,9 +193,7 @@ func (s *StatisticsService) ProcessEmailInterest(sender string, recipient string
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	const (
-		redisExpireTime = 15 * time.Minute
-	)
+	redisExpireTime := time.Duration(global.Conf.EmailStatistics.InterestKeyExpiry) * time.Minute
 
 	// hash recipient and sender to sha265
 	recipientHash := xxhash.Sum64String(recipient)
@@ -281,9 +291,7 @@ func (s *StatisticsService) processStatistics(
  * @param recipient string
  */
 func (s *StatisticsService) ProcessEmailStatistics(sender string, recipient string) error {
-	const (
-		redisExpire = 15 * time.Minute
-	)
+	redisExpire := time.Duration(global.Conf.EmailStatistics.SentRecvBySenderExpiry) * time.Minute
 	return s.processStatistics(redisPrefixEs, sender, recipient, redisExpire)
 }
 
@@ -292,10 +300,7 @@ func (s *StatisticsService) ProcessEmailStatistics(sender string, recipient stri
  * @param sender string
  */
 func (s *StatisticsService) ProcessEmailsSentStatistics(sender string) error {
-	const (
-		redisExpire = 48 * time.Hour
-	)
-
+	redisExpire := time.Duration(global.Conf.EmailStatistics.SentKeyExpiry) * time.Minute
 	day := strconv.FormatInt(time.Now().UTC().Truncate(24*time.Hour).Unix(), 10)
 	return s.processStatistics(redisPrefixEds, sender, day, redisExpire)
 }
@@ -311,13 +316,11 @@ func (s *StatisticsService) FlushEmailInterests() {
 		redisKeyPrefix = "esint"
 	)
 
+	allDocs := make([]*types.EmailStatistics, 0)
+
 	iter := s.env.RedisClient.Scan(ctx, 0, fmt.Sprintf("%s:*", redisKeyPrefix), 0).Iterator()
 	for iter.Next(ctx) {
 		key := iter.Val()
-		// senderRecipient := strings.TrimPrefix(key, redisKeyPrefix+":")
-		// parts := strings.Split(senderRecipient, ":")
-
-		// senderHash, recipientHash := parts[0], parts[1]
 		cachedResult, rErr := s.env.RedisClient.Get(ctx, key).Result()
 		if rErr != nil {
 			if rErr != redis.Nil {
@@ -339,13 +342,15 @@ func (s *StatisticsService) FlushEmailInterests() {
 		}
 		emailStatsDB.Count = cnt
 
-		// save to CouchDB
-		err := s.statisticsRepo.Save(ctx, emailStatsDB.ID, emailStatsDB)
-		if err != nil {
-			global.Logger.Log("CouchDBError", "StatisticsService.FlushEmailInterests", err.Error())
-			continue
+		allDocs = append(allDocs, emailStatsDB)
+	}
+	if len(allDocs) > 0 {
+		bsErr := s.bulkSave(allDocs)
+		if bsErr != nil {
+			global.Logger.Log("CouchDBError", "StatisticsService.FlushEmailInterests on bulkSave", bsErr.Error())
 		}
 	}
+	global.Logger.Log("Info", "StatisticsService.FlushEmailInterests", "flushed", len(allDocs), "email interests")
 }
 
 /**
@@ -387,6 +392,7 @@ func (s *StatisticsService) FlushEmailStatistics() {
 			global.Logger.Log("CouchDBError", "StatisticsService.FlushEmailStatistics", bsErr.Error())
 		}
 	}
+	global.Logger.Log("Info", "StatisticsService.FlushEmailStatistics", "flushed", len(allDocs), "email statistics")
 }
 
 /**
@@ -428,6 +434,7 @@ func (s *StatisticsService) FlushSentEmailStatistics() {
 			global.Logger.Log("CouchDBError", "StatisticsService.FlushSentEmailStatistics", bsErr.Error())
 		}
 	}
+	global.Logger.Log("Info", "StatisticsService.FlushSentEmailStatistics", "flushed", len(allDocs), "sent email statistics")
 }
 
 type bulkRequest struct {
