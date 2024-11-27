@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"net/url"
 	"runtime/debug"
 	"strconv"
 	"strings"
@@ -224,32 +223,32 @@ func (us *UserService) SaveMessage(userAddress string, mailioMessage *types.Mail
 	return mailioMessage, nil
 }
 
-// counts the number of sent messages from mailio user to specific recipient (regular email or mailio address)
-func (us *UserService) CountNumberOfSentByRecipientMessages(address string, recipient string, from int64, to int64) (*types.CouchDBCountResponse, error) {
-	viewPath := "_design/sent-to/_view/count-view"
-	hexUser := "userdb-" + hex.EncodeToString([]byte(address))
+// // counts the number of sent messages from mailio user to specific recipient (regular email or mailio address)
+// func (us *UserService) CountNumberOfSentByRecipientMessages(address string, recipient string, from int64, to int64) (*types.CouchDBCountResponse, error) {
+// 	viewPath := "_design/sent-to/_view/count-view"
+// 	hexUser := "userdb-" + hex.EncodeToString([]byte(address))
 
-	// format: address, folder, timestamp
-	params := url.Values{}
-	params.Add("key", fmt.Sprintf("\"%s\"", recipient))
-	params.Add("group_level", "1")
+// 	// format: address, folder, timestamp
+// 	params := url.Values{}
+// 	params.Add("key", fmt.Sprintf("\"%s\"", recipient))
+// 	params.Add("group_level", "1")
 
-	url := fmt.Sprintf("%s/%s?%s", hexUser, viewPath, params.Encode())
+// 	url := fmt.Sprintf("%s/%s?%s", hexUser, viewPath, params.Encode())
 
-	var couchError types.CouchDBError
-	var response types.CouchDBCountResponse
+// 	var couchError types.CouchDBError
+// 	var response types.CouchDBCountResponse
 
-	httpResp, httpErr := us.restyClient.R().SetResult(&response).SetError(&couchError).Get(url)
-	if httpErr != nil {
-		global.Logger.Log(httpErr.Error(), "failed to send message", hexUser)
-		return nil, httpErr
-	}
-	if httpResp.IsError() {
-		global.Logger.Log(httpResp.String(), "failed to send message", hexUser, couchError.Error, couchError.Reason)
-		return nil, fmt.Errorf("code: %s, reason: %s", couchError.Error, couchError.Reason)
-	}
-	return &response, nil
-}
+// 	httpResp, httpErr := us.restyClient.R().SetResult(&response).SetError(&couchError).Get(url)
+// 	if httpErr != nil {
+// 		global.Logger.Log(httpErr.Error(), "failed to send message", hexUser)
+// 		return nil, httpErr
+// 	}
+// 	if httpResp.IsError() {
+// 		global.Logger.Log(httpResp.String(), "failed to send message", hexUser, couchError.Error, couchError.Reason)
+// 		return nil, fmt.Errorf("code: %s, reason: %s", couchError.Error, couchError.Reason)
+// 	}
+// 	return &response, nil
+// }
 
 // counts the number of sent messages by user between two timestamps
 /**
@@ -260,33 +259,33 @@ func (us *UserService) CountNumberOfSentByRecipientMessages(address string, reci
 * @param to - end timestamp
 * @return - number of messages sent by user
 **/
-func (us *UserService) CountNumberOfSentMessages(address string, from int64, to int64) (*types.CouchDBCountDistinctFromResponse, error) {
-	viewPath := "_design/count/_view/from-address"
-	hexUser := "userdb-" + hex.EncodeToString([]byte(address))
+// func (us *UserService) CountNumberOfSentMessages(address string, from int64, to int64) (*types.CouchDBCountDistinctFromResponse, error) {
+// 	viewPath := "_design/count/_view/from-address"
+// 	hexUser := "userdb-" + hex.EncodeToString([]byte(address))
 
-	// format: address, folder, timestamp
-	params := url.Values{}
-	params.Add("startkey", fmt.Sprintf("[\"%s\",\"%s\",%d]", address, "", from))
-	params.Add("endkey", fmt.Sprintf("[\"%s\",\"%s\",%d]", address, "", to))
-	params.Add("deleted", "true") // include deleted messages
-	params.Add("group_level", "2")
+// 	// format: address, folder, timestamp
+// 	params := url.Values{}
+// 	params.Add("startkey", fmt.Sprintf("[\"%s\",\"%s\",%d]", address, "", from))
+// 	params.Add("endkey", fmt.Sprintf("[\"%s\",\"%s\",%d]", address, "", to))
+// 	params.Add("deleted", "true") // include deleted messages
+// 	params.Add("group_level", "2")
 
-	url := fmt.Sprintf("%s/%s?%s", hexUser, viewPath, params.Encode())
+// 	url := fmt.Sprintf("%s/%s?%s", hexUser, viewPath, params.Encode())
 
-	var couchError types.CouchDBError
-	var response types.CouchDBCountDistinctFromResponse
+// 	var couchError types.CouchDBError
+// 	var response types.CouchDBCountDistinctFromResponse
 
-	httpResp, httpErr := us.restyClient.R().SetResult(&response).SetError(&couchError).Get(url)
-	if httpErr != nil {
-		global.Logger.Log(httpErr.Error(), "failed to send message", hexUser)
-		return nil, httpErr
-	}
-	if httpResp.IsError() {
-		global.Logger.Log(httpResp.String(), "failed to send message", hexUser, couchError.Error, couchError.Reason)
-		return nil, fmt.Errorf("code: %s, reason: %s", couchError.Error, couchError.Reason)
-	}
-	return &response, nil
-}
+// 	httpResp, httpErr := us.restyClient.R().SetResult(&response).SetError(&couchError).Get(url)
+// 	if httpErr != nil {
+// 		global.Logger.Log(httpErr.Error(), "failed to send message", hexUser)
+// 		return nil, httpErr
+// 	}
+// 	if httpResp.IsError() {
+// 		global.Logger.Log(httpResp.String(), "failed to send message", hexUser, couchError.Error, couchError.Reason)
+// 		return nil, fmt.Errorf("code: %s, reason: %s", couchError.Error, couchError.Reason)
+// 	}
+// 	return &response, nil
+// }
 
 /**
 * Counts the number of messages received from a specific sender (from) between two timestamps
@@ -298,58 +297,58 @@ func (us *UserService) CountNumberOfSentMessages(address string, from int64, to 
 * @param toTimestamp - end timestamp
 * @return - number of messages received from the sender
 **/
-func (us *UserService) CountNumberOfMessages(address string, from string, folder string, isRead *bool, fromTimestamp int64, toTimestamp int64) (*types.CouchDBCountDistinctFromResponse, error) {
-	// query for couchdb statistics
+// func (us *UserService) CountNumberOfMessages(address string, from string, folder string, isRead *bool, fromTimestamp int64, toTimestamp int64) (*types.CouchDBCountDistinctFromResponse, error) {
+// 	// query for couchdb statistics
 
-	//_design/count-from/_view/count-from-address (how many messages are received from user)
-	//_design/count-from/_view/count-from-address-read (how many messages are read)
-	// startkey=["0x1869cc058092317800727afa25981bfd2a3d0969","", 0]&endkey=["0x1869cc058092317800727afa25981bfd2a3d0969", "\uffff", 213456789]&group_level=2
-	// startkey=["test@example.com","sent", 0]&endkey=["test@example.com", "sent", 12344432342342]&group_level=2
+// 	//_design/count-from/_view/count-from-address (how many messages are received from user)
+// 	//_design/count-from/_view/count-from-address-read (how many messages are read)
+// 	// startkey=["0x1869cc058092317800727afa25981bfd2a3d0969","", 0]&endkey=["0x1869cc058092317800727afa25981bfd2a3d0969", "\uffff", 213456789]&group_level=2
+// 	// startkey=["test@example.com","sent", 0]&endkey=["test@example.com", "sent", 12344432342342]&group_level=2
 
-	//expected response (for both views):
-	/**
-	{"rows":[
-		{"key":["inbox"],"value":4},
-		{"key":["sent"],"value":4}
-	]}
-	**/
+// 	//expected response (for both views):
+// 	/**
+// 	{"rows":[
+// 		{"key":["inbox"],"value":4},
+// 		{"key":["sent"],"value":4}
+// 	]}
+// 	**/
 
-	//by default check all folders
-	folderFrom := ""
-	folderTo := "\uffff"
-	if folder != "" {
-		// unless single folder specified
-		folderFrom = folder
-		folderTo = folder
-	}
-	viewPath := "_design/count/_view/from-address"
-	if isRead != nil {
-		if *isRead {
-			viewPath = "_design/count-read/_view/from-address-read"
-		}
-	}
-	hexUser := "userdb-" + hex.EncodeToString([]byte(address))
+// 	//by default check all folders
+// 	folderFrom := ""
+// 	folderTo := "\uffff"
+// 	if folder != "" {
+// 		// unless single folder specified
+// 		folderFrom = folder
+// 		folderTo = folder
+// 	}
+// 	viewPath := "_design/count/_view/from-address"
+// 	if isRead != nil {
+// 		if *isRead {
+// 			viewPath = "_design/count-read/_view/from-address-read"
+// 		}
+// 	}
+// 	hexUser := "userdb-" + hex.EncodeToString([]byte(address))
 
-	startKey := fmt.Sprintf("[\"%s\",\"%s\",%d]", from, folderFrom, fromTimestamp)
-	endKey := fmt.Sprintf("[\"%s\",\"%s\",%d]", from, folderTo, toTimestamp)
-	params := url.Values{}
-	params.Add("startkey", startKey)
-	params.Add("endkey", endKey)
-	params.Add("group_level", "2")
+// 	startKey := fmt.Sprintf("[\"%s\",\"%s\",%d]", from, folderFrom, fromTimestamp)
+// 	endKey := fmt.Sprintf("[\"%s\",\"%s\",%d]", from, folderTo, toTimestamp)
+// 	params := url.Values{}
+// 	params.Add("startkey", startKey)
+// 	params.Add("endkey", endKey)
+// 	params.Add("group_level", "2")
 
-	url := fmt.Sprintf("%s/%s?%s", hexUser, viewPath, params.Encode())
+// 	url := fmt.Sprintf("%s/%s?%s", hexUser, viewPath, params.Encode())
 
-	var couchError types.CouchDBError
-	var response types.CouchDBCountDistinctFromResponse
+// 	var couchError types.CouchDBError
+// 	var response types.CouchDBCountDistinctFromResponse
 
-	httpResp, httpErr := us.restyClient.R().SetResult(&response).SetError(&couchError).Get(url)
-	if httpErr != nil {
-		global.Logger.Log(httpErr.Error(), "failed to send message", hexUser)
-		return nil, httpErr
-	}
-	if httpResp.IsError() {
-		global.Logger.Log(httpResp.String(), "failed to send message", hexUser, couchError.Error, couchError.Reason)
-		return nil, fmt.Errorf("code: %s, reason: %s", couchError.Error, couchError.Reason)
-	}
-	return &response, nil
-}
+// 	httpResp, httpErr := us.restyClient.R().SetResult(&response).SetError(&couchError).Get(url)
+// 	if httpErr != nil {
+// 		global.Logger.Log(httpErr.Error(), "failed to send message", hexUser)
+// 		return nil, httpErr
+// 	}
+// 	if httpResp.IsError() {
+// 		global.Logger.Log(httpResp.String(), "failed to send message", hexUser, couchError.Error, couchError.Reason)
+// 		return nil, fmt.Errorf("code: %s, reason: %s", couchError.Error, couchError.Reason)
+// 	}
+// 	return &response, nil
+// }

@@ -14,20 +14,18 @@ import (
 )
 
 type DIDMtpApi struct {
-	handshakeService *services.HandshakeService
-	mtpService       *services.MtpService
-	validate         *validator.Validate
-	env              *types.Environment
+	mtpService *services.MtpService
+	validate   *validator.Validate
+	env        *types.Environment
 }
 
-func NewDIDMtpApi(handshakeService *services.HandshakeService, mtpService *services.MtpService, env *types.Environment) *DIDMtpApi {
+func NewDIDMtpApi(mtpService *services.MtpService, env *types.Environment) *DIDMtpApi {
 	validate := validator.New()
 
 	return &DIDMtpApi{
-		handshakeService: handshakeService,
-		mtpService:       mtpService,
-		validate:         validate,
-		env:              env,
+		mtpService: mtpService,
+		validate:   validate,
+		env:        env,
 	}
 }
 

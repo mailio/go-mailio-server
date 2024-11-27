@@ -19,10 +19,11 @@ type MessageQueue struct {
 	userService        *services.UserService
 	userProfileService *services.UserProfileService
 	mtpService         *services.MtpService
-	handshakeService   *services.HandshakeService
 	deliveryService    *services.MessageDeliveryService
 	s3Service          *services.S3Service
 	malwareService     *services.MalwareService
+	statisticsService  *services.StatisticsService
+	userRepo           repository.Repository
 	restyClient        *resty.Client
 	env                *types.Environment
 }
@@ -33,23 +34,30 @@ func NewMessageQueue(dbSelector *repository.CouchDBSelector, env *types.Environm
 	ssiService := services.NewSelfSovereignService(dbSelector, env)
 	userService := services.NewUserService(dbSelector, env)
 	mtpService := services.NewMtpService(dbSelector, env)
-	handshakeService := services.NewHandshakeService(dbSelector)
 	deliveryService := services.NewMessageDeliveryService(dbSelector)
 	userProfileService := services.NewUserProfileService(dbSelector, env)
 	malwareService := services.NewMalwareService()
 	s3Service := services.NewS3Service(env)
+	statisticsService := services.NewStatisticsService(dbSelector, env)
+
+	userRepo, urErr := dbSelector.ChooseDB(repository.User)
+	if urErr != nil {
+		global.Logger.Log("msg", "error while choosing db", "err", urErr)
+		panic(urErr)
+	}
 
 	return &MessageQueue{
 		ssiService:         ssiService,
 		userService:        userService,
 		mtpService:         mtpService,
-		handshakeService:   handshakeService,
 		deliveryService:    deliveryService,
 		malwareService:     malwareService,
 		restyClient:        rcClient,
 		env:                env,
 		userProfileService: userProfileService,
 		s3Service:          s3Service,
+		userRepo:           userRepo,
+		statisticsService:  statisticsService,
 	}
 }
 

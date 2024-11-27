@@ -6,7 +6,7 @@ import (
 
 const (
 	// CouchDB is the name of the CouchDB database
-	Handshake       = "handshake"
+	// Handshake       = "handshake"
 	Nonce           = "nonce"
 	User            = "_users"
 	Domain          = "domains"

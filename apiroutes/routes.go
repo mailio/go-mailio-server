@@ -47,7 +47,6 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 	userService := services.NewUserService(dbSelector, environment)
 	nonceService := services.NewNonceService(dbSelector)
 	ssiService := services.NewSelfSovereignService(dbSelector, environment)
-	handshakeService := services.NewHandshakeService(dbSelector)
 	mtpService := services.NewMtpService(dbSelector, environment)
 	userProfileService := services.NewUserProfileService(dbSelector, environment)
 	domainService := services.NewDomainService(dbSelector)
@@ -57,23 +56,23 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 	statsService := services.NewStatisticsService(dbSelector, environment)
 
 	// API definitions
-	handshakeApi := api.NewHandshakeApi(handshakeService, nonceService, mtpService, userService, userProfileService)
+	handshakeApi := api.NewHandshakeApi(nonceService, mtpService, userService, userProfileService)
 	accountApi := api.NewUserAccountApi(userService, userProfileService, nonceService, ssiService, smartKeyService)
 	didApi := api.NewDIDApi(ssiService, mtpService)
 	vcApi := api.NewVCApi(ssiService)
-	messageApi := api.NewMessagingApi(ssiService, userService, userProfileService, domainService, environment)
+	messageApi := api.NewMessagingApi(ssiService, userService, userProfileService, domainService, statsService, environment)
 	domainApi := api.NewDomainApi(domainService)
 	webauthnApi := api.NewWebAuthnApi(nonceService, webAuthnService, userService, userProfileService, smartKeyService, ssiService, environment)
 	s3Api := api.NewS3Api(s3Service, environment)
 	statisticsApi := api.NewAPIStatistics(statsService)
 
 	// WEBHOOK API definitions
-	webhookApi := api.NewMailReceiveWebhook(handshakeService, userService, userProfileService, environment)
+	webhookApi := api.NewMailReceiveWebhook(userService, userProfileService, environment)
 
 	// MTP API definitions
-	handshakeMTPApi := api.NewHandshakeMTPApi(handshakeService, mtpService, environment)
-	messageMTPApi := api.NewMessagingMTPApi(handshakeService, mtpService, environment)
-	didMtpApi := api.NewDIDMtpApi(handshakeService, mtpService, environment)
+	handshakeMTPApi := api.NewHandshakeMTPApi(mtpService, environment)
+	messageMTPApi := api.NewMessagingMTPApi(mtpService, environment)
+	didMtpApi := api.NewDIDMtpApi(mtpService, environment)
 
 	// PUBLIC ROOT API
 	rootPublicApi := router.Group("/", restinterceptors.RateLimitMiddleware(), metrics.MetricsMiddleware())
@@ -103,13 +102,7 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 	rootApi := router.Group("/api", metrics.MetricsMiddleware(), restinterceptors.RateLimitMiddleware(), restinterceptors.JWSMiddleware(userProfileService))
 	{
 		// Handshakes
-		// rootApi.GET("/v1/handshake/:id", handshakeApi.GetHandshake)
-		// rootApi.GET("/v1/handshake", handshakeApi.ListHandshakes)
-		// rootApi.POST("/v1/handshake", handshakeApi.CreateHandshake)
-		// rootApi.DELETE("/v1/handshake/:id", handshakeApi.DeleteHandshake)
 		rootApi.GET("/v1/handshakeoffer", handshakeApi.PersonalHandshakeLink)
-		rootApi.POST("/v1/handshakefetch", handshakeApi.HandshakeFetch)
-		// rootApi.GET("/v1/handshakestats", handshakeApi.GetHandshakeStats)
 
 		// Messaging
 		rootApi.POST("/v1/senddid", messageApi.SendDIDMessage)

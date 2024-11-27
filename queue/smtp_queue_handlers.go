@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/mail"
 	"net/url"
@@ -21,6 +20,7 @@ import (
 	smtptypes "github.com/mailio/go-mailio-server/email/smtp/types"
 	smtpvalidator "github.com/mailio/go-mailio-server/email/validator"
 	"github.com/mailio/go-mailio-server/global"
+	"github.com/mailio/go-mailio-server/services"
 	"github.com/mailio/go-mailio-server/types"
 	"github.com/mailio/go-mailio-server/util"
 	"github.com/redis/go-redis/v9"
@@ -157,6 +157,12 @@ func (msq *MessageQueue) SendSMTPMessage(fromMailioAddress string, email *types.
 	if msErr != nil {
 		global.Logger.Log(msErr.Error(), "failed to save message")
 		return fmt.Errorf("failed saving message: %v: %w", msErr, asynq.SkipRetry)
+	}
+
+	// process statistics on successfully sent email
+	msq.statisticsService.ProcessEmailsSentStatistics(fromMailioAddress)
+	for _, to := range tos {
+		msq.statisticsService.ProcessEmailStatistics(fromMailioAddress, to)
 	}
 
 	//TODO: uncomment when the email sending is enabled
@@ -330,7 +336,7 @@ func (msq *MessageQueue) ReceiveSMTPMessage(email *smtptypes.Mail, taskId string
 		// only do the following if the incoming email is not marked as spam
 		if !isSpam {
 			// get user handshake if exists
-			handshake, hErr := msq.handshakeService.GetByMailioAddress(userMapping.MailioAddress, to.Address)
+			handshake, hErr := services.GetHandshakeByID(msq.userRepo, userMapping.MailioAddress, to.Address)
 			if hErr != nil {
 				if hErr != types.ErrNotFound {
 					global.Logger.Log("error finding handshake to ", to.Address, userMapping.MailioAddress, hErr.Error())
@@ -345,7 +351,13 @@ func (msq *MessageQueue) ReceiveSMTPMessage(email *smtptypes.Mail, taskId string
 				}
 			} else {
 				// if handshake hasn't deemed the email to be in the inbox, then check statistics
-				folder = msq.getFolderByStats(userMapping.MailioAddress, email.From.Address)
+				f, fErr := msq.selectMailFolder(email.From.Address, userMapping.MailioAddress)
+				if fErr != nil {
+					global.Logger.Log("error selecting mail folder", fErr.Error())
+					folder = types.MailioFolderInbox // default to inbox
+				} else {
+					folder = f
+				}
 			}
 		}
 
@@ -383,6 +395,9 @@ func (msq *MessageQueue) ReceiveSMTPMessage(email *smtptypes.Mail, taskId string
 			return mErr
 		}
 		global.Logger.Log("message saved", mm.ID)
+
+		// process received email statistics
+		msq.statisticsService.ProcessEmailStatistics(userMapping.MailioAddress, email.From.Address)
 	}
 
 	return nil
@@ -408,72 +423,6 @@ func sendBounce(bounceFromEmail mail.Address, email *smtptypes.Mail, smtpHandler
 		return sndErr
 	}
 	return nil
-}
-
-// getFolderByStats determines the appropriate folder for an incoming email based on statistical analysis of past email interactions.
-//
-// Parameters:
-//   - mailioAddress: The Mailio address of the recipient.
-//   - from: The sender's email address.
-//
-// Returns:
-//   - string: The folder name where the email should be stored. Possible values are "Inbox", "GoodReads", or "Other".
-func (msq *MessageQueue) getFolderByStats(mailioAddress, from string) string {
-	receivedAll := 0
-	receivedRead := 0
-	sent := 0
-
-	toTimestamp := time.Now().UnixMilli()
-	currentTime := time.UnixMilli(toTimestamp)
-	sixMonthsAgo := currentTime.AddDate(0, -3, 0)
-	fromTimestamp := sixMonthsAgo.UnixMilli() // 3 months ago
-
-	// count the number of sent messages to the recipient email or Mailio address
-	countSent, csErr := msq.userService.CountNumberOfSentByRecipientMessages(mailioAddress, from, fromTimestamp, toTimestamp)
-	if csErr != nil {
-		global.Logger.Log("error counting number of sent messages to email", csErr.Error())
-	} else {
-		if len(countSent.Rows) > 0 {
-			sent = countSent.Rows[0].Value
-		}
-	}
-	// check if any sent message in the past 3 months (if yes, then store response in inbox)
-	if sent > 0 {
-		return types.MailioFolderInbox
-	}
-
-	// count number of received messages from the sender
-	isReadCountReceivedAll := false
-	countReceivedAll, crErr := msq.userService.CountNumberOfMessages(mailioAddress, from, "", &isReadCountReceivedAll, fromTimestamp, toTimestamp)
-	// count number of received messages from the sender that are read
-	isReadCountReceivedRead := true
-	countReceivedRead, crrErr := msq.userService.CountNumberOfMessages(mailioAddress, from, "", &isReadCountReceivedRead, fromTimestamp, toTimestamp)
-	if errors.Join(crErr, crrErr) != nil {
-		global.Logger.Log("error counting number of received messages", errors.Join(crErr, crrErr).Error())
-	} else {
-		receivedAll = util.SumUpItemsFromFolderCountResponse([]string{types.MailioFolderInbox, types.MailioFolderArchive, types.MailioFolderGoodReads, types.MailioFolderOther, types.MailioFolderTrash}, countReceivedAll)
-		receivedRead = util.SumUpItemsFromFolderCountResponse([]string{types.MailioFolderInbox, types.MailioFolderArchive, types.MailioFolderGoodReads, types.MailioFolderOther, types.MailioFolderTrash}, countReceivedRead)
-	}
-	// if first time message, then store in inbox
-	if receivedAll == 0 {
-		return types.MailioFolderInbox
-	}
-
-	readVsReceived := global.Conf.Mailio.ReadVsReceived
-
-	// ratio of read messages vs all received messages
-	ratio := 0.0
-	if receivedAll != 0 {
-		ratio = float64(receivedRead) / float64(receivedAll)
-	}
-	// if more than X% of the messages are read, then store in goodreads
-	ratioThreshold := float64(readVsReceived) / 100.0
-	if ratio >= ratioThreshold {
-		return types.MailioFolderGoodReads
-	}
-
-	// default folder
-	return types.MailioFolderOther
 }
 
 // simple determination of a forwarded email
