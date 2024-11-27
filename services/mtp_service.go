@@ -18,20 +18,15 @@ import (
 )
 
 type MtpService struct {
-	domainRepo    repository.Repository
-	handshakeRepo repository.Repository
-	mappingRepo   repository.Repository
-	restyClient   *resty.Client
-	ssiService    *SelfSovereignService
+	domainRepo  repository.Repository
+	mappingRepo repository.Repository
+	userRepo    repository.Repository
+	restyClient *resty.Client
+	ssiService  *SelfSovereignService
 }
 
 func NewMtpService(dbSelector repository.DBSelector, env *types.Environment) *MtpService {
 	domainRepo, err := dbSelector.ChooseDB(repository.Domain)
-	if err != nil {
-		level.Error(global.Logger).Log("msg", "error while choosing db", "err", err)
-		panic(err)
-	}
-	handshakeRepo, err := dbSelector.ChooseDB(repository.Handshake)
 	if err != nil {
 		level.Error(global.Logger).Log("msg", "error while choosing db", "err", err)
 		panic(err)
@@ -41,9 +36,14 @@ func NewMtpService(dbSelector repository.DBSelector, env *types.Environment) *Mt
 		level.Error(global.Logger).Log("msg", "error while choosing db", "err", err)
 		panic(err)
 	}
+	userRepo, err := dbSelector.ChooseDB(repository.User)
+	if err != nil {
+		level.Error(global.Logger).Log("msg", "error while choosing db", "err", err)
+		panic(err)
+	}
 	ssiService := NewSelfSovereignService(dbSelector, env)
 	restyClient := resty.New().SetRetryCount(3).SetRetryWaitTime(5 * time.Second)
-	return &MtpService{domainRepo: domainRepo, handshakeRepo: handshakeRepo, mappingRepo: mappingRepo, ssiService: ssiService, restyClient: restyClient}
+	return &MtpService{domainRepo: domainRepo, mappingRepo: mappingRepo, userRepo: userRepo, ssiService: ssiService, restyClient: restyClient}
 }
 
 // Lookup handshakes locally and if not found
@@ -185,16 +185,16 @@ func (mtp *MtpService) LocalHandshakeLookup(senderAddress string, lookups []type
 
 		switch {
 		case lookup.ID != "":
-			shake, err = GetByID(mtp.handshakeRepo, lookup.ID)
+			shake, err = GetHandshakeByID(mtp.userRepo, lookup.Address, lookup.ID)
 		case lookup.Address != "":
-			shake, err = GetByMailioAddress(mtp.handshakeRepo, lookup.Address, senderAddress)
+			shake, err = GetHandshakeByMailioAddress(mtp.userRepo, lookup.Address, senderAddress)
 		case lookup.EmailHash != "":
-			mappedUser, userErr := getUserByScryptEmail(mtp.handshakeRepo, lookup.EmailHash)
+			mappedUser, userErr := getUserByScryptEmail(mtp.userRepo, lookup.EmailHash)
 			if userErr != nil {
 				err = userErr
 				break
 			}
-			shake, err = GetByMailioAddress(mtp.handshakeRepo, mappedUser.MailioAddress, senderAddress)
+			shake, err = GetHandshakeByMailioAddress(mtp.userRepo, mappedUser.MailioAddress, senderAddress)
 		default:
 			outputErr = types.ErrBadRequest
 			return

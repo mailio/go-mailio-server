@@ -55,29 +55,29 @@ func CreateVcsCredentialSubjectIDIndex(vcsRepo Repository) error {
 	return nil
 }
 
-// create indexes on handshakes database for the address field
-func CreateHandshakeIndex(handshakeRepo Repository) error {
-	dbName := Handshake
-	// create index on database
-	addressIndex := map[string]interface{}{
-		"index": map[string]interface{}{
-			"fields": []map[string]interface{}{{"ownerAddress": "desc"}, {"timestamp": "desc"}},
-		},
-		"name": "ownerAddress-index",
-		"type": "json",
-		"ddoc": "ownerAddressDesign",
-	}
-	c := handshakeRepo.GetClient().(*resty.Client)
-	resp, rErr := c.R().SetBody(addressIndex).Post(fmt.Sprintf("%s/%s", dbName, "_index"))
-	if rErr != nil {
-		return rErr
-	}
-	if resp.IsError() {
-		outErr := handleError(resp)
-		return outErr
-	}
-	return nil
-}
+// // create indexes on handshakes database for the address field
+// func CreateHandshakeIndex(handshakeRepo Repository) error {
+// 	dbName := Handshake
+// 	// create index on database
+// 	addressIndex := map[string]interface{}{
+// 		"index": map[string]interface{}{
+// 			"fields": []map[string]interface{}{{"ownerAddress": "desc"}, {"timestamp": "desc"}},
+// 		},
+// 		"name": "ownerAddress-index",
+// 		"type": "json",
+// 		"ddoc": "ownerAddressDesign",
+// 	}
+// 	c := handshakeRepo.GetClient().(*resty.Client)
+// 	resp, rErr := c.R().SetBody(addressIndex).Post(fmt.Sprintf("%s/%s", dbName, "_index"))
+// 	if rErr != nil {
+// 		return rErr
+// 	}
+// 	if resp.IsError() {
+// 		outErr := handleError(resp)
+// 		return outErr
+// 	}
+// 	return nil
+// }
 
 // creates a database per user (required users_ db to exist)
 func CreateUsers_IfNotExists(usersRepo Repository, repoUrl string) error {

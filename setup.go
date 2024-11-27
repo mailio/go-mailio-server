@@ -56,7 +56,7 @@ func RegisterDiskUsageHandlers(conf *global.Config) {
 func ConfigDBSelector() repository.DBSelector {
 	// configure Repository (couchDB)
 	repoUrl := global.Conf.CouchDB.Scheme + "://" + global.Conf.CouchDB.Host + ":" + strconv.Itoa(global.Conf.CouchDB.Port)
-	handshakeRepo, handshakeRepoErr := repository.NewCouchDBRepository(repoUrl, repository.Handshake, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
+	// handshakeRepo, handshakeRepoErr := repository.NewCouchDBRepository(repoUrl, repository.Handshake, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
 	nonceRepo, nonceRepoErr := repository.NewCouchDBRepository(repoUrl, repository.Nonce, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
 	userRepo, userRepoErr := repository.NewCouchDBRepository(repoUrl, repository.User, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
 	mailioMappingRepo, mappingRepoErr := repository.NewCouchDBRepository(repoUrl, repository.MailioMapping, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
@@ -72,7 +72,7 @@ func ConfigDBSelector() repository.DBSelector {
 	// ensure _users exist
 	users_Err := repository.CreateUsers_IfNotExists(userRepo, repoUrl)
 
-	repoErr := errors.Join(handshakeRepoErr, nonceRepoErr, userRepoErr, mappingRepoErr, didRErr, vscrErr, dErr, mdErr, upErr, users_Err, wErr, smrtkErr, stErr)
+	repoErr := errors.Join(nonceRepoErr, userRepoErr, mappingRepoErr, didRErr, vscrErr, dErr, mdErr, upErr, users_Err, wErr, smrtkErr, stErr)
 	if repoErr != nil {
 		global.Logger.Log("error", "Failed to create repositories", "error", repoErr.Error())
 		panic(repoErr)
@@ -80,7 +80,6 @@ func ConfigDBSelector() repository.DBSelector {
 
 	// REPOSITORY definitions
 	dbSelector := repository.NewCouchDBSelector()
-	dbSelector.AddDB(handshakeRepo)
 	dbSelector.AddDB(nonceRepo)
 	dbSelector.AddDB(userRepo)
 	dbSelector.AddDB(mailioMappingRepo)
@@ -114,19 +113,18 @@ func ConfigMalwareScanner(conf *global.Config, environment *types.Environment) {
 func ConfigDBIndexing(dbSelector *repository.CouchDBSelector, environment *types.Environment) {
 	// CREATE REQUIRED SERVICES
 	nonceService := services.NewNonceService(dbSelector)
+	statisticService := services.NewStatisticsService(dbSelector, environment)
 
 	// Create INDEXES
 	vcsRepo, vscErr := dbSelector.ChooseDB(repository.VCS)
-	handshakeRepo, hshErr := dbSelector.ChooseDB(repository.Handshake)
-	if errors.Join(vscErr, hshErr) != nil {
-		panic(errors.Join(vscErr, hshErr))
+	if vscErr != nil {
+		panic(vscErr)
 	}
 
+	// VCS INDEXES
 	icVcsErr := repository.CreateVcsCredentialSubjectIDIndex(vcsRepo)
-	hiErr := repository.CreateHandshakeIndex(handshakeRepo)
-	iErr := errors.Join(icVcsErr, hiErr)
-	if iErr != nil {
-		panic(iErr)
+	if icVcsErr != nil {
+		panic(icVcsErr)
 	}
 
 	// Create DESIGN DOCUMENTS
@@ -137,6 +135,14 @@ func ConfigDBIndexing(dbSelector *repository.CouchDBSelector, environment *types
 	environment.Cron.AddFunc("@every 5m", nonceService.RemoveExpiredNonces) // remove expired tokens every 5 minutes
 	environment.Cron.Start()
 	go nonceService.RemoveExpiredNonces() // run once on startup
+
+	// cron job for flushing email statistics into the database
+	environment.Cron.AddFunc("@every 5m", statisticService.FlushEmailInterests)
+	environment.Cron.Start()
+	environment.Cron.AddFunc("@every 5m", statisticService.FlushEmailStatistics)
+	environment.Cron.Start()
+	environment.Cron.AddFunc("@every 1h", statisticService.FlushSentEmailStatistics)
+	environment.Cron.Start()
 }
 
 func ConfigS3Storage(conf *global.Config, env *types.Environment) {

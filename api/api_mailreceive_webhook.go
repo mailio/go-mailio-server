@@ -22,13 +22,12 @@ var DENIED_FILE_EXTENSIONS = map[string]string{"ade": "ade", "adp": "adp", "apk"
 
 type MailReceiveWebhook struct {
 	env                *types.Environment
-	handshakeService   *services.HandshakeService
 	userService        *services.UserService
 	userProfileService *services.UserProfileService
 }
 
-func NewMailReceiveWebhook(handshakeService *services.HandshakeService, userService *services.UserService, userProfileService *services.UserProfileService, env *types.Environment) *MailReceiveWebhook {
-	return &MailReceiveWebhook{env: env, handshakeService: handshakeService, userService: userService, userProfileService: userProfileService}
+func NewMailReceiveWebhook(userService *services.UserService, userProfileService *services.UserProfileService, env *types.Environment) *MailReceiveWebhook {
+	return &MailReceiveWebhook{env: env, userService: userService, userProfileService: userProfileService}
 }
 
 // converts a path to smtp provider (e.g. /webhook/mailgun_mime -> mailgun)

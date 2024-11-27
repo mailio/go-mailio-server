@@ -1,12 +1,9 @@
 package services
 
 import (
-	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/go-resty/resty/v2"
 	"github.com/mailio/go-mailio-server/global"
@@ -14,50 +11,31 @@ import (
 	"github.com/mailio/go-mailio-server/types"
 )
 
-// returns default server handshake (used when there is no users handshake related to the sender)
-// func GetServerHandshake(senderAddress string) (*types.Handshake, error) {
-// 	handshake, hErr := util.ServerSideHandshake(global.PublicKey, global.PrivateKey, global.Conf.Mailio.Domain)
-// 	if hErr != nil {
-// 		level.Error(global.Logger).Log("msg", "error while creating handshake", "err", hErr)
-// 		return nil, hErr
-// 	}
-// 	return handshake, nil
-// }
+/**
+ * GetByID returns a handshake by ID of a specific mailio user from local database
+ */
+func GetHandshakeByID(userRepo repository.Repository, handshakeOwnerAddress string, handshakeID string) (*types.StoredHandshake, error) {
+	hexUser := "userdb-" + hex.EncodeToString([]byte(handshakeOwnerAddress))
 
-// Get handshake by ID
-func GetByID(handshakeRepo repository.Repository, handshakeID string) (*types.StoredHandshake, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-	defer cancel()
-	handshakeResponse, err := handshakeRepo.GetByID(ctx, handshakeID)
+	url := fmt.Sprintf("%s/%s", hexUser, handshakeID)
+
+	var storedHandshake types.StoredHandshake
+	resp, err := userRepo.GetClient().(*resty.Client).R().SetResult(&storedHandshake).Get(url)
 	if err != nil {
+		global.Logger.Log("HandshakeService.GetByID", "failed to get", err.Error())
 		return nil, err
 	}
-	response := handshakeResponse.(*resty.Response)
-
-	if response.IsError() {
-		global.Logger.Log(response.Error(), "failed to retrieve handshake id", handshakeID, "response", string(response.Body()))
-		return nil, fmt.Errorf("failed to retrieve handshake id %s", handshakeID)
-	}
-	var handshake types.StoredHandshake
-	if err := json.Unmarshal(response.Body(), &handshake); err != nil {
-		return nil, err
+	if resp.StatusCode() < 200 || resp.StatusCode() >= 300 {
+		return nil, fmt.Errorf("failed to get handshake by ID")
 	}
 
-	return &handshake, nil
+	return &storedHandshake, nil
 }
 
-// get handshake by mailio address (where ID of the handshake is constructed from userOwnerAddress and senderAddress)
-// senderAddress can be either mailio address or email address
-func GetByMailioAddress(handshakeRepo repository.Repository, userOwnerAddress string, senderAddress string) (*types.StoredHandshake, error) {
-
-	handshakeIDConcat := userOwnerAddress + senderAddress
+func GetHandshakeByMailioAddress(userRepo repository.Repository, handshakeOwnerAddress string, senderAddress string) (*types.StoredHandshake, error) {
+	handshakeIDConcat := handshakeOwnerAddress + senderAddress
 	s256 := sha256.Sum256([]byte(handshakeIDConcat))
 	handshakeID := hex.EncodeToString(s256[:])
 
-	handshake, err := GetByID(handshakeRepo, handshakeID)
-	if err != nil {
-		return nil, err
-	}
-
-	return handshake, nil
+	return GetHandshakeByID(userRepo, handshakeOwnerAddress, handshakeID)
 }

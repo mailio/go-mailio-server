@@ -15,20 +15,18 @@ import (
 )
 
 type HandshakeMTPApi struct {
-	handshakeService *services.HandshakeService
-	mtpService       *services.MtpService
-	validate         *validator.Validate
-	env              *types.Environment
+	mtpService *services.MtpService
+	validate   *validator.Validate
+	env        *types.Environment
 }
 
-func NewHandshakeMTPApi(handshakeService *services.HandshakeService, mtpService *services.MtpService, env *types.Environment) *HandshakeMTPApi {
+func NewHandshakeMTPApi(mtpService *services.MtpService, env *types.Environment) *HandshakeMTPApi {
 	validate := validator.New()
 
 	return &HandshakeMTPApi{
-		handshakeService: handshakeService,
-		mtpService:       mtpService,
-		validate:         validate,
-		env:              env,
+		mtpService: mtpService,
+		validate:   validate,
+		env:        env,
 	}
 }
 

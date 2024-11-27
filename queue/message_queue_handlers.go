@@ -1,6 +1,7 @@
 package queue
 
 import (
+	"context"
 	"crypto/md5"
 	"encoding/base64"
 	"encoding/json"
@@ -13,20 +14,25 @@ import (
 	"github.com/hibiken/asynq"
 	"github.com/mailio/go-mailio-did/did"
 	"github.com/mailio/go-mailio-server/global"
+	"github.com/mailio/go-mailio-server/services"
 	"github.com/mailio/go-mailio-server/types"
 	"github.com/mailio/go-mailio-server/util"
 )
 
-func (msq *MessageQueue) selectMailFolder(fromDID did.DID, recipientAddress string) (string, error) {
+/**
+* selectMailFolder selects the mail folder primarly based on existence and status of a handshake
+* and secondary based on the sender and recipient statistics if handshake does not exist.
+ */
+func (msq *MessageQueue) selectMailFolder(fromAddress string, recipientAddress string) (string, error) {
 	// 1. if message to self, then it goes to inbox
-	if fromDID.Fragment() == recipientAddress {
+	if fromAddress == recipientAddress {
 		return types.MailioFolderInbox, nil
 	}
 	// 2. Check if handhsake is accepted (then go to inbox)
 	// GET handshake by fromDID address
-	handshake, hErr := msq.handshakeService.GetByMailioAddress(recipientAddress, fromDID.Fragment())
+	handshake, hErr := services.GetHandshakeByMailioAddress(msq.userRepo, recipientAddress, fromAddress)
 	if hErr != nil && hErr != types.ErrNotFound {
-		global.Logger.Log(hErr.Error(), "failed to get handshake", recipientAddress, fromDID.Fragment())
+		global.Logger.Log(hErr.Error(), "failed to get handshake", recipientAddress, fromAddress)
 		return types.MailioFolderInbox, hErr
 	}
 	if handshake != nil && handshake.Content.Status == types.HANDSHAKE_STATUS_ACCEPTED {
@@ -35,54 +41,45 @@ func (msq *MessageQueue) selectMailFolder(fromDID did.DID, recipientAddress stri
 		return types.MailioFolderSpam, types.ErrHandshakeRevoked
 	}
 
-	// 3. Check the number of sent messages in the past 3 months to the same recipient
-	now := time.Now().UTC()
-	monthsAgo := now.AddDate(0, -3, 0)
+	// 3. Check the number of sent messages in the past to the same recipient
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
 
-	// check the number of sent messages in the past 3 months
-	totalMessagesSent, err := msq.userService.CountNumberOfMessages(fromDID.Fragment(), recipientAddress, "", nil, monthsAgo.UnixMilli(), now.UnixMilli())
+	totalMessagesSent, err := msq.statisticsService.GetEmailStatistics(ctx, fromAddress, recipientAddress)
 	if err != nil {
-		global.Logger.Log(err.Error(), "failed to count number of read messages", recipientAddress, fromDID.Fragment())
+		global.Logger.Log(err.Error(), "failed to count number of read messages", recipientAddress, fromAddress)
 		return types.MailioFolderInbox, err
 	}
 
-	sentTotal := util.SumUpItemsFromFolderCountResponse([]string{types.MailioFolderSent}, totalMessagesSent)
-
 	// if sent more than 1 email to this recipient in the past 3 months, then the message goes to inbox
-	if sentTotal > 0 {
+	if totalMessagesSent > 0 {
 		return types.MailioFolderInbox, nil
 	}
 
 	// 4. check the read vs received ratio
-	fromTimestamp := int64(0)
-	toTimestamp := time.Now().UnixMilli()
-	isReadTotalReceived := false
-	totalMessagesReceived, err := msq.userService.CountNumberOfMessages(recipientAddress, fromDID.Fragment(), "", &isReadTotalReceived, fromTimestamp, toTimestamp)
+	totalMessagesReceived, err := msq.statisticsService.GetEmailStatistics(ctx, fromAddress, recipientAddress)
 	if err != nil {
-		global.Logger.Log(err.Error(), "failed to count number of received messages", recipientAddress, fromDID.Fragment())
+		global.Logger.Log(err.Error(), "failed to count number of received messages", recipientAddress, fromAddress)
 		return types.MailioFolderInbox, err
 	}
-	isTotalMessagesRead := true
-	totalMessagesRead, err := msq.userService.CountNumberOfMessages(recipientAddress, fromDID.Fragment(), "", &isTotalMessagesRead, fromTimestamp, toTimestamp)
+	totalInterest, err := msq.statisticsService.GetEmailInterest(ctx, fromAddress, recipientAddress)
 	if err != nil {
-		global.Logger.Log(err.Error(), "failed to count number of read messages", recipientAddress, fromDID.Fragment())
+		global.Logger.Log(err.Error(), "failed to count number of read messages", recipientAddress, fromAddress)
 		return types.MailioFolderInbox, err
 	}
 
-	// if the recipient has read more than X% of the messages, then the message goes to inbox
-	total := util.SumUpItemsFromFolderCountResponse([]string{types.MailioFolderInbox, types.MailioFolderArchive, types.MailioFolderGoodReads, types.MailioFolderOther, types.MailioFolderTrash}, totalMessagesReceived)
-	if total == 0 {
-		return types.MailioFolderOther, nil
+	// if new sender, then the message goes to inbox
+	if totalMessagesReceived == 0 {
+		return types.MailioFolderInbox, nil
 	}
 
 	// find domain specific setttings
-	readVsReceivedPercent := global.Conf.Mailio.ReadVsReceived
+	interestVsReceivedPercent := global.Conf.Mailio.ReadVsReceived
 
-	// read := collectFoldersExceptSent(totalMessagesRead)
-	read := util.SumUpItemsFromFolderCountResponse([]string{types.MailioFolderInbox, types.MailioFolderArchive, types.MailioFolderGoodReads, types.MailioFolderOther, types.MailioFolderTrash}, totalMessagesRead)
-	readPercent := math.Ceil(float64(float32(read) / float32(total) * 100))
-	if readPercent >= float64(readVsReceivedPercent) {
-		return types.MailioFolderInbox, nil
+	// if the recipient has show interest in more than X% of the messages, then the message goes to good reads
+	interestPercent := math.Ceil(float64(float32(totalInterest) / float32(totalMessagesReceived) * 100))
+	if interestPercent >= float64(interestVsReceivedPercent) {
+		return types.MailioFolderGoodReads, nil
 	}
 	return types.MailioFolderOther, nil
 }
@@ -160,7 +157,7 @@ func (msq *MessageQueue) handleReceivedDIDCommMessage(message *types.DIDCommMess
 
 	for _, recAddress := range localRecipientsAddresses {
 		// select folder based on the recipient's handshakes and statistics
-		folder, fErr := msq.selectMailFolder(fromDID, recAddress)
+		folder, fErr := msq.selectMailFolder(fromDID.Fragment(), recAddress)
 		if fErr != nil {
 			if fErr == types.ErrHandshakeRevoked {
 				deliveryStatuses = append(deliveryStatuses, types.NewMTPStatusCode(5, 8, 2, fmt.Sprintf("handshake revoked for %s", recAddress), types.WithRecAddress(recAddress)))
@@ -228,7 +225,14 @@ func (msq *MessageQueue) handleReceivedDIDCommMessage(message *types.DIDCommMess
 			deliveryStatuses = append(deliveryStatuses, types.NewMTPStatusCode(2, 0, 0, "delivery confirmation", types.WithRecAddress(recAddress)))
 		}
 	}
-	//send delivery message to sender
+
+	// iterate over all local recipients and store statistics
+	for _, recAddress := range localRecipientsAddresses {
+		fullWebDID := "did:web:" + global.Conf.Mailio.ServerDomain + "#" + recAddress
+		msq.statisticsService.ProcessEmailStatistics(fromDID.String(), fullWebDID)
+	}
+
+	// reply with delivery message to sender of this message
 	deliveryMsg := &types.PlainBodyDelivery{
 		StatusCodes: deliveryStatuses,
 	}
@@ -255,6 +259,7 @@ func (msq *MessageQueue) handleReceivedDIDCommMessage(message *types.DIDCommMess
 		global.Logger.Log(sndErr.Error(), "failed to send message to sender", sndCode.Class, sndCode.Subject, sndCode.Detail, sndCode.Description, sndCode.Address)
 		return fmt.Errorf("failed to send message to sender: %v: %w", sndErr, asynq.SkipRetry)
 	}
+
 	return nil
 }
 
@@ -397,6 +402,14 @@ func (msq *MessageQueue) DIDCommSendMessage(userAddress string, input *types.DID
 		return sErr
 	}
 	msq.deliveryService.SaveBulkMtpStatusCodes(message.ID, mtpStatusErrors)
+
+	// statistics
+	sender := "did:web:" + global.Conf.Mailio.ServerDomain + "#" + userAddress
+	msq.statisticsService.ProcessEmailsSentStatistics(sender)
+	// store all recipients in statistics
+	for _, didDoc := range recipientDidMap {
+		msq.statisticsService.ProcessEmailStatistics(sender, didDoc.ID.String())
+	}
 
 	// delete attachments that client wants to delete
 	// remove possible attachments to be removed

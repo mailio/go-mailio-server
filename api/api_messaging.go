@@ -26,9 +26,16 @@ type MessagingApi struct {
 	userService        *services.UserService
 	userProfileService *services.UserProfileService
 	domainService      *services.DomainService
+	statisticsService  *services.StatisticsService
 }
 
-func NewMessagingApi(ssiService *services.SelfSovereignService, userService *services.UserService, userProfileService *services.UserProfileService, domainService *services.DomainService, env *types.Environment) *MessagingApi {
+func NewMessagingApi(ssiService *services.SelfSovereignService,
+	userService *services.UserService,
+	userProfileService *services.UserProfileService,
+	domainService *services.DomainService,
+	statsService *services.StatisticsService,
+	env *types.Environment) *MessagingApi {
+
 	validate := validator.New()
 
 	return &MessagingApi{
@@ -38,6 +45,7 @@ func NewMessagingApi(ssiService *services.SelfSovereignService, userService *ser
 		userService:        userService,
 		userProfileService: userProfileService,
 		domainService:      domainService,
+		statisticsService:  statsService,
 	}
 }
 
@@ -200,14 +208,15 @@ func (ma *MessagingApi) validateSmtpSender(c *gin.Context, fromEmailAddress stri
 func (ma *MessagingApi) sendSMTPMessage(c *gin.Context, mailInput *types.SmtpEmailInput, up *types.UserProfile) (*string, error) {
 	// send email
 	// check daily sent limit (default = 10)
-	fromTimestamp := time.Now().UTC().AddDate(0, 0, -1).UnixMilli()
-	toTimestamp := time.Now().UTC().UnixMilli()
-	countSent, csErr := ma.userService.CountNumberOfSentMessages(up.ID, fromTimestamp, toTimestamp)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	day := time.Now().UTC().Truncate(24 * time.Hour).Unix()
+	countSent, csErr := ma.statisticsService.GetEmailSentByDay(ctx, up.ID, day)
 	if csErr != nil {
 		global.Logger.Log("error counting number of sent messages to email", csErr.Error())
 	}
-	sent := util.SumUpItemsFromFolderCountResponse([]string{types.MailioFolderSent}, countSent)
-	if sent > global.Conf.Mailio.DailySmtpSentLimit {
+	if countSent > int64(global.Conf.Mailio.DailySmtpSentLimit) {
 		return nil, types.ErrTooManyRequests
 	}
 
