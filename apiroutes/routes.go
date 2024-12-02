@@ -58,6 +58,7 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 	// API definitions
 	handshakeApi := api.NewHandshakeApi(nonceService, mtpService, userService, userProfileService)
 	accountApi := api.NewUserAccountApi(userService, userProfileService, nonceService, ssiService, smartKeyService)
+	userProfileApi := api.NewUserProfileApi(userService, userProfileService, webAuthnService)
 	didApi := api.NewDIDApi(ssiService, mtpService)
 	vcApi := api.NewVCApi(ssiService)
 	messageApi := api.NewMessagingApi(ssiService, userService, userProfileService, domainService, statsService, environment)
@@ -115,7 +116,8 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 		rootApi.POST("/v1/credentials/:requestId/verify", vcApi.VerifyVC)
 
 		// user account
-		rootApi.GET("/v1/user/me", accountApi.GetUserAddress)
+		rootApi.GET("/v1/user/me", userProfileApi.GetUserProfile)
+		rootApi.PUT("/v1/user/me", userProfileApi.UpdateUserProfile)
 		rootApi.DELETE("/v1/nonce/:id", accountApi.DeleteNonce)
 
 		// resolve domain

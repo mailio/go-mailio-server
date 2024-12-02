@@ -836,6 +836,17 @@ definitions:
       timestamp:
         type: integer
     type: object
+  types.EmailStatisticsOutput:
+    properties:
+      interest:
+        type: integer
+      received:
+        type: integer
+      sent:
+        type: integer
+      sentByDay:
+        type: integer
+    type: object
   types.EncryptedAttachmentData:
     properties:
       base64:
@@ -970,17 +981,6 @@ definitions:
     - email
     - originServer
     type: object
-  types.HandshakeLookupResponse:
-    properties:
-      found:
-        items:
-          $ref: '#/definitions/types.HandshakeContent'
-        type: array
-      notFound:
-        items:
-          $ref: '#/definitions/types.HandshakeLookup'
-        type: array
-    type: object
   types.HandshakeRequest:
     properties:
       handshakeLookups:
@@ -1068,14 +1068,6 @@ definitions:
       lookups:
         items:
           $ref: '#/definitions/types.DIDLookup'
-        minItems: 1
-        type: array
-    type: object
-  types.InputHandshakeLookup:
-    properties:
-      lookups:
-        items:
-          $ref: '#/definitions/types.HandshakeLookup'
         minItems: 1
         type: array
     type: object
@@ -1429,6 +1421,58 @@ definitions:
       type:
         type: string
     type: object
+  types.UserProfile:
+    properties:
+      _deleted:
+        type: boolean
+      _id:
+        type: string
+      _rev:
+        description: |-
+          Rev is the revision number returned
+          _Rev    string `json:"_rev,omitempty"`
+        type: string
+      company:
+        description: company of the requester
+        type: string
+      created:
+        type: integer
+      description:
+        description: description of the requester
+        type: string
+      diskSpace:
+        type: integer
+      displayName:
+        description: display name of the user
+        type: string
+      domain:
+        type: string
+      enabled:
+        type: boolean
+      jobTitle:
+        description: job title of the requester
+        type: string
+      modified:
+        type: integer
+      ok:
+        description: _ID     string `json:"_id,omitempty"`
+        type: boolean
+      phone:
+        description: phone number of the requester
+        type: string
+      picture:
+        description: avatar of the requester (base64 or link to the image)
+        type: string
+      social:
+        allOf:
+        - $ref: '#/definitions/types.MailioSocial'
+        description: social media links of the requester
+      whatToShare:
+        description: what the user wants to share from their personal data
+        type: string
+    required:
+    - domain
+    type: object
   types.VCValidationResponse:
     properties:
       requestId:
@@ -1741,7 +1785,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/types.OutputBasicUserInfo'
+            $ref: '#/definitions/types.EmailStatisticsOutput'
         "429":
           description: rate limit exceeded
           schema:
@@ -1809,43 +1853,6 @@ paths:
       summary: Find user by base64 scrypt email address
       tags:
       - User Account
-  /api/v1/handshakefetch:
-    post:
-      consumes:
-      - application/json
-      description: Request handshake from origin server (digitally signed)
-      parameters:
-      - description: InputHandshakeLookup
-        in: body
-        name: handshake
-        required: true
-        schema:
-          $ref: '#/definitions/types.InputHandshakeLookup'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/types.HandshakeLookupResponse'
-        "400":
-          description: bad request
-          schema:
-            $ref: '#/definitions/api.ApiError'
-        "401":
-          description: invalid signature
-          schema:
-            $ref: '#/definitions/api.ApiError'
-        "429":
-          description: rate limit exceeded
-          schema:
-            $ref: '#/definitions/api.ApiError'
-      security:
-      - Bearer: []
-      summary: Request handshake from origin server (digitally signed) if missing
-        in local database
-      tags:
-      - Handshake
   /api/v1/handshakeoffer:
     get:
       description: Create personal handshake link
@@ -1935,7 +1942,7 @@ paths:
       parameters:
       - description: DIDDocumentSignedRequest
         in: body
-        name: handshake
+        name: did
         required: true
         schema:
           $ref: '#/definitions/types.DIDDocumentSignedRequest'
@@ -2375,7 +2382,7 @@ paths:
       parameters:
       - description: didcomm-encrypted+json
         in: body
-        name: handshake
+        name: message
         required: true
         schema:
           $ref: '#/definitions/types.DIDCommMessage'
@@ -2498,6 +2505,41 @@ paths:
       security:
       - Bearer: []
       summary: Get logged inusers basic information
+      tags:
+      - User Account
+    put:
+      consumes:
+      - application/json
+      description: Update logged in users profile
+      parameters:
+      - description: User Profile
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/types.UserProfile'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.UserProfile'
+        "400":
+          description: invalid input
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "429":
+          description: rate limit exceeded
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "500":
+          description: failed to save user profile
+          schema:
+            $ref: '#/definitions/api.ApiError'
+      security:
+      - Bearer: []
+      summary: Update logged in users profile
       tags:
       - User Account
   /api/v1/verify_cookie:

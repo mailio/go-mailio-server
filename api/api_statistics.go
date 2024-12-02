@@ -29,7 +29,7 @@ func NewAPIStatistics(statisticsService *services.StatisticsService) *APIStatist
 // @Description Returns number of sent emails, received emails and interest shown by the recipient
 // @Tags Statistics
 // @Param sender query string true "Sender email address or Mailio address"
-// @Success 200 {object} types.OutputBasicUserInfo
+// @Success 200 {object} types.EmailStatisticsOutput
 // @Failure 429 {object} api.ApiError "rate limit exceeded"
 // @Accept json
 // @Produce json
@@ -72,9 +72,14 @@ func (a *APIStatistics) GetEmailStatistics(c *gin.Context) {
 		return
 	}
 
-	// TODO: create typed element for response
+	output := types.EmailStatisticsOutput{
+		Received:  statsReceived,
+		Sent:      statsSent,
+		Interest:  interestCount,
+		SentByDay: senyByDay,
+	}
 
-	c.JSON(http.StatusOK, gin.H{"received": statsReceived, "sent": statsSent, "interest": interestCount, "sentByDay": senyByDay})
+	c.JSON(http.StatusOK, output)
 }
 
 // Reporting interest shown by the recipient

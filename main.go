@@ -96,7 +96,7 @@ func asyncRetryDelayFunc(attempt int, err error, t *asynq.Task) time.Duration {
 	return delay
 }
 
-// initalizes the async queue
+// initalizes the async queue for processing sent and received messages (DIDComm and SMTP)
 func initAsyncQueue(dbSelector *repository.CouchDBSelector, env *types.Environment) (*asynq.Server, *asynq.Client) {
 	queueRedisClient := asynq.RedisClientOpt{
 		Addr:     global.Conf.Redis.Host + ":" + strconv.Itoa(global.Conf.Redis.Port),

@@ -56,7 +56,7 @@ func NewMessagingApi(ssiService *services.SelfSovereignService,
 // @Tags Messaging
 // @Accept json
 // @Produce json
-// @Param handshake body types.DIDCommMessage true "didcomm-encrypted+json"
+// @Param message body types.DIDCommMessage true "didcomm-encrypted+json"
 // @Success 202 {object} types.DIDCommApiResponse
 // @Failure 400 {object} api.ApiError "bad request"
 // @Failure 401 {object} api.ApiError "invalid signature or unauthorized to send messages"

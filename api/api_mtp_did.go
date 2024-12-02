@@ -36,7 +36,7 @@ func NewDIDMtpApi(mtpService *services.MtpService, env *types.Environment) *DIDM
 // @Tags Mailio Transfer Protocol
 // @Accept json
 // @Produce json
-// @Param handshake body types.DIDDocumentSignedRequest true "DIDDocumentSignedRequest"
+// @Param did body types.DIDDocumentSignedRequest true "DIDDocumentSignedRequest"
 // @Success 200 {object} types.DIDDocumentSignedResponse
 // @Failure 401 {object} api.ApiError "invalid signature"
 // @Failure 400 {object} api.ApiError "bad request"

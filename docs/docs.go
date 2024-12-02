@@ -320,7 +320,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/types.OutputBasicUserInfo"
+                            "$ref": "#/definitions/types.EmailStatisticsOutput"
                         }
                     },
                     "429": {
@@ -410,63 +410,6 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/types.OutputUserAddress"
-                        }
-                    },
-                    "429": {
-                        "description": "rate limit exceeded",
-                        "schema": {
-                            "$ref": "#/definitions/api.ApiError"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/handshakefetch": {
-            "post": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Request handshake from origin server (digitally signed)",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Handshake"
-                ],
-                "summary": "Request handshake from origin server (digitally signed) if missing in local database",
-                "parameters": [
-                    {
-                        "description": "InputHandshakeLookup",
-                        "name": "handshake",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/types.InputHandshakeLookup"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/types.HandshakeLookupResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "bad request",
-                        "schema": {
-                            "$ref": "#/definitions/api.ApiError"
-                        }
-                    },
-                    "401": {
-                        "description": "invalid signature",
-                        "schema": {
-                            "$ref": "#/definitions/api.ApiError"
                         }
                     },
                     "429": {
@@ -620,7 +563,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "description": "DIDDocumentSignedRequest",
-                        "name": "handshake",
+                        "name": "did",
                         "in": "body",
                         "required": true,
                         "schema": {
@@ -1293,7 +1236,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "description": "didcomm-encrypted+json",
-                        "name": "handshake",
+                        "name": "message",
                         "in": "body",
                         "required": true,
                         "schema": {
@@ -1474,6 +1417,61 @@ const docTemplate = `{
                     },
                     "429": {
                         "description": "rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Update logged in users profile",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "User Account"
+                ],
+                "summary": "Update logged in users profile",
+                "parameters": [
+                    {
+                        "description": "User Profile",
+                        "name": "input",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.UserProfile"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.UserProfile"
+                        }
+                    },
+                    "400": {
+                        "description": "invalid input",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "429": {
+                        "description": "rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "500": {
+                        "description": "failed to save user profile",
                         "schema": {
                             "$ref": "#/definitions/api.ApiError"
                         }
@@ -2879,6 +2877,23 @@ const docTemplate = `{
                 }
             }
         },
+        "types.EmailStatisticsOutput": {
+            "type": "object",
+            "properties": {
+                "interest": {
+                    "type": "integer"
+                },
+                "received": {
+                    "type": "integer"
+                },
+                "sent": {
+                    "type": "integer"
+                },
+                "sentByDay": {
+                    "type": "integer"
+                }
+            }
+        },
         "types.EncryptedAttachmentData": {
             "type": "object",
             "required": [
@@ -3069,23 +3084,6 @@ const docTemplate = `{
                 }
             }
         },
-        "types.HandshakeLookupResponse": {
-            "type": "object",
-            "properties": {
-                "found": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/types.HandshakeContent"
-                    }
-                },
-                "notFound": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/types.HandshakeLookup"
-                    }
-                }
-            }
-        },
         "types.HandshakeRequest": {
             "type": "object",
             "required": [
@@ -3212,18 +3210,6 @@ const docTemplate = `{
                     "minItems": 1,
                     "items": {
                         "$ref": "#/definitions/types.DIDLookup"
-                    }
-                }
-            }
-        },
-        "types.InputHandshakeLookup": {
-            "type": "object",
-            "properties": {
-                "lookups": {
-                    "type": "array",
-                    "minItems": 1,
-                    "items": {
-                        "$ref": "#/definitions/types.HandshakeLookup"
                     }
                 }
             }
@@ -3728,6 +3714,79 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.UserProfile": {
+            "type": "object",
+            "required": [
+                "domain"
+            ],
+            "properties": {
+                "_deleted": {
+                    "type": "boolean"
+                },
+                "_id": {
+                    "type": "string"
+                },
+                "_rev": {
+                    "description": "Rev is the revision number returned\n_Rev    string ` + "`" + `json:\"_rev,omitempty\"` + "`" + `",
+                    "type": "string"
+                },
+                "company": {
+                    "description": "company of the requester",
+                    "type": "string"
+                },
+                "created": {
+                    "type": "integer"
+                },
+                "description": {
+                    "description": "description of the requester",
+                    "type": "string"
+                },
+                "diskSpace": {
+                    "type": "integer"
+                },
+                "displayName": {
+                    "description": "display name of the user",
+                    "type": "string"
+                },
+                "domain": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "jobTitle": {
+                    "description": "job title of the requester",
+                    "type": "string"
+                },
+                "modified": {
+                    "type": "integer"
+                },
+                "ok": {
+                    "description": "_ID     string ` + "`" + `json:\"_id,omitempty\"` + "`" + `",
+                    "type": "boolean"
+                },
+                "phone": {
+                    "description": "phone number of the requester",
+                    "type": "string"
+                },
+                "picture": {
+                    "description": "avatar of the requester (base64 or link to the image)",
+                    "type": "string"
+                },
+                "social": {
+                    "description": "social media links of the requester",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/types.MailioSocial"
+                        }
+                    ]
+                },
+                "whatToShare": {
+                    "description": "what the user wants to share from their personal data",
                     "type": "string"
                 }
             }

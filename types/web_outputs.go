@@ -34,3 +34,10 @@ type OutputDIDLookup struct {
 type InterestOuput struct {
 	MessageId string `json:"messageId,omitempty"`
 }
+
+type EmailStatisticsOutput struct {
+	Received  int64 `json:"received"`
+	Sent      int64 `json:"sent"`
+	Interest  int64 `json:"interest"`
+	SentByDay int64 `json:"sentByDay"`
+}

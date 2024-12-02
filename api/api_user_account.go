@@ -11,10 +11,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	"github.com/mailio/go-mailio-did/did"
-	diskusagehandlers "github.com/mailio/go-mailio-diskusage-handler"
 	"github.com/mailio/go-mailio-server/api/interceptors"
 	apiutil "github.com/mailio/go-mailio-server/api/util"
-	"github.com/mailio/go-mailio-server/diskusage"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/services"
 	"github.com/mailio/go-mailio-server/types"
@@ -346,60 +344,6 @@ func (ua *UserAccountApi) FindUsersAddressByEmail(c *gin.Context) {
 	}
 	output := &types.OutputUserAddress{
 		Address: mapping.MailioAddress,
-	}
-	c.JSON(http.StatusOK, output)
-}
-
-// Get logged in users basic information
-// @Security Bearer
-// @Summary Get logged inusers basic information
-// @Description Get logged in users basic information
-// @Tags User Account
-// @Success 200 {object} types.OutputBasicUserInfo
-// @Failure 429 {object} api.ApiError "rate limit exceeded"
-// @Accept json
-// @Produce json
-// @Router /api/v1/user/me [get]
-func (ua *UserAccountApi) GetUserAddress(c *gin.Context) {
-	address := c.GetString("subjectAddress")
-	if address == "" {
-		ApiErrorf(c, http.StatusUnauthorized, "address not found")
-		return
-	}
-	totalDiskUsageFromHandlers := int64(0)
-	for _, diskUsageHandler := range diskusage.Handlers() {
-		awsDiskUsage, awsDuErr := diskusage.GetHandler(diskUsageHandler).GetDiskUsage(address)
-		if awsDuErr != nil {
-			if awsDuErr != diskusagehandlers.ErrNotFound {
-				global.Logger.Log("error retrieving disk usage stats", awsDuErr.Error())
-			}
-		}
-		if awsDiskUsage != nil {
-			totalDiskUsageFromHandlers += awsDiskUsage.SizeBytes
-		}
-	}
-	stats, sErr := ua.userProfileService.Stats(address)
-	if sErr != nil {
-		global.Logger.Log("error retrieving disk usage stats", sErr.Error())
-	}
-	up, err := ua.userProfileService.Get(address)
-	if err != nil {
-		ApiErrorf(c, http.StatusInternalServerError, "user profile not found")
-		return
-	}
-	output := &types.OutputBasicUserInfo{
-		Address:     address,
-		TotalDisk:   up.DiskSpace,
-		UsedDisk:    totalDiskUsageFromHandlers + stats.ActiveSize,
-		Created:     up.Created,
-		DisplayName: up.DisplayName,
-		Picture:     up.Picture,
-		Phone:       up.Phone,
-		JobTitle:    up.JobTitle,
-		Company:     up.Company,
-		Description: up.Description,
-		Social:      up.Social,
-		WhatToShare: up.WhatToShare,
 	}
 	c.JSON(http.StatusOK, output)
 }
