@@ -3,12 +3,14 @@ module github.com/mailio/go-mailio-server
 go 1.23.2
 
 require (
+	dario.cat/mergo v1.0.1
 	github.com/aws/aws-sdk-go-v2 v1.30.3
 	github.com/aws/aws-sdk-go-v2/config v1.27.27
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.27
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.17.9
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.58.2
 	github.com/aws/smithy-go v1.20.3
+	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/cespare/xxhash/v2 v2.2.0
 	github.com/fxamacker/cbor/v2 v2.6.0
 	github.com/gin-contrib/cors v1.7.2
@@ -30,6 +32,7 @@ require (
 	github.com/mailio/go-mailio-server/email/smtp v0.0.0-20240618164609-bad0c892b0ec
 	github.com/mailio/go-mailio-server/email/validator v0.0.0-20241023192129-f8719177b347
 	github.com/mailio/go-web3-kit v0.0.0-20230302165532-057a45112b37
+	github.com/mitchellh/mapstructure v1.5.0
 	github.com/prometheus/client_golang v1.15.0
 	github.com/redis/go-redis/v9 v9.0.5
 	github.com/robfig/cron/v3 v3.0.1
@@ -115,7 +118,6 @@ require (
 	github.com/microcosm-cc/bluemonday v1.0.26 // indirect
 	github.com/minio/asm2plan9s v0.0.0-20200509001527-cdd76441f9d8 // indirect
 	github.com/minio/c2goasm v0.0.0-20190812172519-36a3d3bbc4f3 // indirect
-	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/mr-tron/base58 v1.2.0 // indirect

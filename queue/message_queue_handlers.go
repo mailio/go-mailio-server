@@ -190,7 +190,7 @@ func (msq *MessageQueue) handleReceivedDIDCommMessage(message *types.DIDCommMess
 				now := time.Now().UTC().Format("20061010t150405")
 				path := recAddress + "/" + att.Data.Hash + "_" + now
 
-				link, uErr := msq.s3Service.UploadAttachment(global.Conf.Storage.Bucket, path, content)
+				link, uErr := msq.s3Service.UploadAttachment(global.Conf.Storage.Bucket, path, content, "")
 				if uErr != nil {
 					global.Logger.Log(uErr.Error(), "failed to upload attachment")
 					//TODO: store message_delivery error?

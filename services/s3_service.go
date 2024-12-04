@@ -30,7 +30,7 @@ func NewS3Service(env *types.Environment) *S3Service {
 }
 
 // upload attachment to s3
-func (s3s *S3Service) UploadAttachment(bucket, path string, content []byte) (string, error) {
+func (s3s *S3Service) UploadAttachment(bucket, path string, content []byte, contentType string) (string, error) {
 	if len(content) == 0 {
 		return "", types.ErrBadRequest
 	}
@@ -38,18 +38,23 @@ func (s3s *S3Service) UploadAttachment(bucket, path string, content []byte) (str
 	defer cancel()
 
 	ioReader := bytes.NewReader(content)
-	_, uErr := s3s.env.S3Uploader.Upload(ctx, &s3Service.PutObjectInput{
+	input := &s3Service.PutObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String(path),
 		Body:   ioReader,
-	})
+	}
+	if contentType != "" {
+		input.ContentType = aws.String(contentType)
+	}
+
+	_, uErr := s3s.env.S3Uploader.Upload(ctx, input)
 	if uErr != nil {
 		fmt.Printf("Error uploading to S3: %v\n", uErr)
 		debug.PrintStack()
 		global.Logger.Log(uErr.Error(), "failed to upload attachment", path)
 		return "", uErr
 	}
-	return fmt.Sprintf("s3://%s%s", global.Conf.Storage.Bucket, path), nil
+	return fmt.Sprintf("s3://%s/%s", bucket, path), nil
 }
 
 // Delete attachment at specific bucket and path

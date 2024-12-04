@@ -6,10 +6,13 @@ import (
 	"fmt"
 	"time"
 
+	"dario.cat/mergo"
+	"github.com/cenkalti/backoff/v4"
 	"github.com/go-resty/resty/v2"
 	"github.com/jarcoal/httpmock"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/types"
+	"github.com/mitchellh/mapstructure"
 )
 
 // implements Repository interface using CouchDB
@@ -98,16 +101,86 @@ func (c *CouchDBRepository) GetAll(ctx context.Context, limit int, skip int) ([]
 
 // Save creates a new doc or updates an existing one
 func (c *CouchDBRepository) Save(ctx context.Context, docID string, data interface{}) error {
-	var ok types.OK
-	var dbErr types.CouchDBError
 
-	resp, rErr := c.client.R().SetBody(data).SetResult(&ok).SetError(&dbErr).Put(fmt.Sprintf("%s/%s", c.dbName, docID))
-	if rErr != nil {
-		return rErr
+	var maxRetries = 3                     // Limit retries to avoid infinite loops
+	var baseDelay = 100 * time.Millisecond // Initial backoff delay
+
+	incomingData, err := structToMapWithMapstructure(data)
+	if err != nil {
+		return types.ErrConflict
 	}
-	if resp.IsError() {
-		outErr := handleError(resp)
-		return outErr
+	// remove BaseDocument from the data due to struct embedding
+	incomingData["_rev"] = incomingData["BaseDocument"].(map[string]interface{})["_rev"] // add _rev to the data
+	incomingData["_id"] = docID
+	delete(incomingData, "BaseDocument")
+
+	// Define the retryable operation
+	operation := func() error {
+		var ok types.OK
+		var dbErr types.CouchDBError
+
+		resp, rErr := c.client.R().SetBody(incomingData).SetResult(&ok).SetError(&dbErr).Put(fmt.Sprintf("%s/%s", c.dbName, docID))
+		if rErr != nil {
+			return rErr
+		}
+		if resp.IsError() {
+			if resp.StatusCode() == 409 {
+				// try again
+				var existingDoc map[string]interface{}
+				getResp, getErr := c.client.R().SetResult(&existingDoc).SetError(&dbErr).Get(fmt.Sprintf("%s/%s", c.dbName, docID))
+				if getErr != nil || getResp.IsError() {
+					return types.ErrConflict
+				}
+				// Merge `_rev` into the data and retry
+				if rev, ok := existingDoc["_rev"]; ok {
+					incomingData["_rev"] = rev
+				} else {
+					return types.ErrConflict
+				}
+				// remove BaseDocument from the data due to struct embedding
+				delete(existingDoc, "BaseDocument")
+				// merge on conflict old document with new data
+				if err := mergo.Merge(&incomingData, existingDoc, mergo.WithOverride); err != nil {
+					return types.ErrConflict
+				}
+				// Attempt to save the document again
+				resp, rErr := c.client.R().SetBody(incomingData).SetResult(&ok).SetError(&dbErr).Put(fmt.Sprintf("%s/%s", c.dbName, docID))
+				if rErr != nil {
+					return rErr
+				}
+				if resp.IsError() {
+					outErr := handleError(resp)
+					return outErr
+				}
+				return nil
+			}
+			outErr := handleError(resp)
+			return outErr
+		}
+		return nil
+	}
+
+	// backoff strategy
+	b := backoff.NewExponentialBackOff()
+	b.InitialInterval = baseDelay
+	b.MaxInterval = baseDelay * (1 << maxRetries) // Max delay after retries
+	b.MaxElapsedTime = time.Duration(maxRetries) * baseDelay
+
+	// Execute the operation with backoff
+	err = backoff.RetryNotify(
+		func() error {
+			return operation()
+		},
+		backoff.WithContext(b, ctx),
+		func(err error, d time.Duration) {
+			global.Logger.Log("retrying save after conflict", "delay", d, "docID", docID, "error", err)
+		},
+	)
+
+	// Final error after retries
+	if err != nil {
+		global.Logger.Log("save operation failed", "docID", docID, "error", err.Error())
+		return types.ErrConflict
 	}
 	return nil
 }
@@ -183,4 +256,44 @@ func (c *CouchDBRepository) GetDBName() string {
 // returns a resty client
 func (c *CouchDBRepository) GetClient() interface{} {
 	return c.client
+}
+
+func structToMapWithMapstructure(data interface{}) (map[string]interface{}, error) {
+	var result map[string]interface{}
+
+	// Decode the struct directly into a map using mapstructure
+	decoderConfig := &mapstructure.DecoderConfig{
+		Metadata: nil,
+		Result:   &result,
+		TagName:  "json", // Use struct tags like `json:"name"`
+	}
+
+	decoder, err := mapstructure.NewDecoder(decoderConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	err = decoder.Decode(data)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+func exponentialRetry(ctx context.Context, operation func() error, maxRetries int, baseDelay time.Duration) error {
+	b := backoff.NewExponentialBackOff()
+	b.InitialInterval = baseDelay
+	b.MaxElapsedTime = time.Duration(maxRetries) * baseDelay
+	b.MaxInterval = baseDelay * (1 << maxRetries) // Maximum interval (exponential growth)
+
+	return backoff.RetryNotify(
+		func() error {
+			return operation()
+		},
+		backoff.WithContext(b, ctx),
+		func(err error, d time.Duration) {
+			fmt.Printf("Retrying after %v due to: %v\n", d, err)
+		},
+	)
 }

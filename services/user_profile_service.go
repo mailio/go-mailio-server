@@ -129,8 +129,12 @@ func (s *UserProfileService) Save(address string, profile *types.UserProfile) (*
 	if existing != nil {
 		profile.BaseDocument = existing.BaseDocument
 	}
+
 	err := s.userProfileRepo.Save(ctx, address, profile)
 	if err != nil {
+		if err.Error() == "conflict" {
+			return nil, types.ErrConflict
+		}
 		global.Logger.Log("UserProfileService.Save", "failed to save", err.Error())
 		return nil, err
 	}

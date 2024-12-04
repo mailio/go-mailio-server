@@ -518,7 +518,7 @@ func (msq *MessageQueue) processReceiveAttachments(email *smtptypes.Mail, recipi
 					return fmt.Errorf("malware detected: %w", asynq.SkipRetry)
 				}
 				path := recipientAddress + "/" + fileMd5 + "_" + now
-				p, err := msq.s3Service.UploadAttachment(global.Conf.Storage.Bucket, path, att.Content)
+				p, err := msq.s3Service.UploadAttachment(global.Conf.Storage.Bucket, path, att.Content, att.ContentType)
 				if err != nil {
 					fmt.Printf("Error uploading to S3: %v\n", err)
 					debug.PrintStack()

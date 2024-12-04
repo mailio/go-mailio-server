@@ -1095,6 +1095,47 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/s3deleteprofilephoto": {
+            "delete": {
+                "description": "Deletes user profile photo",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "S3"
+                ],
+                "summary": "Delete object from s3 bucket",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.PresignedUrl"
+                        }
+                    },
+                    "400": {
+                        "description": "invalid api call",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "429": {
+                        "description": "rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "500": {
+                        "description": "failed to delete object",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/s3presign": {
             "get": {
                 "description": "The presigned request is valid for the specified number of seconds.",
@@ -1145,6 +1186,47 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "error creating presigned url",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/s3uploadprofilephoto": {
+            "post": {
+                "description": "Upload a profile photo to the users folder",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "S3"
+                ],
+                "summary": "Upload a profile photo",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.PresignedUrl"
+                        }
+                    },
+                    "400": {
+                        "description": "invalid api call",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "429": {
+                        "description": "rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "500": {
+                        "description": "server error uploading photo",
                         "schema": {
                             "$ref": "#/definitions/api.ApiError"
                         }

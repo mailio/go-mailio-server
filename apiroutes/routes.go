@@ -130,6 +130,8 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 
 		// s3
 		rootApi.GET("/v1/s3presign", s3Api.GetPresignedUrlPut)
+		rootApi.POST("/v1/s3uploadprofilephoto", s3Api.UploadProfilePhoto)
+		rootApi.DELETE("/v1/s3deleteprofilephoto", s3Api.DeleteProfilePhoto)
 		rootApi.DELETE("/v1/s3", s3Api.DeleteObjects)
 
 		// did documents

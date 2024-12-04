@@ -107,11 +107,12 @@ type MailDomains struct {
 }
 
 type StorageConfig struct {
-	Type   string `yaml:"type"`
-	Key    string `yaml:"key"`
-	Secret string `yaml:"secret"`
-	Bucket string `yaml:"bucket"`
-	Region string `yaml:"region"`
+	Type               string `yaml:"type"`
+	Key                string `yaml:"key"`
+	Secret             string `yaml:"secret"`
+	Bucket             string `yaml:"bucket"`
+	ProfilePhotoBucket string `yaml:"profilePhotoBucket"`
+	Region             string `yaml:"region"`
 }
 
 type DiskUsageHandlers struct {

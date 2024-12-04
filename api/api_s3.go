@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"crypto/md5"
+	"encoding/base64"
 	"encoding/hex"
 	"net/http"
 	"strings"
@@ -15,6 +16,7 @@ import (
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/services"
 	"github.com/mailio/go-mailio-server/types"
+	"github.com/mailio/go-mailio-server/util"
 )
 
 const lifetimeSecs = 60 * 60 * 30 // duration for which presigned url is valid (30 minutes)
@@ -29,6 +31,110 @@ func NewS3Api(s3Service *services.S3Service, env *types.Environment) *S3Api {
 		env:       env,
 		s3Service: s3Service,
 	}
+}
+
+// GetPresignedUrlGet
+// @Summary Delete object from s3 bucket
+// @Description Deletes user profile photo
+// @Tags S3
+// @Success 200 {object} types.PresignedUrl
+// @Failure 400 {object} api.ApiError "invalid api call"
+// @Failure 429 {object} api.ApiError "rate limit exceeded"
+// @Failure 500 {object} api.ApiError "failed to delete object"
+// @Accept json
+// @Produce json
+// @Router /api/v1/s3deleteprofilephoto [delete]
+func (pa *S3Api) DeleteProfilePhoto(c *gin.Context) {
+	address, exists := c.Get("subjectAddress")
+	if !exists {
+		ApiErrorf(c, http.StatusBadRequest, "not authorized")
+		return
+	}
+
+	filepath := address.(string) + "/profile_photo.jpg"
+	dErr := pa.s3Service.DeleteAttachment(global.Conf.Storage.ProfilePhotoBucket, filepath)
+	if dErr != nil {
+		if dErr == types.ErrNotFound {
+			ApiErrorf(c, http.StatusNotFound, "file not found")
+			return
+		}
+		if dErr == types.ErrNotAuthorized {
+			ApiErrorf(c, http.StatusForbidden, "forbidden to delete")
+			return
+		}
+		global.Logger.Log("error", "failed to delete object")
+		ApiErrorf(c, http.StatusInternalServerError, "failed to delete object")
+		return
+	}
+
+	c.JSON(http.StatusOK, types.PresignedUrl{Url: filepath})
+}
+
+// UploadPhoto
+// @Summary Upload a profile photo
+// @Description Upload a profile photo to the users folder
+// @Tags S3
+// @Success 200 {object} types.PresignedUrl
+// @Failure 400 {object} api.ApiError "invalid api call"
+// @Failure 429 {object} api.ApiError "rate limit exceeded"
+// @Failure 500 {object} api.ApiError "server error uploading photo"
+// @Accept json
+// @Produce json
+// @Router /api/v1/s3uploadprofilephoto [post]
+func (pa *S3Api) UploadProfilePhoto(c *gin.Context) {
+	address, exists := c.Get("subjectAddress")
+	if !exists {
+		ApiErrorf(c, http.StatusBadRequest, "not authorized")
+		return
+	}
+
+	var photoInput types.UploadPhotoInput
+	if err := c.ShouldBindJSON(&photoInput); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	parts := strings.Split(photoInput.PhotoBase64, ",")
+	if len(parts) != 2 {
+		ApiErrorf(c, http.StatusBadRequest, "invalid base64 encoding")
+		return
+	}
+	imgBytes, b64Err := base64.StdEncoding.DecodeString(parts[1])
+	if b64Err != nil {
+		ApiErrorf(c, http.StatusBadRequest, "invalid base64 encoding")
+		return
+	}
+	// extract file extension
+	mimePart := strings.TrimPrefix(parts[0], "data:")
+	mimeType := strings.Split(mimePart, ";")[0]
+
+	if mimeType != "image/jpg" && mimeType != "image/png" && mimeType != "image/jpeg" {
+		ApiErrorf(c, http.StatusBadRequest, "unspoorted file type")
+		return
+	}
+	// convert file to jpg
+	img, dErr := util.ParseImageBytesToJPG(imgBytes, mimeType)
+	if dErr != nil {
+		ApiErrorf(c, http.StatusBadRequest, "invalid image")
+		return
+	}
+	// validate dimensions (must be 256x256)
+	if img.Bounds().Dx() > 256 || img.Bounds().Dy() > 256 {
+		ApiErrorf(c, http.StatusBadRequest, "image must be maximum 256 x 256")
+		return
+	}
+
+	filepath := address.(string) + "/profile_photo.jpg"
+	url, uErr := pa.s3Service.UploadAttachment(global.Conf.Storage.ProfilePhotoBucket, filepath, imgBytes, mimeType)
+	if uErr != nil {
+		global.Logger.Log("error", "failed to upload photo", "error", uErr)
+		ApiErrorf(c, http.StatusInternalServerError, "server error uploading photo")
+		return
+	}
+
+	url = strings.Replace(url, "s3://"+global.Conf.Storage.ProfilePhotoBucket, "https://"+global.Conf.Storage.ProfilePhotoBucket+".s3."+global.Conf.Storage.Region+".amazonaws.com", 1)
+
+	c.JSON(http.StatusOK, types.PresignedUrl{Url: url})
 }
 
 // GetPresignedUrlPut
@@ -74,10 +180,12 @@ func (pa *S3Api) GetPresignedUrlPut(c *gin.Context) {
 		m5Sum := m5.Sum(nil)
 		path := address.(string) + "/" + hex.EncodeToString(m5Sum) + "_" + currentTime
 
-		r, e := pa.env.S3PresignClient.PresignPutObject(ctx, &s3.PutObjectInput{
+		putObjectInput := &s3.PutObjectInput{
 			Bucket: aws.String(global.Conf.Storage.Bucket),
 			Key:    aws.String(path),
-		}, func(opts *s3.PresignOptions) {
+		}
+
+		r, e := pa.env.S3PresignClient.PresignPutObject(ctx, putObjectInput, func(opts *s3.PresignOptions) {
 			opts.Expires = time.Duration(lifetimeSecs * int64(time.Second))
 		})
 		request = *r

@@ -2295,6 +2295,33 @@ paths:
       summary: Delete object from s3 bucket
       tags:
       - S3
+  /api/v1/s3deleteprofilephoto:
+    delete:
+      consumes:
+      - application/json
+      description: Deletes user profile photo
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.PresignedUrl'
+        "400":
+          description: invalid api call
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "429":
+          description: rate limit exceeded
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "500":
+          description: failed to delete object
+          schema:
+            $ref: '#/definitions/api.ApiError'
+      summary: Delete object from s3 bucket
+      tags:
+      - S3
   /api/v1/s3presign:
     get:
       consumes:
@@ -2332,6 +2359,33 @@ paths:
             $ref: '#/definitions/api.ApiError'
       summary: GetObject makes a presigned request that can be used to get an object
         from a bucket.
+      tags:
+      - S3
+  /api/v1/s3uploadprofilephoto:
+    post:
+      consumes:
+      - application/json
+      description: Upload a profile photo to the users folder
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.PresignedUrl'
+        "400":
+          description: invalid api call
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "429":
+          description: rate limit exceeded
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "500":
+          description: server error uploading photo
+          schema:
+            $ref: '#/definitions/api.ApiError'
+      summary: Upload a profile photo
       tags:
       - S3
   /api/v1/sendcancel:

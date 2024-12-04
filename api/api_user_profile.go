@@ -144,6 +144,10 @@ func (a *UserProfileApi) UpdateUserProfile(c *gin.Context) {
 	}
 	up, err := a.userProfileService.Save(address, &input)
 	if err != nil {
+		if err == types.ErrConflict {
+			ApiErrorf(c, http.StatusConflict, "conflict")
+			return
+		}
 		ApiErrorf(c, http.StatusInternalServerError, "failed to save user profile")
 		return
 	}

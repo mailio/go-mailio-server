@@ -65,3 +65,7 @@ type InterestInput struct {
 	Sender    string `json:"sender" validate:"required"`
 	MessageId string `json:"messageId" validate:"required"`
 }
+
+type UploadPhotoInput struct {
+	PhotoBase64 string `json:"photoBase64" validate:"required"`
+}
