@@ -38,7 +38,7 @@ func (msq *MessageQueue) selectMailFolder(fromAddress string, recipientAddress s
 	if handshake != nil && handshake.Content.Status == types.HANDSHAKE_STATUS_ACCEPTED {
 		return types.MailioFolderInbox, nil
 	} else if handshake != nil && handshake.Content.Status == types.HANDSHAKE_STATUS_REVOKED {
-		return types.MailioFolderSpam, types.ErrHandshakeRevoked
+		return types.MailioFolderSpam, nil
 	} else if handshake != nil && handshake.Content.Status == types.HANDSHAKE_STATUS_REQUEST {
 		return types.MailioFolderHandshake, nil
 	}

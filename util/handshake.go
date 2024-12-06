@@ -9,16 +9,6 @@ import (
 	"github.com/mailio/go-mailio-server/types"
 )
 
-// Converting StoredHandshake to Handshake (user doesn't need details of revisions for now)
-func StoredHandshakeToModelHandsake(storedHandshake *types.StoredHandshake) *types.Handshake {
-	output := &types.Handshake{
-		Content:           storedHandshake.Content,
-		SignatureBase64:   storedHandshake.SignatureBase64,
-		CborPayloadBase64: storedHandshake.CborPayloadBase64,
-	}
-	return output
-}
-
 // VerifyHandshake verifies the signature of the handshake along with the basic sanity checks
 func VerifyHandshake(handshake *types.Handshake, userPublicKeyEd25519Base64 string) (bool, error) {
 	// sanity checks

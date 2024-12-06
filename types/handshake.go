@@ -73,16 +73,6 @@ type SenderMetadata struct {
 	Address   string `json:"address,omitempty"`   // mailio address
 }
 
-// handshake is a struct that represents a handshake stored in the database
-type StoredHandshake struct {
-	BaseDocument      `json:",inline"`
-	Content           HandshakeContent `json:"content"`
-	OwnerAddress      string           `json:"ownerAddress"` // Mailio address of the owner of the handshake
-	SignatureBase64   string           `json:"signatureBase64"`
-	CborPayloadBase64 string           `json:"cborPayloadBase64"`
-	Timestamp         int64            `json:"timestamp"` // timestamp of the handshake (created or updated)
-}
-
 type HandshakeLink struct {
 	Link string `json:"link"`
 }

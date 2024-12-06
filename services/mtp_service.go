@@ -180,7 +180,7 @@ func (mtp *MtpService) LocalHandshakeLookup(senderAddress string, lookups []type
 	notFound = []*types.HandshakeLookup{}
 
 	for _, lookup := range lookups {
-		var shake *types.StoredHandshake
+		var shake *types.Handshake
 		var err error
 
 		switch {
