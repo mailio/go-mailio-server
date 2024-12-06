@@ -33,12 +33,14 @@ func (msq *MessageQueue) selectMailFolder(fromAddress string, recipientAddress s
 	handshake, hErr := services.GetHandshakeByMailioAddress(msq.userRepo, recipientAddress, fromAddress)
 	if hErr != nil && hErr != types.ErrNotFound {
 		global.Logger.Log(hErr.Error(), "failed to get handshake", recipientAddress, fromAddress)
-		return types.MailioFolderInbox, hErr
+		// do nothing, continue to statistics
 	}
 	if handshake != nil && handshake.Content.Status == types.HANDSHAKE_STATUS_ACCEPTED {
 		return types.MailioFolderInbox, nil
 	} else if handshake != nil && handshake.Content.Status == types.HANDSHAKE_STATUS_REVOKED {
 		return types.MailioFolderSpam, types.ErrHandshakeRevoked
+	} else if handshake != nil && handshake.Content.Status == types.HANDSHAKE_STATUS_REQUEST {
+		return types.MailioFolderHandshake, nil
 	}
 
 	// 3. Check the number of sent messages in the past to the same recipient
@@ -157,7 +159,7 @@ func (msq *MessageQueue) handleReceivedDIDCommMessage(message *types.DIDCommMess
 
 	for _, recAddress := range localRecipientsAddresses {
 		// select folder based on the recipient's handshakes and statistics
-		folder, fErr := msq.selectMailFolder(fromDID.Fragment(), recAddress)
+		folder, fErr := msq.selectMailFolder(fromDID.String(), recAddress)
 		if fErr != nil {
 			if fErr == types.ErrHandshakeRevoked {
 				deliveryStatuses = append(deliveryStatuses, types.NewMTPStatusCode(5, 8, 2, fmt.Sprintf("handshake revoked for %s", recAddress), types.WithRecAddress(recAddress)))

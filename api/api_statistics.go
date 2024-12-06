@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
+	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/services"
 	"github.com/mailio/go-mailio-server/types"
 	"github.com/mailio/go-mailio-server/util"
@@ -44,29 +45,31 @@ func (a *APIStatistics) GetEmailStatistics(c *gin.Context) {
 		return
 	}
 
+	localUserDid := "did:web:" + global.Conf.Mailio.ServerDomain + "#" + address
+
 	sender := c.Query("sender")
 	if sender == "" {
 		ApiErrorf(c, http.StatusBadRequest, "sender required")
 		return
 	}
 
-	statsReceived, sErr := a.statisticsService.GetEmailStatistics(ctx, sender, address)
+	statsReceived, sErr := a.statisticsService.GetEmailStatistics(ctx, sender, localUserDid)
 	if sErr != nil {
 		ApiErrorf(c, http.StatusInternalServerError, "failed to get email statistics: %s", sErr.Error())
 		return
 	}
-	statsSent, sErr := a.statisticsService.GetEmailStatistics(ctx, address, sender)
+	statsSent, sErr := a.statisticsService.GetEmailStatistics(ctx, localUserDid, sender)
 	if sErr != nil {
 		ApiErrorf(c, http.StatusInternalServerError, "failed to get email statistics: %s", sErr.Error())
 		return
 	}
-	interestCount, iErr := a.statisticsService.GetEmailInterest(ctx, sender, address)
+	interestCount, iErr := a.statisticsService.GetEmailInterest(ctx, sender, localUserDid)
 	if iErr != nil {
 		ApiErrorf(c, http.StatusInternalServerError, "failed to get email interest: %s", iErr.Error())
 		return
 	}
 
-	senyByDay, sErr := a.statisticsService.GetEmailSentByDay(ctx, address, time.Now().UTC().Truncate(24*time.Hour).Unix())
+	senyByDay, sErr := a.statisticsService.GetEmailSentByDay(ctx, localUserDid, time.Now().UTC().Truncate(24*time.Hour).Unix())
 	if sErr != nil {
 		ApiErrorf(c, http.StatusInternalServerError, "failed to get email sent by day: %s", sErr.Error())
 		return

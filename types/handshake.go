@@ -11,6 +11,7 @@ const (
 	HANDSHAKE_STATUS_ACCEPTED = "accepted"
 	HANDSHAKE_STATUS_REVOKED  = "revoked"
 	HANDSHAKE_STATUS_NOTFOUND = "notfound"
+	HANDSHAKE_STATUS_REQUEST  = "request"
 
 	// Possbile handshake signup sub types
 	HANDSHAKE_SIGNUP_SUBTYPE_TRANSACTIONAL = "transactional"

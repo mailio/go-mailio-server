@@ -3,7 +3,9 @@ package util
 import (
 	"bytes"
 	"crypto/ed25519"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -11,6 +13,7 @@ import (
 	"time"
 
 	"github.com/mailio/go-mailio-server/types"
+	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -133,4 +136,16 @@ func TestCBOR(t *testing.T) {
 
 		previous = b
 	}
+}
+
+func TestHandshakeCreateID(t *testing.T) {
+	ownerAddress := "0xded2c4bd132eb661000f790c13c30b1fe93b7800"
+	sender := "did:web:localhost:8080#0xbd5892c986679c803c55322a297778eeee30c84c"
+	id := "2a69191be05ed96d7107982d7e15bb576061950fc17d6b9137ed28309d99fb69"
+
+	handshakeIDConcat := ownerAddress + sender
+	s256 := sha256.Sum256([]byte(handshakeIDConcat))
+	handshakeID := hex.EncodeToString(s256[:])
+
+	assert.Equal(t, handshakeID, id)
 }
