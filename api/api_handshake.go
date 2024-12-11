@@ -45,14 +45,7 @@ func (ha *HandshakeApi) PersonalHandshakeLink(c *gin.Context) {
 		ApiErrorf(c, http.StatusUnauthorized, "not authorized to create personal handshake")
 		return
 	}
-	// // create a personal handshake link
-	// profile, pErr := ha.userProfileService.Get(address.(string))
-	// if pErr != nil {
-	// 	ApiErrorf(c, http.StatusNotFound, "user profile not found")
-	// 	return
-	// }
 
-	// domain := global.Conf.Mailio.Domain
 	// nonces are typically deleted within 5 minutes. That should be enough time to use the link
 	nonce, nErr := ha.nonceService.CreateCustomNonce(16)
 	if nErr != nil {

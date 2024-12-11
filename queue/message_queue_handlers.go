@@ -162,6 +162,12 @@ func (msq *MessageQueue) handleReceivedDIDCommMessage(message *types.DIDCommMess
 		var folder string
 		if message.Intent == types.DIDCommIntentHandshake || message.Intent == types.DIDCommIntentHandshakeRequest || message.Intent == types.DIDCommIntentHandshakeResponse {
 			folder = types.MailioFolderHandshake
+			//TODO: also check the nonce and if it is a valid handshake request
+			if !msq.isNonceValid(message.PlainBodyBase64) {
+				// invalid nonce (drop the message)
+				global.Logger.Log("invalid nonce", "failed to validate nonce", recAddress, "msg id: ", message.ID, "from: ", message.From)
+				continue
+			}
 		} else {
 			// select folder based on the recipient's handshakes and statistics
 			f, fErr := msq.selectMailFolder(fromDID.String(), recAddress)
@@ -238,31 +244,33 @@ func (msq *MessageQueue) handleReceivedDIDCommMessage(message *types.DIDCommMess
 	}
 
 	// reply with delivery message to sender of this message
-	deliveryMsg := &types.PlainBodyDelivery{
-		StatusCodes: deliveryStatuses,
-	}
-	deliveryMsgStr, delErr := json.Marshal(deliveryMsg)
-	if delErr != nil {
-		global.Logger.Log(delErr.Error(), "failed to marshal delivery message")
-		return fmt.Errorf("failed to marshal delivery message: %v: %w", delErr, asynq.SkipRetry)
-	}
-	thisServerDIDDoc, err := util.CreateMailioDIDDocument()
-	if err != nil {
-		global.Logger.Log(err.Error(), "failed to create Mailio DID document")
-		return fmt.Errorf("failed to create Mailio DID document: %v: %w", err, asynq.SkipRetry)
-	}
-	didMessage := &types.DIDCommMessage{
-		ID:              message.ID,
-		Intent:          types.DIDCommIntentDelivery,
-		Type:            "application/didcomm-signed+json",
-		From:            "did:web:" + global.Conf.Mailio.ServerDomain + ":" + thisServerDIDDoc.ID.Value(), // this server DID
-		To:              []string{message.From},
-		PlainBodyBase64: base64.StdEncoding.EncodeToString(deliveryMsgStr),
-	}
-	sndCode, sndErr := msq.httpSend(didMessage, endpoint)
-	if sndErr != nil {
-		global.Logger.Log(sndErr.Error(), "failed to send message to sender", sndCode.Class, sndCode.Subject, sndCode.Detail, sndCode.Description, sndCode.Address)
-		return fmt.Errorf("failed to send message to sender: %v: %w", sndErr, asynq.SkipRetry)
+	if len(deliveryStatuses) > 0 {
+		deliveryMsg := &types.PlainBodyDelivery{
+			StatusCodes: deliveryStatuses,
+		}
+		deliveryMsgStr, delErr := json.Marshal(deliveryMsg)
+		if delErr != nil {
+			global.Logger.Log(delErr.Error(), "failed to marshal delivery message")
+			return fmt.Errorf("failed to marshal delivery message: %v: %w", delErr, asynq.SkipRetry)
+		}
+		thisServerDIDDoc, err := util.CreateMailioDIDDocument()
+		if err != nil {
+			global.Logger.Log(err.Error(), "failed to create Mailio DID document")
+			return fmt.Errorf("failed to create Mailio DID document: %v: %w", err, asynq.SkipRetry)
+		}
+		didMessage := &types.DIDCommMessage{
+			ID:              message.ID,
+			Intent:          types.DIDCommIntentDelivery,
+			Type:            "application/didcomm-signed+json",
+			From:            "did:web:" + global.Conf.Mailio.ServerDomain + ":" + thisServerDIDDoc.ID.Value(), // this server DID
+			To:              []string{message.From},
+			PlainBodyBase64: base64.StdEncoding.EncodeToString(deliveryMsgStr),
+		}
+		sndCode, sndErr := msq.httpSend(didMessage, endpoint)
+		if sndErr != nil {
+			global.Logger.Log(sndErr.Error(), "failed to send message to sender", sndCode.Class, sndCode.Subject, sndCode.Detail, sndCode.Description, sndCode.Address)
+			return fmt.Errorf("failed to send message to sender: %v: %w", sndErr, asynq.SkipRetry)
+		}
 	}
 
 	return nil

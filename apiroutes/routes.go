@@ -141,7 +141,6 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 		// statistics
 		rootApi.GET("/v1/emailstatistics", statisticsApi.GetEmailStatistics)
 		rootApi.PUT("/v1/emailstatistics/interest", statisticsApi.ReportInterest)
-		rootApi.GET("/v1/teststats", statisticsApi.TestEmailStatistics)
 	}
 
 	// server-to-server communication (aka MTP - Mailio Transfer Protocol)

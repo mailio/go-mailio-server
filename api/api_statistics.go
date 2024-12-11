@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"time"
 
@@ -116,7 +115,8 @@ func (a *APIStatistics) ReportInterest(c *gin.Context) {
 		ApiErrorf(c, http.StatusBadRequest, msg)
 		return
 	}
-
+	// full users web did
+	address = "did:web:" + global.Conf.Mailio.ServerDomain + "#" + address
 	iErr := a.statisticsService.ProcessEmailInterest(senderInput.Sender, address, senderInput.MessageId)
 	if iErr != nil {
 		ApiErrorf(c, http.StatusInternalServerError, "failed to process email interest %s", iErr.Error())
@@ -124,54 +124,4 @@ func (a *APIStatistics) ReportInterest(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusAccepted, types.InterestOuput{MessageId: senderInput.MessageId})
-
-}
-
-// Test Email statistics
-// @Security Bearer
-// @Summary Get Email statistics
-// @Description Returns number of sent emails, received emails and interest shown by the recipient
-// @Tags Statistics
-// @Param sender query string true "Sender email address or Mailio address"
-// @Success 200 {object} types.OutputBasicUserInfo
-// @Failure 429 {object} api.ApiError "rate limit exceeded"
-// @Accept json
-// @Produce json
-// @Router /api/v1/teststats [get]
-func (a *APIStatistics) TestEmailStatistics(c *gin.Context) {
-
-	address := c.GetString("subjectAddress")
-	if address == "" {
-		ApiErrorf(c, http.StatusUnauthorized, "address not found")
-		return
-	}
-
-	sender := c.Query("sender")
-	if sender == "" {
-		ApiErrorf(c, http.StatusBadRequest, "sender required")
-		return
-	}
-
-	peOneErr := a.statisticsService.ProcessEmailStatistics(sender, address)
-	peTwoErr := a.statisticsService.ProcessEmailStatistics(address, sender)
-	if errors.Join(peOneErr, peTwoErr) != nil {
-		ApiErrorf(c, http.StatusInternalServerError, "failed to process email statistics: %s", errors.Join(peOneErr, peTwoErr).Error())
-		return
-	}
-	iErr := a.statisticsService.ProcessEmailInterest(sender, address, "test")
-	if iErr != nil {
-		ApiErrorf(c, http.StatusInternalServerError, "failed to process email interest %s", iErr.Error())
-		return
-	}
-	sErr := a.statisticsService.ProcessEmailsSentStatistics(address)
-	if sErr != nil {
-		ApiErrorf(c, http.StatusInternalServerError, "failed to process email sent statistics %s", sErr.Error())
-		return
-	}
-
-	// Flushing the cache
-	a.statisticsService.FlushEmailInterests()
-	a.statisticsService.FlushEmailStatistics()
-	a.statisticsService.FlushSentEmailStatistics()
-
 }

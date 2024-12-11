@@ -22,6 +22,7 @@ type MessageQueue struct {
 	deliveryService    *services.MessageDeliveryService
 	s3Service          *services.S3Service
 	malwareService     *services.MalwareService
+	nonceService       *services.NonceService
 	statisticsService  *services.StatisticsService
 	userRepo           repository.Repository
 	restyClient        *resty.Client
@@ -39,6 +40,7 @@ func NewMessageQueue(dbSelector *repository.CouchDBSelector, env *types.Environm
 	malwareService := services.NewMalwareService()
 	s3Service := services.NewS3Service(env)
 	statisticsService := services.NewStatisticsService(dbSelector, env)
+	nonceService := services.NewNonceService(dbSelector)
 
 	userRepo, urErr := dbSelector.ChooseDB(repository.User)
 	if urErr != nil {
@@ -58,6 +60,7 @@ func NewMessageQueue(dbSelector *repository.CouchDBSelector, env *types.Environm
 		s3Service:          s3Service,
 		userRepo:           userRepo,
 		statisticsService:  statisticsService,
+		nonceService:       nonceService,
 	}
 }
 

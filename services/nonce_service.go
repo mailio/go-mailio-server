@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"time"
 
 	"github.com/go-kit/log/level"
@@ -52,12 +53,16 @@ func (ns *NonceService) CreateCustomNonce(nonceSizeInBytes int) (*types.Nonce, e
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
+	n = url.PathEscape(n)
 	nonce := &types.Nonce{
 		Nonce:   n,
 		Created: time.Now().UTC().UnixMilli(),
 	}
-	ns.nonceRepo.Save(ctx, n, nonce)
-	return nonce, nil
+	neErr := ns.nonceRepo.Save(ctx, n, nonce)
+	if neErr != nil {
+		global.Logger.Log("nonce creation failed", neErr)
+	}
+	return nonce, neErr
 }
 
 // Returns nonce by nonce id (wich is nonce itself) from database

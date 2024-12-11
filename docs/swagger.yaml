@@ -642,6 +642,7 @@ definitions:
         - message
         - handshake
         - delivery
+        - handshake_request
         type: string
       next:
         description: in case forward message
@@ -677,6 +678,9 @@ definitions:
         - application/didcomm-encrypted+json
         - application/didcomm-signed+json
         - application/mailio-smtp+json
+        - application/mailio-handshake+json
+        - application/mailio-handshake-request+json
+        - application/mailio-handshake-response+json
         type: string
     required:
     - from
@@ -907,10 +911,6 @@ definitions:
       x:
         description: The X coordinate for the elliptic curve point
         type: string
-    required:
-    - crv
-    - kty
-    - x
     type: object
   types.HandshakeContent:
     properties:
@@ -1060,7 +1060,6 @@ definitions:
         description: '(Key ID): A hint indicating which key was used to encrypt the'
         type: string
     required:
-    - epk
     - kid
     type: object
   types.InputDIDLookup:
@@ -2512,34 +2511,6 @@ paths:
       summary: Send SMTP email
       tags:
       - Messaging
-  /api/v1/teststats:
-    get:
-      consumes:
-      - application/json
-      description: Returns number of sent emails, received emails and interest shown
-        by the recipient
-      parameters:
-      - description: Sender email address or Mailio address
-        in: query
-        name: sender
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/types.OutputBasicUserInfo'
-        "429":
-          description: rate limit exceeded
-          schema:
-            $ref: '#/definitions/api.ApiError'
-      security:
-      - Bearer: []
-      summary: Get Email statistics
-      tags:
-      - Statistics
   /api/v1/user/me:
     get:
       consumes:

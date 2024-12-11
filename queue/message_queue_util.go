@@ -2,6 +2,7 @@ package queue
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -202,4 +203,34 @@ func (msq *MessageQueue) httpSend(message *types.DIDCommMessage,
 		return types.NewMTPStatusCode(5, 4, 4, fmt.Sprintf("failed to verify response from %s", endpoint)), types.ErrContinue
 	}
 	return nil, nil
+}
+
+func (msq *MessageQueue) isNonceValid(nonceBase64Object string) bool {
+	// check if nonce is valid
+	if nonceBase64Object == "" {
+		return false
+	}
+
+	nonceBody, nErr := base64.StdEncoding.DecodeString(nonceBase64Object)
+	nonceMap := map[string]string{}
+	nuErr := json.Unmarshal(nonceBody, &nonceMap)
+	if nErr != nil || nuErr != nil {
+		return false
+	}
+	if _, ok := nonceMap["nonce"]; !ok {
+		return false
+	}
+	nonceString := nonceMap["nonce"]
+	if len([]byte(nonceString)) != 16 {
+		return false
+	}
+
+	nc, err := msq.nonceService.GetNonce(nonceMap["nonce"])
+	if err != nil {
+		return false
+	}
+	if nc == nil {
+		return false
+	}
+	return true
 }

@@ -114,6 +114,10 @@ func (c *CouchDBRepository) Save(ctx context.Context, docID string, data interfa
 	incomingData["_id"] = docID
 	delete(incomingData, "BaseDocument")
 
+	if incomingData["_rev"] == nil {
+		delete(incomingData, "_rev")
+	}
+
 	// Define the retryable operation
 	operation := func() error {
 		var ok types.OK

@@ -1429,49 +1429,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/teststats": {
-            "get": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Returns number of sent emails, received emails and interest shown by the recipient",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Statistics"
-                ],
-                "summary": "Get Email statistics",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Sender email address or Mailio address",
-                        "name": "sender",
-                        "in": "query",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/types.OutputBasicUserInfo"
-                        }
-                    },
-                    "429": {
-                        "description": "rate limit exceeded",
-                        "schema": {
-                            "$ref": "#/definitions/api.ApiError"
-                        }
-                    }
-                }
-            }
-        },
         "/api/v1/user/me": {
             "get": {
                 "security": [
@@ -2701,7 +2658,8 @@ const docTemplate = `{
                     "enum": [
                         "message",
                         "handshake",
-                        "delivery"
+                        "delivery",
+                        "handshake_request"
                     ]
                 },
                 "next": {
@@ -2740,7 +2698,10 @@ const docTemplate = `{
                     "enum": [
                         "application/didcomm-encrypted+json",
                         "application/didcomm-signed+json",
-                        "application/mailio-smtp+json"
+                        "application/mailio-smtp+json",
+                        "application/mailio-handshake+json",
+                        "application/mailio-handshake-request+json",
+                        "application/mailio-handshake-response+json"
                     ]
                 }
             }
@@ -3043,11 +3004,6 @@ const docTemplate = `{
         },
         "types.Epk": {
             "type": "object",
-            "required": [
-                "crv",
-                "kty",
-                "x"
-            ],
             "properties": {
                 "crv": {
                     "description": "The curve parameter used for the key",
@@ -3266,7 +3222,6 @@ const docTemplate = `{
         "types.Header": {
             "type": "object",
             "required": [
-                "epk",
                 "kid"
             ],
             "properties": {
