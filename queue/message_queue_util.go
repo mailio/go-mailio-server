@@ -35,7 +35,7 @@ func (msq *MessageQueue) validateRecipientDIDFromEmails(message *types.DIDCommMe
 	found, notFound, err := msq.mtpService.FetchDIDDocuments(message.From, lookups)
 	if err != nil {
 		if err == types.ErrInvalidEmail { // should not happen
-			mtpStatusErrors = append(mtpStatusErrors, types.NewMTPStatusCode(5, 1, 1, fmt.Sprintf("one of the recipients has invalid email")))
+			mtpStatusErrors = append(mtpStatusErrors, types.NewMTPStatusCode(5, 1, 1, "one of the recipients has invalid email"))
 			hasinvalidEmail = true
 		}
 	}

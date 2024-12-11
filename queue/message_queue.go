@@ -121,7 +121,7 @@ func (msq *MessageQueue) DidCommReceiveMessage(message *types.DIDCommMessage) er
 	global.Logger.Log("received msg intent", message.Intent, "id", message.ID, "from", message.From)
 	fmt.Printf("received msg intent %s id %s from %s\n", message.Intent, message.ID, message.From)
 	switch message.Intent {
-	case types.DIDCommIntentMessage, types.DIDCommIntentHandshake:
+	case types.DIDCommIntentMessage, types.DIDCommIntentHandshake, types.DIDCommIntentHandshakeRequest, types.DIDCommIntentHandshakeResponse:
 		// handle message receive
 		msq.handleReceivedDIDCommMessage(message)
 	case types.DIDCommIntentDelivery:

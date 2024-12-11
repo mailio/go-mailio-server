@@ -158,17 +158,20 @@ func (msq *MessageQueue) handleReceivedDIDCommMessage(message *types.DIDCommMess
 	}
 
 	for _, recAddress := range localRecipientsAddresses {
-		// select folder based on the recipient's handshakes and statistics
-		folder, fErr := msq.selectMailFolder(fromDID.String(), recAddress)
-		if fErr != nil {
-			if fErr == types.ErrHandshakeRevoked {
-				deliveryStatuses = append(deliveryStatuses, types.NewMTPStatusCode(5, 8, 2, fmt.Sprintf("handshake revoked for %s", recAddress), types.WithRecAddress(recAddress)))
-				continue
-			}
-		}
 		// in case request is a handshake request
-		if message.Intent == types.DIDCommIntentHandshake {
+		var folder string
+		if message.Intent == types.DIDCommIntentHandshake || message.Intent == types.DIDCommIntentHandshakeRequest || message.Intent == types.DIDCommIntentHandshakeResponse {
 			folder = types.MailioFolderHandshake
+		} else {
+			// select folder based on the recipient's handshakes and statistics
+			f, fErr := msq.selectMailFolder(fromDID.String(), recAddress)
+			if fErr != nil {
+				if fErr == types.ErrHandshakeRevoked {
+					deliveryStatuses = append(deliveryStatuses, types.NewMTPStatusCode(5, 8, 2, fmt.Sprintf("handshake revoked for %s", recAddress), types.WithRecAddress(recAddress)))
+					continue
+				}
+			}
+			folder = f
 		}
 
 		isReplied := false
@@ -397,15 +400,17 @@ func (msq *MessageQueue) DIDCommSendMessage(userAddress string, input *types.DID
 	if len(mtpStatusErrors) == 0 {
 		mtpStatusErrors = append(mtpStatusErrors, types.NewMTPStatusCode(2, 0, 0, "message sent"))
 	}
-	// store mailioMessage in database (sent folder of the sender)
-	_, sErr := msq.userService.SaveMessage(userAddress, &mailioMessage)
-	if sErr != nil {
-		global.Logger.Log(sErr.Error(), "(sendMessage) failed to save message", userAddress)
-		return sErr
+	// store mailioMessage in database (sent folder of the sender), unless handshake request
+	if message.Intent != types.DIDCommIntentHandshakeRequest && message.Intent != types.DIDCommIntentHandshakeResponse {
+		_, sErr := msq.userService.SaveMessage(userAddress, &mailioMessage)
+		if sErr != nil {
+			global.Logger.Log(sErr.Error(), "(sendMessage) failed to save message", userAddress)
+			return sErr
+		}
+		msq.deliveryService.SaveBulkMtpStatusCodes(message.ID, mtpStatusErrors)
 	}
-	msq.deliveryService.SaveBulkMtpStatusCodes(message.ID, mtpStatusErrors)
 
-	// statistics
+	// statistics (including handshake requests)
 	sender := "did:web:" + global.Conf.Mailio.ServerDomain + "#" + userAddress
 	msq.statisticsService.ProcessEmailsSentStatistics(sender)
 	// store all recipients in statistics

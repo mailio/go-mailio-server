@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"net/url"
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
@@ -61,8 +62,12 @@ func (ha *HandshakeApi) PersonalHandshakeLink(c *gin.Context) {
 
 	// create a link with the nonce
 	// format: nonce:web:domain:address
+	baseUrl := global.Conf.Mailio.ServerDomain
+	u, _ := url.Parse(baseUrl)
+	u.Scheme = "https"
+	u.Path = "/"
 	link := types.HandshakeLink{
-		Link: nonce.Nonce + ":web:" + global.Conf.Mailio.ServerDomain + ":" + address.(string),
+		Link: nonce.Nonce + ":" + global.Conf.Mailio.ServerDomain + ":" + address.(string),
 	}
 	c.JSON(http.StatusOK, link)
 }
