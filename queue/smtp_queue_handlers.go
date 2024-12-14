@@ -165,15 +165,14 @@ func (msq *MessageQueue) SendSMTPMessage(fromMailioAddress string, email *types.
 		msq.statisticsService.ProcessEmailStatistics(fromMailioAddress, to)
 	}
 
-	//TODO: uncomment when the email sending is enabled
-	fmt.Printf("sending email: %s\n", mime)
-	// docID, err := mgHandler.SendMimeMail(smtpEmail.From, mime, smtpEmail.To)
-	// if err != nil {
-	// 	global.Logger.Log(err.Error(), "failed to send smtp email")
-	// 	//TODO: store the email in the inbox folder if sending fails
-	// 	return fmt.Errorf("failed sending smtp email: %v: %w", err, asynq.SkipRetry)
-	// }
-	// global.Logger.Log(fmt.Sprintf("smtp message sent: %s", docID), "message sent")
+	// using the handler to send the email
+	docID, err := mgHandler.SendMimeMail(smtpEmail.From, mime, smtpEmail.To)
+	if err != nil {
+		global.Logger.Log(err.Error(), "failed to send smtp email")
+		//TODO: store the email in the inbox folder if sending fails
+		return fmt.Errorf("failed sending smtp email: %v: %w", err, asynq.SkipRetry)
+	}
+	global.Logger.Log(fmt.Sprintf("smtp message sent: %s", docID), "message sent")
 
 	// remove possible attachments to be removed (the cient reports those when only 1 type of recipient is present, but both encrypted and plain attachments is uploaded)
 	for _, att := range email.DeleteAttachments {
