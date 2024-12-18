@@ -162,7 +162,7 @@ func (msq *MessageQueue) handleReceivedDIDCommMessage(message *types.DIDCommMess
 		var folder string
 		if message.Intent == types.DIDCommIntentHandshake || message.Intent == types.DIDCommIntentHandshakeRequest || message.Intent == types.DIDCommIntentHandshakeResponse {
 			folder = types.MailioFolderHandshake
-			//TODO: also check the nonce and if it is a valid handshake request
+			// also check the nonce and if it is a valid handshake request
 			if !msq.isNonceValid(message.PlainBodyBase64) {
 				// invalid nonce (drop the message)
 				global.Logger.Log("invalid nonce", "failed to validate nonce", recAddress, "msg id: ", message.ID, "from: ", message.From)

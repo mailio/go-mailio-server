@@ -160,9 +160,16 @@ func (msq *MessageQueue) SendSMTPMessage(fromMailioAddress string, email *types.
 	}
 
 	// process statistics on successfully sent email
-	msq.statisticsService.ProcessEmailsSentStatistics(fromMailioAddress)
+	// for statistics always full web did is used
+	localUsersWebDID := "did:web:" + global.Conf.Mailio.ServerDomain + "#" + fromMailioAddress
+	msq.statisticsService.ProcessEmailsSentStatistics(localUsersWebDID)
 	for _, to := range tos {
-		msq.statisticsService.ProcessEmailStatistics(fromMailioAddress, to)
+		pTo, pErr := mail.ParseAddress(to)
+		if pErr != nil {
+			global.Logger.Log(pErr.Error(), "failed to parse email address")
+			continue
+		}
+		msq.statisticsService.ProcessEmailStatistics(localUsersWebDID, pTo.Address)
 	}
 
 	// using the handler to send the email
@@ -395,8 +402,9 @@ func (msq *MessageQueue) ReceiveSMTPMessage(email *smtptypes.Mail, taskId string
 		}
 		global.Logger.Log("message saved", mm.ID)
 
-		// process received email statistics
-		msq.statisticsService.ProcessEmailStatistics(userMapping.MailioAddress, email.From.Address)
+		// process received email statistics (for local recipient always use full web did for statistics)
+		localUsersWebDID := "did:web:" + global.Conf.Mailio.ServerDomain + "#" + userMapping.MailioAddress
+		msq.statisticsService.ProcessEmailStatistics(email.From.Address, localUsersWebDID)
 	}
 
 	return nil
@@ -561,6 +569,7 @@ func (msq *MessageQueue) processSendAttachments(email *smtptypes.Mail) error {
 				return fmt.Errorf("failed downloading attachment: %v: %w", dErr, asynq.SkipRetry)
 			}
 			newAtt.Content = content
+			newAttachments = append(newAttachments, &newAtt)
 		}
 	}
 	email.Attachments = newAttachments

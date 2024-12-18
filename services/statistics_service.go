@@ -287,8 +287,8 @@ func (s *StatisticsService) processStatistics(
 /**
  * processEmail count for each sender:recipient number of received/sent emails (dependent on sender, recipient pair)
  * uses redis as short term cache (about 15 minutes)
- * @param sender string
- * @param recipient string
+ * @param sender string - the one who is sending an email
+ * @param recipient string - the one who is receiving an email
  */
 func (s *StatisticsService) ProcessEmailStatistics(sender string, recipient string) error {
 	redisExpire := time.Duration(global.Conf.EmailStatistics.SentRecvBySenderExpiry) * time.Minute
