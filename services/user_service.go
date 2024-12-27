@@ -55,12 +55,70 @@ func NewUserService(repoSelector *repository.CouchDBSelector, env *types.Environ
 	}
 }
 
-// CreateUser creates a new user with the given email and password.
-// It returns a pointer to an InputEmailPassword struct and an error (if any).
-func (us *UserService) CreateUser(user *types.User, mk *did.MailioKey, databasePassword string) (*types.User, error) {
+// CreateDatabase creates a new database for the user with the given email and password.
+// It returns an error (if any).
+func (us *UserService) CreateDatabase(user *types.User, databasePassword string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
+	userRepo, rErr := us.repoSelector.ChooseDB(repository.User)
+	if rErr != nil {
+		global.Logger.Log(rErr, "Failed to choose repository")
+		return rErr
+	}
+	err := userRepo.Save(ctx,
+		fmt.Sprintf("%s:%s", "org.couchdb.user", user.MailioAddress),
+		map[string]interface{}{
+			"name":           user.MailioAddress,
+			"password":       databasePassword,
+			"roles":          []string{},
+			"type":           "user",
+			"encryptedEmail": user.EncryptedEmail,
+			"created":        user.Created})
+	if err != nil {
+		global.Logger.Log(err, "Failed to register user")
+		return err
+	}
+
+	hexUser := "userdb-" + hex.EncodeToString([]byte(user.MailioAddress)) // MailioAddress already hex
+
+	// wait for database to be created
+	c := userRepo.GetClient().(*resty.Client)
+
+	for i := 1; i < 5; i++ {
+
+		headResponse, hErr := c.R().Get(hexUser)
+		if hErr != nil {
+			global.Logger.Log(hErr, "failed to create user database")
+			return errors.New("failed to create user database")
+		}
+		if headResponse.StatusCode() == 200 {
+			break
+		}
+
+		//TODO! is this really the best way to wait for database to be created?
+		if headResponse.StatusCode() == 404 {
+			backoff := int(100 * math.Pow(2, float64(i)))
+			time.Sleep(time.Duration(backoff) * time.Millisecond)
+			continue
+		} else {
+			global.Logger.Log(headResponse.String(), "failed to create user database")
+			return errors.New("failed to create user database")
+		}
+	}
+
+	// Create folder index: created, folder
+	indErr := repository.CreateFolderIndex(userRepo, hexUser)
+	if indErr != nil {
+		global.Logger.Log(indErr, "failed to create folder index")
+		return indErr
+	}
+	return nil
+}
+
+// CreateUser creates a new user with the given email and password.
+// It returns a pointer to an InputEmailPassword struct and an error (if any).
+func (us *UserService) CreateUser(user *types.User, mk *did.MailioKey, databasePassword string) (*types.User, error) {
 	// map sacrypt (encrryped email) address to mailio address
 	_, errMu := us.MapEmailToMailioAddress(user)
 	if errMu != nil {
@@ -76,48 +134,10 @@ func (us *UserService) CreateUser(user *types.User, mk *did.MailioKey, databaseP
 		return nil, types.ErrDomainNotFound
 	}
 
-	userRepo, rErr := us.repoSelector.ChooseDB(repository.User)
-	if rErr != nil {
-		return nil, rErr
-	}
-
-	err := userRepo.Save(ctx,
-		fmt.Sprintf("%s:%s", "org.couchdb.user", user.MailioAddress),
-		map[string]interface{}{
-			"name":           user.MailioAddress,
-			"password":       databasePassword,
-			"roles":          []string{},
-			"type":           "user",
-			"encryptedEmail": user.EncryptedEmail,
-			"created":        user.Created})
-	if err != nil {
-		global.Logger.Log(err, "Failed to register user")
-		return nil, err
-	}
-
-	hexUser := "userdb-" + hex.EncodeToString([]byte(user.MailioAddress)) // MailioAddress already hex
-
-	// wait for database to be created
-	c := userRepo.GetClient().(*resty.Client)
-
-	for i := 1; i < 5; i++ {
-
-		headResponse, hErr := c.R().Get(hexUser)
-		if hErr != nil {
-			return nil, errors.New("failed to create user database")
-		}
-		if headResponse.StatusCode() == 200 {
-			break
-		}
-
-		//TODO! is this really the best way to wait for database to be created?
-		if headResponse.StatusCode() == 404 {
-			backoff := int(100 * math.Pow(2, float64(i)))
-			time.Sleep(time.Duration(backoff) * time.Millisecond)
-			continue
-		} else {
-			return nil, errors.New("failed to create user database")
-		}
+	dbErr := us.CreateDatabase(user, databasePassword)
+	if dbErr != nil {
+		global.Logger.Log(dbErr, "failed to create database")
+		return nil, dbErr
 	}
 
 	_, upErr := us.userProfileService.Save(user.MailioAddress, &types.UserProfile{

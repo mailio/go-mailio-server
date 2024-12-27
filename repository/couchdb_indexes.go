@@ -33,6 +33,30 @@ func CreateVcsCredentialSubjectIDIndex(vcsRepo Repository) error {
 	return nil
 }
 
+func CreateFolderIndex(userRepo Repository, mailioAddressHex string) error {
+	// create index on database
+	// Define the index payload
+	indexPayload := map[string]interface{}{
+		"index": map[string]interface{}{
+			"fields": []string{"created", "folder"}, // Fields to index
+		},
+		"name": "client-folder-index", // Index name
+		"ddoc": "client-folder-index", // Design document name
+		"type": "json",                // Index type
+	}
+
+	c := userRepo.GetClient().(*resty.Client)
+	resp, rErr := c.R().SetBody(indexPayload).Post(fmt.Sprintf("%s/%s", mailioAddressHex, "_index"))
+	if rErr != nil {
+		return rErr
+	}
+	if resp.IsError() {
+		outErr := handleError(resp)
+		return outErr
+	}
+	return nil
+}
+
 // // create indexes on handshakes database for the address field
 // func CreateHandshakeIndex(handshakeRepo Repository) error {
 // 	dbName := Handshake
