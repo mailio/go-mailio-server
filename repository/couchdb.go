@@ -12,7 +12,6 @@ import (
 	"github.com/jarcoal/httpmock"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/types"
-	"github.com/mitchellh/mapstructure"
 )
 
 // implements Repository interface using CouchDB
@@ -51,7 +50,7 @@ func NewCouchDBRepository(url, DBName string, username string, password string, 
 	if dbErr2.Error != "" {
 		return nil, fmt.Errorf("failed to create database %s: %s", DBName, dbErr2.Error)
 	}
-	if ok.IsOK == false {
+	if !ok.IsOK {
 		return nil, fmt.Errorf("failed to create database %s", DBName)
 	}
 	return &CouchDBRepository{cl, DBName}, nil
@@ -110,12 +109,16 @@ func (c *CouchDBRepository) Save(ctx context.Context, docID string, data interfa
 		return types.ErrConflict
 	}
 	// remove BaseDocument from the data due to struct embedding
-	incomingData["_rev"] = incomingData["BaseDocument"].(map[string]interface{})["_rev"] // add _rev to the data
+	if _, ok := incomingData["BaseDocument"]; ok {
+		incomingData["_rev"] = incomingData["BaseDocument"].(map[string]interface{})["_rev"] // add _rev to the data
+		delete(incomingData, "BaseDocument")
+	}
 	incomingData["_id"] = docID
-	delete(incomingData, "BaseDocument")
 
-	if incomingData["_rev"] == nil {
-		delete(incomingData, "_rev")
+	if _, ok := incomingData["_rev"]; ok {
+		if incomingData["_rev"] == nil {
+			delete(incomingData, "_rev")
+		}
 	}
 
 	// Define the retryable operation
@@ -262,42 +265,21 @@ func (c *CouchDBRepository) GetClient() interface{} {
 	return c.client
 }
 
+// converts a struct to a map (used for saving data to CouchDB)
 func structToMapWithMapstructure(data interface{}) (map[string]interface{}, error) {
 	var result map[string]interface{}
 
-	// Decode the struct directly into a map using mapstructure
-	decoderConfig := &mapstructure.DecoderConfig{
-		Metadata: nil,
-		Result:   &result,
-		TagName:  "json", // Use struct tags like `json:"name"`
-	}
-
-	decoder, err := mapstructure.NewDecoder(decoderConfig)
+	// Marshal the struct into JSON
+	jsonBytes, err := json.Marshal(data)
 	if err != nil {
 		return nil, err
 	}
 
-	err = decoder.Decode(data)
+	// Unmarshal the JSON back into a map
+	err = json.Unmarshal(jsonBytes, &result)
 	if err != nil {
 		return nil, err
 	}
 
 	return result, nil
-}
-
-func exponentialRetry(ctx context.Context, operation func() error, maxRetries int, baseDelay time.Duration) error {
-	b := backoff.NewExponentialBackOff()
-	b.InitialInterval = baseDelay
-	b.MaxElapsedTime = time.Duration(maxRetries) * baseDelay
-	b.MaxInterval = baseDelay * (1 << maxRetries) // Maximum interval (exponential growth)
-
-	return backoff.RetryNotify(
-		func() error {
-			return operation()
-		},
-		backoff.WithContext(b, ctx),
-		func(err error, d time.Duration) {
-			fmt.Printf("Retrying after %v due to: %v\n", d, err)
-		},
-	)
 }
