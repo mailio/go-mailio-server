@@ -38,11 +38,14 @@ func CreateFolderIndex(userRepo Repository, mailioAddressHex string) error {
 	// Define the index payload
 	indexPayload := map[string]interface{}{
 		"index": map[string]interface{}{
-			"fields": []string{"created", "folder"}, // Fields to index
+			"fields": []map[string]interface{}{
+				{"folder": "desc"},
+				{"created": "desc"},
+			},
 		},
-		"name": "client-folder-index", // Index name
-		"ddoc": "client-folder-index", // Design document name
-		"type": "json",                // Index type
+		"name": "client-folder-created-desc-index", // Index name
+		"ddoc": "client-folder-created-desc-index", // Design document name
+		"type": "json",                             // Index type
 	}
 
 	c := userRepo.GetClient().(*resty.Client)

@@ -71,10 +71,14 @@ func (a *UserProfileApi) GetUserProfile(c *gin.Context) {
 		ApiErrorf(c, http.StatusInternalServerError, "user profile not found")
 		return
 	}
+	activeSize := int64(0)
+	if stats != nil {
+		activeSize = stats.ActiveSize
+	}
 	output := &types.OutputBasicUserInfo{
 		Address:     address,
 		TotalDisk:   up.DiskSpace,
-		UsedDisk:    totalDiskUsageFromHandlers + stats.ActiveSize,
+		UsedDisk:    totalDiskUsageFromHandlers + activeSize,
 		Created:     up.Created,
 		DisplayName: up.DisplayName,
 		Picture:     up.Picture,
