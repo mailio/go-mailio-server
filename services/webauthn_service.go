@@ -2,6 +2,9 @@ package services
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/go-resty/resty/v2"
@@ -85,4 +88,63 @@ func (s *WebAuthnService) SaveUser(user *types.WebAuhnUser) error {
 		return err
 	}
 	return nil
+}
+
+/**
+ * GetUserByEmail gets a user from the database by email (querying the field: name)
+ */
+func (s *WebAuthnService) GetUserByEmail(email string) (*types.WebAuthnUserDB, error) {
+	email = strings.ToLower(email)
+	client := s.webauthnUserRepo.GetClient().(*resty.Client).R().
+		SetHeader("Accept", "application/json").
+		SetHeader("Content-Type", "application/json").
+		SetBody(map[string]interface{}{
+			"selector": map[string]interface{}{
+				"name": map[string]interface{}{
+					"$eq": email,
+				},
+			},
+			"limit": 1, // Assuming "limit" should be an integer
+		})
+	resp, err := client.Post(fmt.Sprintf("%s/_find", repository.WebAuthnUser))
+	if err != nil {
+		global.Logger.Log("msg", "failed to get user by email", "error", err)
+		return nil, err
+	}
+	if resp.Error() != nil {
+		if resp.StatusCode() == 404 {
+			return nil, types.ErrNotFound
+		}
+		global.Logger.Log("msg", "failed to get user by email", "error", resp.Error())
+		return nil, types.ErrInternal
+	}
+
+	if resp.StatusCode() != 200 {
+		return nil, types.ErrInternal
+	}
+	var existing map[string]interface{}
+	mErr := json.Unmarshal(resp.Body(), &existing)
+	if mErr != nil {
+		global.Logger.Log("msg", "failed to map object", "error", mErr)
+		return nil, mErr
+	}
+	// Ensure "docs" is a slice of interfaces and check if it's not empty
+	docs, ok := existing["docs"].([]interface{})
+	if !ok || len(docs) == 0 {
+		return nil, types.ErrNotFound
+	}
+	// Convert the first element of "docs" to JSON for unmarshaling
+	docBytes, err := json.Marshal(docs[0])
+	if err != nil {
+		global.Logger.Log("msg", "failed to marshal document", "error", err)
+		return nil, err
+	}
+	// Unmarshal the JSON into the WebAuthnUserDB struct
+	var user types.WebAuthnUserDB
+	if err := json.Unmarshal(docBytes, &user); err != nil {
+		global.Logger.Log("msg", "failed to unmarshal document into user", "error", err)
+		return nil, err
+	}
+
+	return &user, nil
 }

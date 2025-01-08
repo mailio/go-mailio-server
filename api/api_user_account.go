@@ -3,8 +3,10 @@ package api
 import (
 	"crypto/ed25519"
 	"encoding/base64"
+	"errors"
 	"net/http"
 	"net/mail"
+	"net/url"
 	"strings"
 	"time"
 
@@ -25,16 +27,18 @@ type UserAccountApi struct {
 	ssiService         *services.SelfSovereignService
 	userProfileService *services.UserProfileService
 	smartKeyService    *services.SmartKeyService
+	webauthnService    *services.WebAuthnService
 	validate           *validator.Validate
 }
 
-func NewUserAccountApi(userService *services.UserService, userProfileService *services.UserProfileService, nonceService *services.NonceService, ssiService *services.SelfSovereignService, smartKeyService *services.SmartKeyService) *UserAccountApi {
+func NewUserAccountApi(userService *services.UserService, userProfileService *services.UserProfileService, nonceService *services.NonceService, ssiService *services.SelfSovereignService, smartKeyService *services.SmartKeyService, webauthnService *services.WebAuthnService) *UserAccountApi {
 	return &UserAccountApi{
 		userService:        userService,
 		nonceService:       nonceService,
 		ssiService:         ssiService,
 		userProfileService: userProfileService,
 		smartKeyService:    smartKeyService,
+		webauthnService:    webauthnService,
 		validate:           validator.New(),
 	}
 }
@@ -324,7 +328,8 @@ func (ua *UserAccountApi) Register(c *gin.Context) {
 // @Summary Find user by base64 scrypt email address
 // @Description Returns a mailio address
 // @Tags User Account
-// @Param email query string true "Base64 formatted Scrypt of email address"
+// @Param emailHash query string true "Base64 formatted Scrypt of email address"
+// @Param email query string true "hashed email in clear text"
 // @Success 200 {object} types.OutputUserAddress
 // @Failure 429 {object} api.ApiError "rate limit exceeded"
 // @Accept json
@@ -332,18 +337,56 @@ func (ua *UserAccountApi) Register(c *gin.Context) {
 // @Router /api/v1/findaddress [get]
 func (ua *UserAccountApi) FindUsersAddressByEmail(c *gin.Context) {
 	email := c.Query("email")
+	emailHash := c.Query("emailHash")
 	if email == "" {
 		ApiErrorf(c, http.StatusBadRequest, "scrypt of email is require with params: N=32768, R=8,P=1,Len=32")
 		return
 	}
-
-	mapping, err := ua.userService.FindUserByScryptEmail(email)
+	if emailHash == "" {
+		ApiErrorf(c, http.StatusBadRequest, "email hash is required")
+		return
+	}
+	// check email validity
+	decodedEmail, uErr := url.QueryUnescape(email)
+	decodedHash, hErr := url.QueryUnescape(emailHash)
+	if (errors.Join(uErr, hErr) != nil) || (decodedEmail == "" || decodedHash == "") {
+		ApiErrorf(c, http.StatusBadRequest, "invalid email")
+		return
+	}
+	parsedEmail, err := mail.ParseAddress(decodedEmail)
 	if err != nil {
+		ApiErrorf(c, http.StatusBadRequest, "invalid email")
+		return
+	}
+	mappingNotFound := false
+	webAuthnNotFound := false
+	mapping, err := ua.userService.FindUserByScryptEmail(decodedHash)
+	if err != nil {
+		mappingNotFound = true
+	}
+	// double check on webauth_user (because scrypted email can be different for lowercase/uppercase emails, which is not allowed)
+	waUser, waErr := ua.webauthnService.GetUserByEmail(strings.ToLower(parsedEmail.Address))
+	if waErr != nil {
+		if waErr == types.ErrNotFound {
+			webAuthnNotFound = true
+			ApiErrorf(c, http.StatusNotFound, "email not found")
+			return
+		}
+		ApiErrorf(c, http.StatusInternalServerError, "failed to look for user")
+		return
+	}
+	if mappingNotFound && webAuthnNotFound {
 		ApiErrorf(c, http.StatusNotFound, "email not found")
 		return
 	}
+	var address string
+	if mapping != nil {
+		address = mapping.MailioAddress
+	} else if waUser != nil {
+		address = waUser.Address
+	}
 	output := &types.OutputUserAddress{
-		Address: mapping.MailioAddress,
+		Address: address,
 	}
 	c.JSON(http.StatusOK, output)
 }

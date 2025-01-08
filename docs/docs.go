@@ -400,6 +400,13 @@ const docTemplate = `{
                     {
                         "type": "string",
                         "description": "Base64 formatted Scrypt of email address",
+                        "name": "emailHash",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "hashed email in clear text",
                         "name": "email",
                         "in": "query",
                         "required": true

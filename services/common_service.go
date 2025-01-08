@@ -27,6 +27,7 @@ const (
 func getUserByScryptEmail(repo repository.Repository, hashedEmail string) (*types.EmailToMailioMapping, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
+	hashedEmail = url.QueryEscape(hashedEmail)
 	response, eErr := repo.GetByID(ctx, hashedEmail)
 	if eErr != nil {
 		if eErr != types.ErrNotFound {

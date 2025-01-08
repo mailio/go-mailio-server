@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	src "math/rand"
 	"regexp"
+	"strings"
 
 	"github.com/mailio/go-mailio-server/types"
 	"golang.org/x/crypto/scrypt"
@@ -27,6 +28,7 @@ var (
 )
 
 func ScryptEmail(email string) (string, error) {
+	email = strings.ToLower(email)
 	dk, err := scrypt.Key([]byte(email), []byte(email), scryptN, scryptR, scryptP, scryptLen)
 	if err != nil {
 		return "", err

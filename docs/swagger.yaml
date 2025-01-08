@@ -1835,6 +1835,11 @@ paths:
       parameters:
       - description: Base64 formatted Scrypt of email address
         in: query
+        name: emailHash
+        required: true
+        type: string
+      - description: hashed email in clear text
+        in: query
         name: email
         required: true
         type: string

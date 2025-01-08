@@ -130,6 +130,17 @@ func ConfigDBIndexing(dbSelector *repository.CouchDBSelector, environment *types
 	// create a design document to return all documents older than N minutes
 	repository.CreateDesign_DeleteExpiredRecordsByCreatedDate(repository.Nonce, "nonce", "old")
 
+	// Create INDEXES
+	webauthnRepo, waErr := dbSelector.ChooseDB(repository.WebAuthnUser)
+	if waErr != nil {
+		panic(waErr)
+	}
+	// create indexes on a webauthn_user database
+	eacErr := repository.CreateWebAuthNNameIndex(webauthnRepo)
+	if eacErr != nil {
+		panic(eacErr)
+	}
+
 	// cron jobs
 	environment.Cron.AddFunc("@every 5m", nonceService.RemoveExpiredNonces) // remove expired tokens every 5 minutes
 	environment.Cron.Start()

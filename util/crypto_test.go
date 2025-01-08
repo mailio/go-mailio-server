@@ -10,14 +10,18 @@ import (
 
 func TestScryptEmail(t *testing.T) {
 	global.Conf.Mailio = global.MailioConfig{}
-	scrypted, err := ScryptEmail("test@mail.io")
+	scrypted, err := ScryptEmail("test@example.com")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(scrypted) != 32 {
+	decoded, dErr := base64.StdEncoding.DecodeString(scrypted)
+	if dErr != nil {
+		t.Fatal(dErr)
+	}
+	if len(decoded) != 32 {
 		t.Fatal("scrypted email is not 32 bytes long")
 	}
-	assert.Equal(t, "FHKrlVeIovkfMAf/e8D7NCxiI3i4EAJjObE1VhBcank=", scrypted)
+	assert.Equal(t, "ymswrp83Dy79wmX+OKRNqWXP2KiT75k0l4YRDE3sdiA=", scrypted)
 }
 
 func TestGenerateKeyPair(t *testing.T) {

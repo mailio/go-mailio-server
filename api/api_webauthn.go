@@ -212,6 +212,15 @@ func (a *WebAuthnApi) VerifyRegistration(c *gin.Context) {
 		ApiErrorf(c, http.StatusInternalServerError, "failed to search for email")
 		return
 	}
+	// double check on webauth_user (because scrypted email can be different for lowercase/uppercase emails, which is not allowed)
+	_, waErr := a.webauthnService.GetUserByEmail(strings.ToLower(pe.Address))
+	if waErr == nil {
+		ApiErrorf(c, http.StatusConflict, "email already exists")
+		return
+	} else if waErr != types.ErrNotFound {
+		ApiErrorf(c, http.StatusInternalServerError, "failed to search for users email")
+		return
+	}
 
 	user := &types.WebAuhnUser{
 		ID:          []byte(req.SmartKeyPayload.Address),
