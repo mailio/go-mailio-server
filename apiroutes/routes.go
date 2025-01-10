@@ -32,7 +32,7 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 
 	corsConfig := cors.Config{
 		AllowAllOrigins:     false,
-		AllowOrigins:        []string{"http://localhost:4200", "https://" + global.Conf.Host, "https://" + global.Conf.Mailio.ServerDomain, "http://localhost:8080", "https://c4eb-2605-a601-f3fe-2701-28f0-7c2c-dea3-1478.ngrok-free.app"},
+		AllowOrigins:        []string{"http://localhost:4200", "https://" + global.Conf.Host, "https://" + global.Conf.Mailio.ServerDomain, "http://localhost:8080", "https://srv.mailiomail.com", "https://web.mailiomail.com"},
 		AllowMethods:        []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"},
 		AllowWildcard:       true,
 		AllowPrivateNetwork: true,
@@ -141,6 +141,11 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 		// statistics
 		rootApi.GET("/v1/emailstatistics", statisticsApi.GetEmailStatistics)
 		rootApi.PUT("/v1/emailstatistics/interest", statisticsApi.ReportInterest)
+
+		// tranfer device key (1/3 password for decrypting smartKey)
+		rootApi.POST("/v1/devicetransfer", accountApi.StoreEncryptedPasswordForDeviceTransfer)
+		rootApi.GET("/v1/devicetransfer/:id", accountApi.GetEncryptedPasswordForDeviceTransfer)
+		rootApi.DELETE("/v1/devicetransfer/:id", accountApi.DeleteEncryptedPasswordForDeviceTransfer)
 	}
 
 	// server-to-server communication (aka MTP - Mailio Transfer Protocol)

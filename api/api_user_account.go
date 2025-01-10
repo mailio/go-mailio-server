@@ -234,7 +234,7 @@ func (ua *UserAccountApi) Register(c *gin.Context) {
 	err := ua.validate.Struct(inputRegister)
 	if err != nil {
 		msg := ValidatorErrorToUser(err.(validator.ValidationErrors))
-		ApiErrorf(c, http.StatusBadRequest, msg)
+		ApiErrorf(c, http.StatusBadRequest, "%s", msg)
 		return
 	}
 
@@ -461,4 +461,130 @@ func (ua *UserAccountApi) Logout(c *gin.Context) {
 
 	http.SetCookie(c.Writer, &cookie)
 	c.JSON(http.StatusOK, gin.H{"message": "logged out"})
+}
+
+// Transfer 1/3 password for smartkey to another device
+// @Security Bearer
+// @Summary Transfer 1/3 password for smartkey to another device
+// @Description Returns a nonce for constructing url for QR Code
+// @Tags User Account
+// @Param transferKey body types.DeviceKeyTransferInput true "encrypted shared password"
+// @Success 200 {object} types.DeviceKeyTransferOutput
+// @Failure 401 {object} api.ApiError "Invalid signature"
+// @Failure 404 {object} ApiError "Invalid input parameters"
+// @Failure 409 {object} ApiError "User already exists"
+// @Failure 429 {object} api.ApiError "rate limit exceeded"
+// @Failure 500 {object} ApiError "Internal server error"
+// @Accept json
+// @Produce json
+// @Router /api/v1/devicetransfer [post]
+func (ua *UserAccountApi) StoreEncryptedPasswordForDeviceTransfer(c *gin.Context) {
+	// get the address from the token
+	address := c.GetString("subjectAddress")
+	if address == "" {
+		ApiErrorf(c, http.StatusUnauthorized, "address not found")
+		return
+	}
+	var input types.DeviceKeyTransferInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		ApiErrorf(c, http.StatusBadRequest, "invalid input")
+		return
+	}
+	vErr := ua.validate.Struct(input)
+	if vErr != nil {
+		msg := ValidatorErrorToUser(vErr.(validator.ValidationErrors))
+		ApiErrorf(c, http.StatusBadRequest, "%s", msg)
+		return
+	}
+	// nonce is used as url to find the encrypted password
+	nonce := util.GenerateNonce(16)
+	transferKey := &types.DeviceKeyTransfer{
+		BaseDocument: types.BaseDocument{
+			ID: nonce,
+		},
+		Address:                 address,
+		EncryptedSharedPassword: input.EncryptedSharedPassword,
+		Email:                   input.Email,
+	}
+
+	// store the encrypted password
+	err := ua.smartKeyService.SaveDeviceKeyTransfer(transferKey)
+	if err != nil {
+		ApiErrorf(c, http.StatusInternalServerError, "failed to store encrypted password")
+		return
+	}
+	output := &types.DeviceKeyTransferOutput{
+		Nonce: nonce,
+	}
+	c.JSON(http.StatusOK, output)
+}
+
+// Get encrypted password for device transfer
+// @Security Bearer
+// @Summary Get encrypted password for device transfer
+// @Description Returns the encrypted shared password
+// @Tags User Account
+// @Param id path string true "nonce"
+// @Success 200 {object} types.DeviceKeyTransfer
+// @Failure 401 {object} api.ApiError "Unauthorized"
+// @Failure 404 {object} ApiError "Invalid input parameters"
+// @Failure 409 {object} ApiError "User already exists"
+// @Failure 429 {object} api.ApiError "rate limit exceeded"
+// @Failure 500 {object} ApiError "Internal server error"
+// @Accept json
+// @Produce json
+// @Router /api/v1/devicetransfer/{id} [get]
+func (ua *UserAccountApi) GetEncryptedPasswordForDeviceTransfer(c *gin.Context) {
+	address := c.GetString("subjectAddress")
+	if address == "" {
+		ApiErrorf(c, http.StatusUnauthorized, "address not found")
+		return
+	}
+	nonce := c.Param("id")
+	if nonce == "" {
+		ApiErrorf(c, http.StatusBadRequest, "nonce is required")
+		return
+	}
+	transfer, err := ua.smartKeyService.GetDeviceKeyTransfer(nonce)
+	if err != nil {
+		ApiErrorf(c, http.StatusNotFound, "encrypted password not found")
+		return
+	}
+	if transfer.Address != address {
+		ApiErrorf(c, http.StatusUnauthorized, "not authorized")
+		return
+	}
+	c.JSON(http.StatusOK, transfer)
+}
+
+// Delete password for device transfer
+// @Summary delete password for device transfer
+// @Description delete passord for device transfer
+// @Tags User Account
+// @Param id path string true "nonce"
+// @Success 200
+// @Failure 400 {object} api.ApiError "invalid api call"
+// @Failure 429 {object} api.ApiError "rate limit exceeded"
+// @Failure 500 {object} api.ApiError "error deletin object"
+// @Accept json
+// @Produce json
+// @Router /api/v1/devicetransfer/{id} [delete]
+func (ua *UserAccountApi) DeleteEncryptedPasswordForDeviceTransfer(c *gin.Context) {
+	// get the address from the token
+	address := c.GetString("subjectAddress")
+	if address == "" {
+		ApiErrorf(c, http.StatusUnauthorized, "address not found")
+		return
+	}
+	nonce := c.Param("id")
+	if nonce == "" {
+		ApiErrorf(c, http.StatusBadRequest, "nonce is required")
+		return
+	}
+	err := ua.smartKeyService.DeleteDeviceKeyTransfer(nonce)
+	if err != nil {
+		ApiErrorf(c, http.StatusNotFound, "not found")
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "deleted"})
 }

@@ -806,6 +806,50 @@ definitions:
     required:
     - lookupHeader
     type: object
+  types.DeviceKeyTransfer:
+    properties:
+      _deleted:
+        type: boolean
+      _id:
+        type: string
+      _rev:
+        description: |-
+          Rev is the revision number returned
+          _Rev    string `json:"_rev,omitempty"`
+        type: string
+      address:
+        type: string
+      created:
+        type: integer
+      email:
+        type: string
+      encryptedSharedPassword:
+        type: string
+      ok:
+        description: _ID     string `json:"_id,omitempty"`
+        type: boolean
+      passwordShare:
+        type: string
+      smartKeyEncrypted:
+        type: string
+    type: object
+  types.DeviceKeyTransferInput:
+    properties:
+      email:
+        type: string
+      encryptedSharedPassword:
+        type: string
+    required:
+    - email
+    - encryptedSharedPassword
+    type: object
+  types.DeviceKeyTransferOutput:
+    properties:
+      nonce:
+        type: string
+    required:
+    - nonce
+    type: object
   types.Domain:
     properties:
       _deleted:
@@ -1741,6 +1785,123 @@ paths:
       summary: List all VCs for a specific mailio address
       tags:
       - Verifiable Credentials
+  /api/v1/devicetransfer:
+    post:
+      consumes:
+      - application/json
+      description: Returns a nonce for constructing url for QR Code
+      parameters:
+      - description: encrypted shared password
+        in: body
+        name: transferKey
+        required: true
+        schema:
+          $ref: '#/definitions/types.DeviceKeyTransferInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.DeviceKeyTransferOutput'
+        "401":
+          description: Invalid signature
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "404":
+          description: Invalid input parameters
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "409":
+          description: User already exists
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "429":
+          description: rate limit exceeded
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/api.ApiError'
+      security:
+      - Bearer: []
+      summary: Transfer 1/3 password for smartkey to another device
+      tags:
+      - User Account
+  /api/v1/devicetransfer/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: delete passord for device transfer
+      parameters:
+      - description: nonce
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: invalid api call
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "429":
+          description: rate limit exceeded
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "500":
+          description: error deletin object
+          schema:
+            $ref: '#/definitions/api.ApiError'
+      summary: delete password for device transfer
+      tags:
+      - User Account
+    get:
+      consumes:
+      - application/json
+      description: Returns the encrypted shared password
+      parameters:
+      - description: nonce
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.DeviceKeyTransfer'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "404":
+          description: Invalid input parameters
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "409":
+          description: User already exists
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "429":
+          description: rate limit exceeded
+          schema:
+            $ref: '#/definitions/api.ApiError'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/api.ApiError'
+      security:
+      - Bearer: []
+      summary: Get encrypted password for device transfer
+      tags:
+      - User Account
   /api/v1/domains:
     get:
       consumes:

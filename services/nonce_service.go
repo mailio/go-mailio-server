@@ -108,7 +108,7 @@ func (ns *NonceService) RemoveExpiredNonces() {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 		defer cancel()
 
-		time_ago := time.Now().UnixMilli() - (5 * 60 * 1000) // 5 seconds ago and older
+		time_ago := time.Now().UnixMilli() - (5 * 60 * 1000) // 5 minutes ago and older
 		query := fmt.Sprintf("_design/nonce/_view/old?descending=true&startkey=%d&limit=100", time_ago)
 		response, err := ns.nonceRepo.GetByID(ctx, query)
 		if err != nil {

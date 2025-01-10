@@ -7,17 +7,18 @@ import (
 const (
 	// CouchDB is the name of the CouchDB database
 	// Handshake       = "handshake"
-	Nonce           = "nonce"
-	User            = "_users"
-	Domain          = "domains"
-	MailioMapping   = "mailio_mapping"
-	DID             = "did"              // decentralized identifiers
-	VCS             = "vcs"              // verifiable credentials
-	MessageDelivery = "message_delivery" // message delivery statuses
-	UserProfile     = "user_profile"     // user profile (for system use only)
-	WebAuthnUser    = "webauthn_user"    // webauthn user
-	SmartKey        = "smart_key"        // smart keys
-	EmailStatistics = "email_statistics" // statistics
+	Nonce             = "nonce"
+	User              = "_users"
+	Domain            = "domains"
+	MailioMapping     = "mailio_mapping"
+	DID               = "did"                 // decentralized identifiers
+	VCS               = "vcs"                 // verifiable credentials
+	MessageDelivery   = "message_delivery"    // message delivery statuses
+	UserProfile       = "user_profile"        // user profile (for system use only)
+	WebAuthnUser      = "webauthn_user"       // webauthn user
+	SmartKey          = "smart_key"           // smart keys
+	EmailStatistics   = "email_statistics"    // statistics
+	DeviceKeyTransfer = "device_key_transfer" // device password transfer
 )
 
 type CouchDBSelector struct {

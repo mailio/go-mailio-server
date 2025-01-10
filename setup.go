@@ -55,7 +55,10 @@ func RegisterDiskUsageHandlers(conf *global.Config) {
 // Configure DB Repositories and create DB Selector
 func ConfigDBSelector() repository.DBSelector {
 	// configure Repository (couchDB)
-	repoUrl := global.Conf.CouchDB.Scheme + "://" + global.Conf.CouchDB.Host + ":" + strconv.Itoa(global.Conf.CouchDB.Port)
+	repoUrl := global.Conf.CouchDB.Scheme + "://" + global.Conf.CouchDB.Host
+	if global.Conf.CouchDB.Port != 0 {
+		repoUrl += ":" + strconv.Itoa(global.Conf.CouchDB.Port)
+	}
 	nonceRepo, nonceRepoErr := repository.NewCouchDBRepository(repoUrl, repository.Nonce, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
 	userRepo, userRepoErr := repository.NewCouchDBRepository(repoUrl, repository.User, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
 	mailioMappingRepo, mappingRepoErr := repository.NewCouchDBRepository(repoUrl, repository.MailioMapping, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
@@ -67,11 +70,11 @@ func ConfigDBSelector() repository.DBSelector {
 	webauthnUser, wErr := repository.NewCouchDBRepository(repoUrl, repository.WebAuthnUser, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
 	smartKey, smrtkErr := repository.NewCouchDBRepository(repoUrl, repository.SmartKey, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
 	emailStatisticsRepo, stErr := repository.NewCouchDBRepository(repoUrl, repository.EmailStatistics, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
-
+	deviceKeyTransferRepo, dktErr := repository.NewCouchDBRepository(repoUrl, repository.DeviceKeyTransfer, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
 	// ensure _users exist
 	users_Err := repository.CreateUsers_IfNotExists(userRepo, repoUrl)
 
-	repoErr := errors.Join(nonceRepoErr, userRepoErr, mappingRepoErr, didRErr, vscrErr, dErr, mdErr, upErr, users_Err, wErr, smrtkErr, stErr)
+	repoErr := errors.Join(nonceRepoErr, userRepoErr, mappingRepoErr, didRErr, vscrErr, dErr, mdErr, upErr, users_Err, wErr, smrtkErr, stErr, dktErr)
 	if repoErr != nil {
 		global.Logger.Log("error", "Failed to create repositories", "error", repoErr.Error())
 		panic(repoErr)
@@ -90,6 +93,7 @@ func ConfigDBSelector() repository.DBSelector {
 	dbSelector.AddDB(webauthnUser)
 	dbSelector.AddDB(smartKey)
 	dbSelector.AddDB(emailStatisticsRepo)
+	dbSelector.AddDB(deviceKeyTransferRepo)
 
 	return dbSelector
 }
@@ -129,6 +133,8 @@ func ConfigDBIndexing(dbSelector *repository.CouchDBSelector, environment *types
 	// Create DESIGN DOCUMENTS
 	// create a design document to return all documents older than N minutes
 	repository.CreateDesign_DeleteExpiredRecordsByCreatedDate(repository.Nonce, "nonce", "old")
+
+	repository.CreateDesign_DeleteTransferKeysByCreatedDate(repository.DeviceKeyTransfer, "transferkey", "oldkeys")
 
 	// Create INDEXES
 	webauthnRepo, waErr := dbSelector.ChooseDB(repository.WebAuthnUser)
@@ -189,13 +195,16 @@ func ConfigWebAuthN(conf *global.Config, env *types.Environment) {
 		}
 	}
 	requireResidentKey := true
+	// TODO! this is just for development purposes. improve the PR
+	fmt.Printf("RPID: %s\n", host)
 	wconfig := &webauthn.Config{
-		RPDisplayName: conf.Mailio.ServerDomain,
-		RPID:          host,
-		RPOrigins:     []string{"https://" + conf.Mailio.ServerDomain, "localhost", "http://localhost:4200"},
-		Debug:         true,
+		RPDisplayName: "Mailio e-Mail",
+		// RPID:          host,
+		RPID:      "web.mailiomail.com",
+		RPOrigins: []string{"https://" + conf.Mailio.ServerDomain, "localhost", "http://localhost:4200", "https://web.mailiomail.com"},
+		Debug:     true,
 		AuthenticatorSelection: protocol.AuthenticatorSelection{
-			UserVerification:        protocol.VerificationRequired,
+			UserVerification:        protocol.VerificationDiscouraged,
 			RequireResidentKey:      &requireResidentKey,
 			AuthenticatorAttachment: protocol.Platform,
 		},

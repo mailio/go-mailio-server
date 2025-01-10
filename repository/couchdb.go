@@ -224,6 +224,7 @@ func (c *CouchDBRepository) Delete(ctx context.Context, id string) error {
 	if id == "" {
 		return types.ErrNotFound
 	}
+
 	doc, err := c.GetByID(ctx, id)
 	if err != nil {
 		if err != types.ErrNotFound {

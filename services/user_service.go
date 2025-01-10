@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -119,6 +120,11 @@ func (us *UserService) CreateDatabase(user *types.User, databasePassword string)
 // CreateUser creates a new user with the given email and password.
 // It returns a pointer to an InputEmailPassword struct and an error (if any).
 func (us *UserService) CreateUser(user *types.User, mk *did.MailioKey, databasePassword string) (*types.User, error) {
+	// validate if the domain is supported
+	userDomain := strings.Split(user.Email, "@")[1]
+	if !util.IsSupportedMailioDomain(userDomain) {
+		return nil, types.ErrDomainNotFound
+	}
 	// map sacrypt (encrryped email) address to mailio address
 	_, errMu := us.MapEmailToMailioAddress(user)
 	if errMu != nil {
@@ -126,12 +132,6 @@ func (us *UserService) CreateUser(user *types.User, mk *did.MailioKey, databaseP
 			return user, errMu
 		}
 		return nil, errMu
-	}
-
-	// validate if the domain is supported
-	userDomain := strings.Split(user.Email, "@")[1]
-	if !util.IsSupportedMailioDomain(userDomain) {
-		return nil, types.ErrDomainNotFound
 	}
 
 	dbErr := us.CreateDatabase(user, databasePassword)
@@ -163,6 +163,10 @@ func (us *UserService) CreateUser(user *types.User, mk *did.MailioKey, databaseP
 
 // Maps encrypted email to mailio address so outside users can request per user email if they know it
 func (us *UserService) MapEmailToMailioAddress(user *types.User) (*types.EmailToMailioMapping, error) {
+
+	// since it's base64 encoded, we need to escape it
+	id := base64.RawStdEncoding.EncodeToString([]byte(user.EncryptedEmail))
+
 	mapping := &types.EmailToMailioMapping{
 		EncryptedEmail: user.EncryptedEmail,
 		MailioAddress:  user.MailioAddress,
@@ -175,7 +179,7 @@ func (us *UserService) MapEmailToMailioAddress(user *types.User) (*types.EmailTo
 	defer cancel()
 
 	// Check if email already exists
-	existingResponse, eErr := repo.GetByID(ctx, mapping.EncryptedEmail)
+	existingResponse, eErr := repo.GetByID(ctx, id)
 	if eErr != nil {
 		if eErr != types.ErrNotFound {
 			return nil, eErr
@@ -189,7 +193,7 @@ func (us *UserService) MapEmailToMailioAddress(user *types.User) (*types.EmailTo
 		}
 		mapping.BaseDocument = existing.BaseDocument
 	}
-	sErr := repo.Save(ctx, mapping.EncryptedEmail, mapping)
+	sErr := repo.Save(ctx, id, mapping)
 	if sErr != nil {
 		return nil, sErr
 	}

@@ -46,7 +46,6 @@ const (
 
 // Generates a random nonce of custom length in bytes
 // method based on https://stackoverflow.com/questions/22892120/how-to-generate-a-random-string-of-a-fixed-length-in-go
-// 5. Masking improved version
 func GenerateNonce(n int) string {
 	b := make([]byte, n)
 	// A src.Int63() generates 63 random bits, enough for letterIdxMax characters!
