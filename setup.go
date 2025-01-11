@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
 	"strconv"
 	"strings"
 
@@ -32,8 +31,7 @@ func RegisterSmtpHandlers(conf *global.Config) {
 		if wh.Provider == "mailgun" {
 			for _, domain := range wh.Domains {
 				// development api key not needed for now (but prepared for later versions)
-				handler := mailgunhandler.NewMailgunSmtpHandler(wh.Webhookkey, "", nil)
-				handler.SetDomainAndSendApiKey(domain.Sendapikey, domain.Domain)
+				handler := mailgunhandler.NewMailgunSmtpHandler(wh.Webhookkey, "", domain.SmtpServer, domain.SmtpPort, domain.SmtpUsername, domain.SmtpPassword)
 				smtpmodule.RegisterSmtpHandler(domain.Domain, handler)
 			}
 		}
@@ -117,6 +115,7 @@ func ConfigDBIndexing(dbSelector *repository.CouchDBSelector, environment *types
 	// CREATE REQUIRED SERVICES
 	nonceService := services.NewNonceService(dbSelector)
 	statisticService := services.NewStatisticsService(dbSelector, environment)
+	userService := services.NewUserService(dbSelector, environment)
 
 	// Create INDEXES
 	vcsRepo, vscErr := dbSelector.ChooseDB(repository.VCS)
@@ -152,6 +151,11 @@ func ConfigDBIndexing(dbSelector *repository.CouchDBSelector, environment *types
 	environment.Cron.Start()
 	go nonceService.RemoveExpiredNonces() // run once on startup
 
+	// cron job for deleteing transfer keys after 5 minutes
+	environment.Cron.AddFunc("@every 5m", userService.DeleteExpiredTransferKeys)
+	environment.Cron.Start()
+	go userService.DeleteExpiredTransferKeys() // run once on startup
+
 	// cron job for flushing email statistics into the database
 	environment.Cron.AddFunc(fmt.Sprintf("@every %dm", global.Conf.EmailStatistics.InterestKeyFlush), statisticService.FlushEmailInterests)
 	environment.Cron.Start()
@@ -184,27 +188,22 @@ func ConfigS3Storage(conf *global.Config, env *types.Environment) {
 }
 
 func ConfigWebAuthN(conf *global.Config, env *types.Environment) {
-	// configure WebAuthN
-	host, _, err := net.SplitHostPort(global.Conf.Mailio.ServerDomain)
-	if err != nil {
-		if strings.Contains(err.Error(), "missing port in address") {
-			host = global.Conf.Mailio.ServerDomain
-		} else {
-			fmt.Printf("failed to parse server domain: %v", err)
-			panic(err)
-		}
+	if conf.Mailio.WebDomain == "" {
+		fmt.Printf("failed to parse server domain: %v", errors.New("WebDomain is empty"))
+		panic(errors.New("WebDomain is empty"))
+	}
+	scheme := "https"
+	if strings.Contains(conf.Mailio.WebDomain, "localhost") {
+		scheme = "http"
 	}
 	requireResidentKey := true
-	// TODO! this is just for development purposes. improve the PR
-	fmt.Printf("RPID: %s\n", host)
 	wconfig := &webauthn.Config{
 		RPDisplayName: "Mailio e-Mail",
-		// RPID:          host,
-		RPID:      "web.mailiomail.com",
-		RPOrigins: []string{"https://" + conf.Mailio.ServerDomain, "localhost", "http://localhost:4200", "https://web.mailiomail.com"},
-		Debug:     true,
+		RPID:          global.Conf.Mailio.WebDomain, // alowed passkey domains to login from
+		RPOrigins:     []string{scheme + "://" + global.Conf.Mailio.WebDomain},
+		Debug:         true,
 		AuthenticatorSelection: protocol.AuthenticatorSelection{
-			UserVerification:        protocol.VerificationDiscouraged,
+			UserVerification:        protocol.VerificationRequired,
 			RequireResidentKey:      &requireResidentKey,
 			AuthenticatorAttachment: protocol.Platform,
 		},

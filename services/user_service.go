@@ -237,3 +237,18 @@ func (us *UserService) SaveMessage(userAddress string, mailioMessage *types.Mail
 
 	return mailioMessage, nil
 }
+
+/**
+ * Deletes expired transfer keys every 5 minutes or so
+ */
+func (us *UserService) DeleteExpiredTransferKeys() {
+	transferKeyRepo, trErr := us.repoSelector.ChooseDB(repository.DeviceKeyTransfer)
+	if trErr != nil {
+		global.Logger.Log(trErr, "failed to choose repository")
+		return
+	}
+	err := RemoveExpiredDocuments(transferKeyRepo, "transferkey", "oldkeys", 5)
+	if err != nil {
+		global.Logger.Log("Error removing expired transfer keys", "%s", err.Error())
+	}
+}

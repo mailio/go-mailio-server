@@ -171,16 +171,18 @@ func ToMime(msg *mailiosmtp.Mail, rfc2822MessageID string) ([]byte, error) {
 		}
 		outgoingMime = outgoingMime.CCAddrs(noPtrCc)
 	}
-	if msg.Bcc != nil {
-		var noPtrBcc []mail.Address
-		for _, address := range msg.Bcc {
-			noPtrBcc = append(noPtrBcc, *address)
-		}
-		outgoingMime = outgoingMime.BCCAddrs(noPtrBcc)
-	}
+	// Bcc recipients should not be included in the message headers
+	// if msg.Bcc != nil {
+	// 	var noPtrBcc []mail.Address
+	// 	for _, address := range msg.Bcc {
+	// 		noPtrBcc = append(noPtrBcc, *address)
+	// 	}
+	// 	outgoingMime = outgoingMime.BCCAddrs(noPtrBcc)
+	// }
 
 	// add headers
 	outgoingMime = outgoingMime.Header("X-Mailer", "Mailio")
+	outgoingMime = outgoingMime.Header("X-Mailio-Message-Id", msg.MessageId)
 
 	// add attachments
 	if msg.Attachments != nil {
@@ -190,7 +192,7 @@ func ToMime(msg *mailiosmtp.Mail, rfc2822MessageID string) ([]byte, error) {
 
 	}
 
-	outgoingMime = outgoingMime.Header("Message-ID", rfc2822MessageID)
+	outgoingMime = outgoingMime.Header("Message-Id", rfc2822MessageID)
 
 	// build and encode the message
 	ep, err := outgoingMime.Build()

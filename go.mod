@@ -19,7 +19,7 @@ require (
 	github.com/go-kit/log v0.2.1
 	github.com/go-playground/validator/v10 v10.20.0
 	github.com/go-redis/redis_rate/v10 v10.0.1
-	github.com/go-resty/resty/v2 v2.13.1
+	github.com/go-resty/resty/v2 v2.16.3
 	github.com/go-webauthn/webauthn v0.10.2
 	github.com/google/uuid v1.6.0
 	github.com/hibiken/asynq v0.24.1
@@ -27,21 +27,21 @@ require (
 	github.com/lestrrat-go/jwx/v2 v2.0.19
 	github.com/mailio/go-mailio-did v0.0.0-20240219171524-88713f84b09d
 	github.com/mailio/go-mailio-diskusage-handler v1.0.0
-	github.com/mailio/go-mailio-mailgun-smtp-handler v1.0.4
+	github.com/mailio/go-mailio-mailgun-smtp-handler v1.1.0
 	github.com/mailio/go-mailio-server/diskusage v0.0.0-20240531204144-2069ccd8b024
-	github.com/mailio/go-mailio-server/email/smtp v0.0.0-20240618164609-bad0c892b0ec
+	github.com/mailio/go-mailio-server/email/smtp v0.0.0-20241227232228-78b256eb7356
 	github.com/mailio/go-mailio-server/email/validator v0.0.0-20241023192129-f8719177b347
 	github.com/mailio/go-web3-kit v0.0.0-20230302165532-057a45112b37
 	github.com/prometheus/client_golang v1.15.0
 	github.com/redis/go-redis/v9 v9.0.5
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/spf13/cobra v1.7.0
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 	github.com/swaggo/swag v1.16.1
 	github.com/tj/assert v0.0.3
-	golang.org/x/crypto v0.24.0
-	golang.org/x/net v0.26.0
-	golang.org/x/sys v0.21.0
+	golang.org/x/crypto v0.32.0
+	golang.org/x/net v0.34.0
+	golang.org/x/sys v0.29.0
 )
 
 require (
@@ -77,7 +77,7 @@ require (
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/gabriel-vasile/mimetype v1.4.3 // indirect
 	github.com/gin-contrib/sse v0.1.0 // indirect
-	github.com/go-chi/chi/v5 v5.0.12 // indirect
+	github.com/go-chi/chi/v5 v5.2.0 // indirect
 	github.com/go-logfmt/logfmt v0.6.0 // indirect
 	github.com/go-openapi/jsonpointer v0.19.6 // indirect
 	github.com/go-openapi/jsonreference v0.20.2 // indirect
@@ -96,7 +96,7 @@ require (
 	github.com/gorilla/css v1.0.1 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jaytaylor/html2text v0.0.0-20230321000545-74c2419ad056 // indirect
-	github.com/jhillyerd/enmime v1.2.0 // indirect
+	github.com/jhillyerd/enmime v1.3.0 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
@@ -109,12 +109,13 @@ require (
 	github.com/lestrrat-go/httprc v1.0.4 // indirect
 	github.com/lestrrat-go/iter v1.0.2 // indirect
 	github.com/lestrrat-go/option v1.0.1 // indirect
-	github.com/mailgun/mailgun-go/v4 v4.12.0 // indirect
+	github.com/mailgun/errors v0.4.0 // indirect
+	github.com/mailgun/mailgun-go/v4 v4.21.0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
-	github.com/mattn/go-runewidth v0.0.15 // indirect
+	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
-	github.com/microcosm-cc/bluemonday v1.0.26 // indirect
+	github.com/microcosm-cc/bluemonday v1.0.27 // indirect
 	github.com/minio/asm2plan9s v0.0.0-20200509001527-cdd76441f9d8 // indirect
 	github.com/minio/c2goasm v0.0.0-20190812172519-36a3d3bbc4f3 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
@@ -143,9 +144,9 @@ require (
 	golang.org/x/arch v0.7.0 // indirect
 	golang.org/x/exp v0.0.0-20220827204233-334a2380cb91 // indirect
 	golang.org/x/mod v0.18.0 // indirect
-	golang.org/x/sync v0.7.0 // indirect
-	golang.org/x/text v0.16.0 // indirect
-	golang.org/x/time v0.5.0 // indirect
+	golang.org/x/sync v0.10.0 // indirect
+	golang.org/x/text v0.21.0 // indirect
+	golang.org/x/time v0.6.0 // indirect
 	golang.org/x/tools v0.22.0 // indirect
 	golang.org/x/xerrors v0.0.0-20220609144429-65e65417b02f // indirect
 	google.golang.org/genproto v0.0.0-20210630183607-d20f26d13c79 // indirect

@@ -53,9 +53,8 @@ func (mtp *MtpService) LookupHandshakes(senderAddress string, inputLookups []typ
 	// resolve domain from the lookups
 
 	// Create a map for quick lookup of local domains
-	localDomainMap := make(map[string]string)
-	for _, localDomain := range global.Conf.Mailio.DomainConfig {
-		localDomainMap[localDomain.Domain] = ""
+	localDomainMap := map[string]string{
+		global.Conf.Mailio.WebDomain: "", // empty value since only key is important
 	}
 
 	localLookups := []types.HandshakeLookup{}

@@ -78,8 +78,13 @@ func (msq *MessageQueue) SendSMTPMessage(fromMailioAddress string, email *types.
 		global.Logger.Log("unsupported domain", domain)
 		return fmt.Errorf("unsupported domain: %w", asynq.SkipRetry)
 	}
+	smtpSendingDomain, smtpErr := util.ExtractSmtpSendingDomain(domain)
+	if smtpErr != nil {
+		global.Logger.Log(smtpErr.Error(), "failed to extract sending domain", smtpErr)
+		return fmt.Errorf("failed extracting sending domain: %v: %w", smtpErr, asynq.SkipRetry)
+	}
 	// finding the supported SMTP email handler from the senders email domain
-	mgHandler := mailiosmtp.GetHandler(domain)
+	mgHandler := mailiosmtp.GetHandler(smtpSendingDomain)
 	if mgHandler == nil {
 		global.Logger.Log("failed retrieving an smtp handler")
 		return fmt.Errorf("failed retrieving an smtp handler: %w", asynq.SkipRetry)
@@ -173,7 +178,16 @@ func (msq *MessageQueue) SendSMTPMessage(fromMailioAddress string, email *types.
 	}
 
 	// using the handler to send the email
-	docID, err := mgHandler.SendMimeMail(smtpEmail.From, mime, smtpEmail.To)
+	// when dealing with BCC recipients, don't add them to the mime document, but add all recipients (to, cc, anc bcc to allTos)
+	allTos := []mail.Address{}
+	allTos = append(allTos, smtpEmail.To...)
+	for _, cc := range smtpEmail.Cc {
+		allTos = append(allTos, *cc)
+	}
+	for _, bcc := range smtpEmail.Bcc {
+		allTos = append(allTos, *bcc)
+	}
+	docID, err := mgHandler.SendMimeMail(smtpEmail.From, mime, allTos)
 	if err != nil {
 		global.Logger.Log(err.Error(), "failed to send smtp email")
 		//TODO: store the email in the inbox folder if sending fails

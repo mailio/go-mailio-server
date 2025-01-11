@@ -53,7 +53,7 @@ type MailioConfig struct {
 	ServerKeysPath           string                        `yaml:"serverKeysPath"`
 	ServerHanshake           ServerHandshakeConfig         `yaml:"serverHandshake"`
 	ReadVsReceived           int                           `yaml:"readVsReceived"`
-	DomainConfig             []MailioDomainConfig          `yaml:"domains"`
+	WebDomain                string                        `yaml:"webDomain"`
 }
 
 type MailioDomainConfig struct {
@@ -102,8 +102,11 @@ type SmtpServerConfig struct {
 }
 
 type MailDomains struct {
-	Domain     string `yaml:"domain"`
-	Sendapikey string `yaml:"sendapikey"`
+	Domain       string `yaml:"domain"`
+	SmtpPort     int    `yaml:"smtpPort"`
+	SmtpServer   string `yaml:"smtpServer"`
+	SmtpUsername string `yaml:"smtpUsername"`
+	SmtpPassword string `yaml:"smtpPassword"`
 }
 
 type StorageConfig struct {

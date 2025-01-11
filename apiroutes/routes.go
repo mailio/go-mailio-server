@@ -1,6 +1,7 @@
 package apiroutes
 
 import (
+	"strings"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -30,9 +31,18 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 		authorized.GET("", gin.WrapH(promhttp.Handler()))
 	}
 
+	webScheme := "https"
+	serverScheme := "https"
+	if strings.Contains(global.Conf.Mailio.WebDomain, "localhost") {
+		webScheme = "http"
+	}
+	if strings.Contains(global.Conf.Mailio.ServerDomain, "localhost") {
+		serverScheme = "http"
+	}
+
 	corsConfig := cors.Config{
 		AllowAllOrigins:     false,
-		AllowOrigins:        []string{"http://localhost:4200", "https://" + global.Conf.Host, "https://" + global.Conf.Mailio.ServerDomain, "http://localhost:8080", "https://srv.mailiomail.com", "https://web.mailiomail.com"},
+		AllowOrigins:        []string{webScheme + "://" + global.Conf.Mailio.WebDomain, serverScheme + "://" + global.Conf.Mailio.ServerDomain},
 		AllowMethods:        []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"},
 		AllowWildcard:       true,
 		AllowPrivateNetwork: true,
