@@ -53,6 +53,36 @@ func (msq *MessageQueue) SendSMTPMessage(fromMailioAddress string, email *types.
 	}
 
 	securityStatus := "clean" // default
+
+	// check if sending smtp domain supported and extract smtp sending domain
+	// parse users from address
+	from, fromErr := mail.ParseAddress(email.From)
+	if fromErr != nil {
+		global.Logger.Log(fromErr.Error(), "failed to parse email address", email.From)
+		return fmt.Errorf("failed parsing email address: %v: %w", fromErr, asynq.SkipRetry)
+	}
+	domain := strings.Split(from.Address, "@")[1]
+	sendingDomain, sndErr := util.ExtractSmtpSendingDomain(domain)
+	if sndErr != nil {
+		global.Logger.Log(sndErr.Error(), "failed to extract sending domain from", email.From)
+		return fmt.Errorf("failed extracting sending domain: %v: %w", sndErr, asynq.SkipRetry)
+	}
+	if sendingDomain != domain {
+		global.Logger.Log("sending domain is different from the domain in the from address", "sendingDomain", sendingDomain, "fromDomain", domain)
+		return fmt.Errorf("sending domain is different from the domain in the from address: %w", asynq.SkipRetry)
+	}
+	email.From = from.Address
+
+	// include the senders name if in profile and user allows it
+	up, upErr := msq.userProfileService.Get(fromMailioAddress)
+	if upErr != nil {
+		global.Logger.Log(upErr.Error(), "failed to get user profile")
+	} else {
+		if strings.Contains(up.WhatToShare, "displayName") {
+			email.From = fmt.Sprintf("%q <%s>", up.DisplayName, from.Address)
+		}
+	}
+
 	smtpEmail, smtpConvErr := util.ConvertToSmtpEmail(*email)
 	if smtpConvErr != nil {
 		global.Logger.Log(smtpConvErr.Error(), "failed to convert email")
@@ -72,19 +102,8 @@ func (msq *MessageQueue) SendSMTPMessage(fromMailioAddress string, email *types.
 		}
 	}
 
-	// support multiple emails domains (based on the FROM domain use the handler for instance)
-	domain := strings.Split(smtpEmail.From.Address, "@")[1]
-	if !util.IsSupportedSmtpDomain(domain) {
-		global.Logger.Log("unsupported domain", domain)
-		return fmt.Errorf("unsupported domain: %w", asynq.SkipRetry)
-	}
-	smtpSendingDomain, smtpErr := util.ExtractSmtpSendingDomain(domain)
-	if smtpErr != nil {
-		global.Logger.Log(smtpErr.Error(), "failed to extract sending domain", smtpErr)
-		return fmt.Errorf("failed extracting sending domain: %v: %w", smtpErr, asynq.SkipRetry)
-	}
 	// finding the supported SMTP email handler from the senders email domain
-	mgHandler := mailiosmtp.GetHandler(smtpSendingDomain)
+	mgHandler := mailiosmtp.GetHandler(sendingDomain)
 	if mgHandler == nil {
 		global.Logger.Log("failed retrieving an smtp handler")
 		return fmt.Errorf("failed retrieving an smtp handler: %w", asynq.SkipRetry)

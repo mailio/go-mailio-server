@@ -9,7 +9,6 @@ import (
 	"math"
 	"runtime/debug"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/go-resty/resty/v2"
@@ -17,7 +16,6 @@ import (
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/repository"
 	"github.com/mailio/go-mailio-server/types"
-	"github.com/mailio/go-mailio-server/util"
 )
 
 type UserService struct {
@@ -120,11 +118,6 @@ func (us *UserService) CreateDatabase(user *types.User, databasePassword string)
 // CreateUser creates a new user with the given email and password.
 // It returns a pointer to an InputEmailPassword struct and an error (if any).
 func (us *UserService) CreateUser(user *types.User, mk *did.MailioKey, databasePassword string) (*types.User, error) {
-	// validate if the domain is supported
-	userDomain := strings.Split(user.Email, "@")[1]
-	if !util.IsSupportedMailioDomain(userDomain) {
-		return nil, types.ErrDomainNotFound
-	}
 	// map sacrypt (encrryped email) address to mailio address
 	_, errMu := us.MapEmailToMailioAddress(user)
 	if errMu != nil {
@@ -143,7 +136,7 @@ func (us *UserService) CreateUser(user *types.User, mk *did.MailioKey, databaseP
 	_, upErr := us.userProfileService.Save(user.MailioAddress, &types.UserProfile{
 		Enabled:   true,
 		DiskSpace: global.Conf.Mailio.DiskSpace,
-		Domain:    userDomain,
+		Domain:    global.Conf.Mailio.EmailDomain,
 		Created:   time.Now().UTC().UnixMilli(),
 		Modified:  time.Now().UTC().UnixMilli(),
 	})
@@ -231,7 +224,7 @@ func (us *UserService) SaveMessage(userAddress string, mailioMessage *types.Mail
 	}
 	if httpResp.IsError() {
 		stackTrace := string(debug.Stack())
-		global.Logger.Log(httpResp.String(), "failed to save message", hexUser, postError.Error, postError.Reason)
+		global.Logger.Log(httpResp.String(), "failed to save message", hexUser, "msgId: ", mailioMessage.ID, postError.Error, postError.Reason)
 		return nil, fmt.Errorf("code: %s, reason: %s, trace: %v", postError.Error, postError.Reason, stackTrace)
 	}
 

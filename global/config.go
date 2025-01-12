@@ -48,16 +48,13 @@ type MailioConfig struct {
 	DiskSpace                int64                         `yaml:"diskSpace"`
 	AuthenticationPath       string                        `yaml:"authenticationPath"`
 	MessagingPath            string                        `yaml:"messagingPath"`
+	EmailDomain              string                        `yaml:"emailDomain"`
 	ServerDomain             string                        `yaml:"serverDomain"`
+	WebDomain                string                        `yaml:"webDomain"`
 	ServerSubdomainQueryList []*MailioServerSubdomainQuery `yaml:"serverSubdomainQueryList"`
 	ServerKeysPath           string                        `yaml:"serverKeysPath"`
 	ServerHanshake           ServerHandshakeConfig         `yaml:"serverHandshake"`
 	ReadVsReceived           int                           `yaml:"readVsReceived"`
-	WebDomain                string                        `yaml:"webDomain"`
-}
-
-type MailioDomainConfig struct {
-	Domain string `yaml:"domain"`
 }
 
 type MailioServerSubdomainQuery struct {

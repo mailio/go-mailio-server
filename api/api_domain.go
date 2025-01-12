@@ -21,13 +21,9 @@ type DomainApi struct {
 func NewDomainApi(domainService *services.DomainService) *DomainApi {
 	// take all configured domains
 	allSmtp := util.ListSmtpDomains()
-	allMailio := util.ListMailioDomains()
 	all := []types.UserDomain{}
 	for _, domain := range allSmtp {
 		all = append(all, types.UserDomain{Name: domain, Type: "smtp"})
-	}
-	for _, domain := range allMailio {
-		all = append(all, types.UserDomain{Name: domain, Type: "mailio"})
 	}
 	return &DomainApi{
 		allDomains:    all,

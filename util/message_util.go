@@ -56,22 +56,6 @@ func ListSmtpDomains() []string {
 	return domains
 }
 
-func ListMailioDomains() []string {
-	domains := []string{
-		global.Conf.Mailio.WebDomain,
-	}
-	return domains
-}
-
-func IsSupportedMailioDomain(domain string) bool {
-	for _, d := range ListMailioDomains() {
-		if d == domain {
-			return true
-		}
-	}
-	return false
-}
-
 func ExtractRootDomain(domain string) (string, error) {
 	// Get the root domain using the publicsuffix library
 	rootDomain, err := publicsuffix.EffectiveTLDPlusOne(domain)

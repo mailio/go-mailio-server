@@ -198,6 +198,18 @@ func (a *WebAuthnApi) VerifyRegistration(c *gin.Context) {
 		pe.Name = strings.Split(pe.Address, "@")[0]
 	}
 
+	// validate if the domain is supported
+	userDomain := strings.Split(req.SmartKeyPayload.Email, "@")[1]
+	rootDomain, rErr := util.ExtractRootDomain(userDomain)
+	if rErr != nil {
+		ApiErrorf(c, http.StatusInternalServerError, "failed to extract root domain")
+		return
+	}
+	if rootDomain != global.Conf.Mailio.EmailDomain {
+		ApiErrorf(c, http.StatusForbidden, "domain not supported. check configuration")
+		return
+	}
+
 	scryptedEmail, sErr := util.ScryptEmail(req.SmartKeyPayload.Email)
 	if sErr != nil {
 		ApiErrorf(c, http.StatusInternalServerError, "Failed to scrypt email")
