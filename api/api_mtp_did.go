@@ -46,6 +46,11 @@ func (didMtp *DIDMtpApi) GetLocalDIDDocuments(c *gin.Context) {
 	// input DIDDocumentSignedRequest
 	var input types.DIDDocumentSignedRequest
 	if err := c.ShouldBindJSON(&input); err != nil {
+		body, bErr := c.GetRawData()
+		if bErr != nil {
+			global.Logger.Log("error getting raw data", bErr.Error())
+		}
+		global.Logger.Log("error binding json", err.Error(), " request body: ", string(body))
 		ApiErrorf(c, http.StatusBadRequest, "invalid format")
 		return
 	}

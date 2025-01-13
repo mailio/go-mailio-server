@@ -243,7 +243,7 @@ func getHostWithoutPort(host string) string {
 // it also checks if all the email addresses are valid
 func getLocalAndRemoteRecipients(lookups []*types.DIDLookup) ([]*types.DIDLookup, map[string][]*types.DIDLookup, error) {
 	localDomainMap := map[string]string{
-		global.Conf.Mailio.WebDomain: "",
+		global.Conf.Mailio.ServerDomain: "",
 	}
 
 	localLookups := []*types.DIDLookup{}
@@ -257,6 +257,12 @@ func getLocalAndRemoteRecipients(lookups []*types.DIDLookup) ([]*types.DIDLookup
 		lookupEmailParsed.Address = strings.ToLower(lookupEmailParsed.Address)
 		lookup.Email = lookupEmailParsed.Address
 		lookupDomain := strings.Split(lookupEmailParsed.Address, "@")[1]
+
+		// check if user has local email domain, if so then the lookup server
+		if lookupDomain == global.Conf.Mailio.EmailDomain {
+			lookupDomain = global.Conf.Mailio.ServerDomain
+		}
+
 		// check if local or remote
 		if _, ok := localDomainMap[lookupDomain]; ok {
 			localLookups = append(localLookups, lookup)
