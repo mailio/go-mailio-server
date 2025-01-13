@@ -76,4 +76,7 @@ var (
 
 	// ErrBadRequestMissingSubjectOrBody - missing subject or body
 	ErrBadRequestMissingSubjectOrBody = errors.New("missing subject or body")
+
+	// ErrRecordExists - record exists
+	ErrRecordExists = errors.New("record exists")
 )

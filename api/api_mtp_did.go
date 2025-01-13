@@ -57,7 +57,7 @@ func (didMtp *DIDMtpApi) GetLocalDIDDocuments(c *gin.Context) {
 	err := didMtp.validate.Struct(input)
 	if err != nil {
 		msg := util.ValidationErrorToMessage(err)
-		ApiErrorf(c, http.StatusBadRequest, msg)
+		ApiErrorf(c, http.StatusBadRequest, "%s", msg)
 		return
 	}
 	found, notFound, fErr := didMtp.mtpService.GetLocalDIDDocumentsByEmailHash(input.DIDLookupRequest.DIDLookups)

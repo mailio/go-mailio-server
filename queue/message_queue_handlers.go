@@ -215,9 +215,8 @@ func (msq *MessageQueue) handleReceivedDIDCommMessage(message *types.DIDCommMess
 			}
 		}
 
-		uniqueID, _ := util.DIDDocumentToUniqueID(message, folder)
 		mailioMessage := &types.MailioMessage{
-			ID:             uniqueID,
+			ID:             message.ID,
 			DIDCommMessage: message,
 			Folder:         folder,
 			IsRead:         false,

@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/go-resty/resty/v2"
 	"github.com/mailio/go-mailio-did/did"
 	"github.com/mailio/go-mailio-server/global"
@@ -215,17 +216,63 @@ func (us *UserService) SaveMessage(userAddress string, mailioMessage *types.Mail
 	hexUser := "userdb-" + hex.EncodeToString([]byte(userAddress))
 	url := fmt.Sprintf("%s/%s", hexUser, mailioMessage.ID)
 
-	var postResult types.CouchDBResponse
-	var postError types.CouchDBError
-	httpResp, httpErr := us.restyClient.R().SetBody(mailioMessage).SetResult(&postResult).SetError(&postError).Put(url)
-	if httpErr != nil {
-		global.Logger.Log(httpErr.Error(), "failed to save message", hexUser)
-		return nil, httpErr
+	operation := func() (*types.MailioMessage, error) {
+		var getError types.CouchDBError
+		getResponse, getErr := us.restyClient.R().SetError(getError).Get(url)
+		if getErr != nil {
+			global.Logger.Log(getErr.Error(), "failed to get message", hexUser)
+			return nil, getErr
+		}
+		if getResponse.StatusCode() != 404 {
+			// only "good" response is 404
+			global.Logger.Log(getResponse.String(), "failed to get message", hexUser, "msg id: ", mailioMessage.ID)
+			return nil, backoff.Permanent(types.ErrRecordExists) // Wrap in backoff.Permanent to stop retries
+		}
+		var postResult types.CouchDBResponse
+		var postError types.CouchDBError
+		httpResp, httpErr := us.restyClient.R().SetBody(mailioMessage).SetResult(&postResult).SetError(&postError).Put(url)
+		if httpErr != nil {
+			global.Logger.Log(httpErr.Error(), "failed to save message", hexUser)
+			return nil, httpErr
+		}
+		if httpResp.IsError() {
+			stackTrace := string(debug.Stack())
+			global.Logger.Log(httpResp.String(), "failed to save message", hexUser, "msgId: ", mailioMessage.ID, postError.Error, postError.Reason)
+			return nil, fmt.Errorf("code: %s, reason: %s, trace: %v", postError.Error, postError.Reason, stackTrace)
+		}
+		return mailioMessage, nil
 	}
-	if httpResp.IsError() {
-		stackTrace := string(debug.Stack())
-		global.Logger.Log(httpResp.String(), "failed to save message", hexUser, "msgId: ", mailioMessage.ID, postError.Error, postError.Reason)
-		return nil, fmt.Errorf("code: %s, reason: %s, trace: %v", postError.Error, postError.Reason, stackTrace)
+
+	var maxRetries = 3                     // Limit retries to avoid infinite loops
+	var baseDelay = 100 * time.Millisecond // Initial backoff delay
+
+	// backoff strategy
+	b := backoff.NewExponentialBackOff()
+	b.InitialInterval = baseDelay
+	b.MaxInterval = baseDelay * (1 << maxRetries) // Max delay after retries
+	b.MaxElapsedTime = time.Duration(maxRetries) * baseDelay
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Execute the operation with backoff
+	err := backoff.RetryNotify(
+		func() error {
+			_, err := operation()
+			return err
+		},
+		backoff.WithContext(b, ctx),
+		func(err error, d time.Duration) {
+			global.Logger.Log("retrying message save ", "delay", d, "docID", mailioMessage.ID, "error", err)
+		},
+	)
+
+	if err != nil {
+		if errors.Is(err, types.ErrRecordExists) {
+			global.Logger.Log("record already exists, no retries attempted", "docID", mailioMessage.ID)
+			return mailioMessage, nil
+		}
+		global.Logger.Log("operation failed after retries", "error", err)
+		return nil, err
 	}
 
 	return mailioMessage, nil
