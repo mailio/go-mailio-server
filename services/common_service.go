@@ -294,7 +294,11 @@ func RemoveExpiredDocuments(repo repository.Repository, designDoc string, viewNa
 		query := fmt.Sprintf("_design/%s/_view/%s?descending=true&startkey=%d&limit=100", designDoc, viewName, time_ago)
 		response, err := repo.GetByID(ctx, query)
 		if err != nil {
-			log.Printf("Error getting expired documents: %v", err)
+			if r, ok := response.(*resty.Response); ok {
+				data := r.Body()
+				global.Logger.Log("msg", "error while getting expired documents", "err", err, "couchdb response: ", string(data))
+			}
+			global.Logger.Log("msg", "error while getting expired documents", "err", err)
 			return err
 		}
 
@@ -308,12 +312,16 @@ func RemoveExpiredDocuments(repo repository.Repository, designDoc string, viewNa
 		}
 		err = repository.MapToObject(response, &expiredDocs)
 		if err != nil {
-			log.Printf("Error mapping expired documents: %v", err)
+			if r, ok := response.(*resty.Response); ok {
+				data := r.Body()
+				global.Logger.Log("msg", "error while getting expired documents", "err", err, "couchdb response: ", string(data))
+			}
+			global.Logger.Log("msg", "error while getting expired documents", "err", err)
 			return err
 		}
 
 		if len(expiredDocs.Rows) > 0 {
-			log.Printf("Expired documents count: %d", expiredDocs.TotalRows)
+			global.Logger.Log("msg", "expired documents count", "count", expiredDocs.TotalRows)
 
 			bulkDelete := []types.BaseDocument{}
 			for _, doc := range expiredDocs.Rows {
