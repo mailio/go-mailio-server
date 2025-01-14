@@ -436,16 +436,12 @@ func (ua *UserAccountApi) VerifyCookie(c *gin.Context) {
 // @Router /api/v1/logout [get]
 func (ua *UserAccountApi) Logout(c *gin.Context) {
 	// delete httpOnly cookie
-	domain, dErr := apiutil.GetIPFromContext(c)
-	if dErr != nil {
-		d := "localhost"
-		domain = &d
-	}
+	domain := global.Conf.Mailio.ServerDomain
 	secure := true
-	if strings.Contains(*domain, "localhost") || strings.Contains(*domain, "::1") || strings.Contains(*domain, "127.0.0.1") {
+	if strings.Contains(domain, "localhost") || strings.Contains(domain, "::1") || strings.Contains(domain, "127.0.0.1") {
 		secure = false
 		d := "localhost"
-		domain = &d
+		domain = d
 	}
 
 	cookie := http.Cookie{
@@ -453,7 +449,7 @@ func (ua *UserAccountApi) Logout(c *gin.Context) {
 		Value:    "",
 		Expires:  time.Now().Add(-1 * time.Hour), // an hour ago
 		Path:     "/",
-		Domain:   *domain,
+		Domain:   domain,
 		Secure:   secure,
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
