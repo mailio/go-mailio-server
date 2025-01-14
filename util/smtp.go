@@ -115,6 +115,7 @@ func ConvertToSmtpEmail(email types.SmtpEmailInput) (*smtptypes.Mail, error) {
 	if fErr != nil {
 		return nil, types.ErrInvalidFormat
 	}
+
 	// to recipient list
 	tos, tErr := mail.ParseAddressList(strings.Join(email.To, ","))
 	if tErr != nil {

@@ -38,11 +38,14 @@ func CreateFolderIndex(userRepo Repository, mailioAddressHex string) error {
 	// Define the index payload
 	indexPayload := map[string]interface{}{
 		"index": map[string]interface{}{
-			"fields": []string{"created", "folder"}, // Fields to index
+			"fields": []map[string]interface{}{
+				{"folder": "desc"},
+				{"created": "desc"},
+			},
 		},
-		"name": "client-folder-index", // Index name
-		"ddoc": "client-folder-index", // Design document name
-		"type": "json",                // Index type
+		"name": "client-folder-created-desc-index", // Index name
+		"ddoc": "client-folder-created-desc-index", // Design document name
+		"type": "json",                             // Index type
 	}
 
 	c := userRepo.GetClient().(*resty.Client)
@@ -57,29 +60,31 @@ func CreateFolderIndex(userRepo Repository, mailioAddressHex string) error {
 	return nil
 }
 
-// // create indexes on handshakes database for the address field
-// func CreateHandshakeIndex(handshakeRepo Repository) error {
-// 	dbName := Handshake
-// 	// create index on database
-// 	addressIndex := map[string]interface{}{
-// 		"index": map[string]interface{}{
-// 			"fields": []map[string]interface{}{{"ownerAddress": "desc"}, {"timestamp": "desc"}},
-// 		},
-// 		"name": "ownerAddress-index",
-// 		"type": "json",
-// 		"ddoc": "ownerAddressDesign",
-// 	}
-// 	c := handshakeRepo.GetClient().(*resty.Client)
-// 	resp, rErr := c.R().SetBody(addressIndex).Post(fmt.Sprintf("%s/%s", dbName, "_index"))
-// 	if rErr != nil {
-// 		return rErr
-// 	}
-// 	if resp.IsError() {
-// 		outErr := handleError(resp)
-// 		return outErr
-// 	}
-// 	return nil
-// }
+/**
+ * CreateWebAuthNNameIndex creates an index on the webauthn_user database for searching by email
+ */
+func CreateWebAuthNNameIndex(webauthnRepo Repository) error {
+	dbName := WebAuthnUser
+	// create index on database
+	credentialSubjectIDIndex := map[string]interface{}{
+		"index": map[string]interface{}{
+			"fields": []string{"name"},
+		},
+		"name": "webauthn-user-index",
+		"type": "json",
+		"ddoc": "webauthn-user-index",
+	}
+	c := webauthnRepo.GetClient().(*resty.Client)
+	resp, rErr := c.R().SetBody(credentialSubjectIDIndex).Post(fmt.Sprintf("%s/%s", dbName, "_index"))
+	if rErr != nil {
+		return rErr
+	}
+	if resp.IsError() {
+		outErr := handleError(resp)
+		return outErr
+	}
+	return nil
+}
 
 // creates a database per user (required users_ db to exist)
 func CreateUsers_IfNotExists(usersRepo Repository, repoUrl string) error {

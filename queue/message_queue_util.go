@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -183,10 +184,16 @@ func (msq *MessageQueue) httpSend(message *types.DIDCommMessage,
 		return types.NewMTPStatusCode(5, 4, 4, fmt.Sprintf("failed to decode cbor or signature response from %s", endpoint)), types.ErrContinue
 	}
 
-	// get public key from the recipients serv er
+	// get public key from the recipients server
 	discovery := &types.Domain{SupportsMailio: true, MailioPublicKey: base64.StdEncoding.EncodeToString(global.PublicKey)}
 	if !strings.Contains(endpoint, "localhost") {
-		d, dErr := msq.mtpService.ResolveDomain(endpoint, false)
+		urlParsed, pErr := url.Parse(endpoint)
+		if pErr != nil {
+			global.Logger.Log(pErr.Error(), "failed to parse endpoint", endpoint)
+			return types.NewMTPStatusCode(5, 4, 4, fmt.Sprintf("failed to parse endpoint %s", endpoint)), types.ErrContinue
+		}
+
+		d, dErr := msq.mtpService.ResolveDomain(urlParsed.Host, false)
 		if dErr != nil {
 			global.Logger.Log(dErr.Error(), "failed to get public key for", endpoint)
 			return types.NewMTPStatusCode(5, 4, 4, fmt.Sprintf("failed to get public key for endpoint %s", endpoint)), types.ErrContinue

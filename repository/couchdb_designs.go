@@ -93,49 +93,59 @@ func CreateDesign_DeleteExpiredRecordsByCreatedDate(databaseName string, designN
 	return createDesignAndView(databaseName, designName, viewName, mapFunction, "")
 }
 
-// created for each user database
-func CreateDesign_CountFromAddress(databaseName string, designName string, viewName string) error {
+func CreateDesign_DeleteTransferKeysByCreatedDate(databaseName string, designName string, viewName string) error {
 	mapFunction := `function(doc)
 						{
-							if (doc.folder && doc.from && doc.created) {
-								var splitted = doc.from.split("#");
-								var address = splitted[splitted.length-1];
-								emit([address,doc.folder,doc.created], 1);
+							if (doc.created) {
+								emit(doc.created, doc._rev);
 							}
 						}`
-	return createDesignAndView(databaseName, designName, viewName, mapFunction, "_approx_count_distinct")
+	return createDesignAndView(databaseName, designName, viewName, mapFunction, "")
 }
 
-func CreateDesign_SentToCountView(databaseName string, designName string, viewName string) error {
-	mapFunction := `function(doc)
-						{
-							const emailRegex = /[\w.-]+@[\w.-]+\.\w+/g;
-							if (doc.didCommMessage && doc.didCommMessage.to && doc.folder == "sent") {
-								doc.didCommMessage.to.forEach(function(email) {
-									if (email.includes("@")) {
-										const matches = email.match(emailRegex);
-										const found = matches ? matches[0] : "No email found";
-										emit(found, 1);
-									} else {
-										emit(email, 1);
-									}
-								});
-							}
-						}`
-	return createDesignAndView(databaseName, designName, viewName, mapFunction, "_count")
-}
+// // created for each user database
+// func CreateDesign_CountFromAddress(databaseName string, designName string, viewName string) error {
+// 	mapFunction := `function(doc)
+// 						{
+// 							if (doc.folder && doc.from && doc.created) {
+// 								var splitted = doc.from.split("#");
+// 								var address = splitted[splitted.length-1];
+// 								emit([address,doc.folder,doc.created], 1);
+// 							}
+// 						}`
+// 	return createDesignAndView(databaseName, designName, viewName, mapFunction, "_approx_count_distinct")
+// }
 
-// created for each user database
-func CreateDesign_CountFromAddressRead(databaseName string, designName string, viewName string) error {
-	mapFunction := `function(doc)
-						{
-							if (doc.folder && doc.from && doc.created) {
-								if (doc.isRead) {
-									var splitted = doc.from.split("#");
-									var address = splitted[splitted.length-1];
-									emit([address,doc.folder,doc.created], 1);
-								}
-							}
-						}`
-	return createDesignAndView(databaseName, designName, viewName, mapFunction, "_approx_count_distinct")
-}
+// func CreateDesign_SentToCountView(databaseName string, designName string, viewName string) error {
+// 	mapFunction := `function(doc)
+// 						{
+// 							const emailRegex = /[\w.-]+@[\w.-]+\.\w+/g;
+// 							if (doc.didCommMessage && doc.didCommMessage.to && doc.folder == "sent") {
+// 								doc.didCommMessage.to.forEach(function(email) {
+// 									if (email.includes("@")) {
+// 										const matches = email.match(emailRegex);
+// 										const found = matches ? matches[0] : "No email found";
+// 										emit(found, 1);
+// 									} else {
+// 										emit(email, 1);
+// 									}
+// 								});
+// 							}
+// 						}`
+// 	return createDesignAndView(databaseName, designName, viewName, mapFunction, "_count")
+// }
+
+// // created for each user database
+// func CreateDesign_CountFromAddressRead(databaseName string, designName string, viewName string) error {
+// 	mapFunction := `function(doc)
+// 						{
+// 							if (doc.folder && doc.from && doc.created) {
+// 								if (doc.isRead) {
+// 									var splitted = doc.from.split("#");
+// 									var address = splitted[splitted.length-1];
+// 									emit([address,doc.folder,doc.created], 1);
+// 								}
+// 							}
+// 						}`
+// 	return createDesignAndView(databaseName, designName, viewName, mapFunction, "_approx_count_distinct")
+// }

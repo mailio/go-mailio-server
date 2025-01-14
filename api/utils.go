@@ -8,7 +8,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/mailio/go-mailio-did/did"
 	"github.com/mailio/go-mailio-server/api/interceptors"
-	apiutil "github.com/mailio/go-mailio-server/api/util"
 	"github.com/mailio/go-mailio-server/global"
 )
 
@@ -18,25 +17,20 @@ func setCookieAndGenerateToken(c *gin.Context, userDID *did.MailioKey, challenge
 	if tErr != nil {
 		return "", tErr
 	}
-
-	domain, dErr := apiutil.GetIPFromContext(c)
-	if dErr != nil {
-		d := "localhost"
-		domain = &d
-	}
+	domain := global.Conf.Mailio.ServerDomain
 	secure := true
-	if strings.Contains(*domain, "localhost") || strings.Contains(*domain, "::1") || strings.Contains(*domain, "127.0.0.1") {
+	if strings.Contains(domain, "localhost") || strings.Contains(domain, "::1") || strings.Contains(domain, "127.0.0.1") {
 		secure = false
-		d := "localhost"
-		domain = &d
+		domain = "localhost"
 	}
 
 	cookie := http.Cookie{
 		Name:     "__mailio-jws-token",
 		Value:    token,
 		Expires:  time.Now().Add(24 * 29 * time.Hour), // 29 days
+		MaxAge:   24 * 29 * 60 * 60,
 		Path:     "/",
-		Domain:   *domain,
+		Domain:   "." + domain,
 		Secure:   secure,
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,

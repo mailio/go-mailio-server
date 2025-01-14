@@ -147,11 +147,11 @@ func (c *CouchDBRepository) Save(ctx context.Context, docID string, data interfa
 				// remove BaseDocument from the data due to struct embedding
 				delete(existingDoc, "BaseDocument")
 				// merge on conflict old document with new data
-				if err := mergo.Merge(&incomingData, existingDoc, mergo.WithOverride); err != nil {
+				if err := mergo.Merge(&existingDoc, incomingData, mergo.WithOverride); err != nil {
 					return types.ErrConflict
 				}
 				// Attempt to save the document again
-				resp, rErr := c.client.R().SetBody(incomingData).SetResult(&ok).SetError(&dbErr).Put(fmt.Sprintf("%s/%s", c.dbName, docID))
+				resp, rErr := c.client.R().SetBody(existingDoc).SetResult(&ok).SetError(&dbErr).Put(fmt.Sprintf("%s/%s", c.dbName, docID))
 				if rErr != nil {
 					return rErr
 				}
@@ -224,6 +224,7 @@ func (c *CouchDBRepository) Delete(ctx context.Context, id string) error {
 	if id == "" {
 		return types.ErrNotFound
 	}
+
 	doc, err := c.GetByID(ctx, id)
 	if err != nil {
 		if err != types.ErrNotFound {

@@ -7,6 +7,7 @@ import (
 
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/types"
+	"golang.org/x/net/publicsuffix"
 )
 
 // converts the DID document to unique ID
@@ -55,30 +56,53 @@ func ListSmtpDomains() []string {
 	return domains
 }
 
-func ListMailioDomains() []string {
-	domains := []string{}
-	for _, domainConf := range global.Conf.Mailio.DomainConfig {
-		domains = append(domains, domainConf.Domain)
+func ExtractRootDomain(domain string) (string, error) {
+	// Get the root domain using the publicsuffix library
+	rootDomain, err := publicsuffix.EffectiveTLDPlusOne(domain)
+	if err != nil {
+		return "", err
 	}
-	return domains
-}
-
-func IsSupportedMailioDomain(domain string) bool {
-	for _, d := range ListMailioDomains() {
-		if d == domain {
-			return true
-		}
-	}
-	return false
-
+	return rootDomain, nil
 }
 
 // IsSupportedDomain checks if the domain is in the list of smtp server domains or mailio domains
 func IsSupportedSmtpDomain(domain string) bool {
-	for _, d := range ListSmtpDomains() {
-		if d == domain {
+	rootDomain, rdErr := ExtractRootDomain(domain)
+	if rdErr != nil {
+		global.Logger.Log(rdErr, "failed to extract root domain")
+		return false
+	}
+
+	for _, smtpDomain := range ListSmtpDomains() {
+		smtpDomainRoot, smtpErr := ExtractRootDomain(smtpDomain)
+		if smtpErr != nil {
+			global.Logger.Log(smtpErr, "failed to extract root domain", smtpErr.Error())
+			return false
+		}
+		if smtpDomainRoot == rootDomain {
 			return true
 		}
 	}
 	return false
+}
+
+// Extract the corresponding smtp sending domain for the given domain from the configuration
+func ExtractSmtpSendingDomain(domain string) (string, error) {
+	rootDomain, rdErr := ExtractRootDomain(domain)
+	if rdErr != nil {
+		global.Logger.Log(rdErr, "failed to extract root domain")
+		return "", rdErr
+	}
+
+	for _, smtpDomain := range ListSmtpDomains() {
+		smtpDomainRoot, smtpErr := ExtractRootDomain(smtpDomain)
+		if smtpErr != nil {
+			global.Logger.Log(smtpErr, "failed to extract root domain", smtpErr.Error())
+			return "", smtpErr
+		}
+		if smtpDomainRoot == rootDomain {
+			return smtpDomain, nil
+		}
+	}
+	return "", types.ErrBadRequest
 }

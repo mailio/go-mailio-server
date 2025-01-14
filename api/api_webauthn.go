@@ -198,6 +198,18 @@ func (a *WebAuthnApi) VerifyRegistration(c *gin.Context) {
 		pe.Name = strings.Split(pe.Address, "@")[0]
 	}
 
+	// validate if the domain is supported
+	userDomain := strings.Split(req.SmartKeyPayload.Email, "@")[1]
+	rootDomain, rErr := util.ExtractRootDomain(userDomain)
+	if rErr != nil {
+		ApiErrorf(c, http.StatusInternalServerError, "failed to extract root domain")
+		return
+	}
+	if rootDomain != global.Conf.Mailio.EmailDomain {
+		ApiErrorf(c, http.StatusForbidden, "domain not supported. check configuration")
+		return
+	}
+
 	scryptedEmail, sErr := util.ScryptEmail(req.SmartKeyPayload.Email)
 	if sErr != nil {
 		ApiErrorf(c, http.StatusInternalServerError, "Failed to scrypt email")
@@ -210,6 +222,15 @@ func (a *WebAuthnApi) VerifyRegistration(c *gin.Context) {
 		return
 	} else if fuErr != types.ErrNotFound {
 		ApiErrorf(c, http.StatusInternalServerError, "failed to search for email")
+		return
+	}
+	// double check on webauth_user (because scrypted email can be different for lowercase/uppercase emails, which is not allowed)
+	_, waErr := a.webauthnService.GetUserByEmail(strings.ToLower(pe.Address))
+	if waErr == nil {
+		ApiErrorf(c, http.StatusConflict, "email already exists")
+		return
+	} else if waErr != types.ErrNotFound {
+		ApiErrorf(c, http.StatusInternalServerError, "failed to search for users email")
 		return
 	}
 

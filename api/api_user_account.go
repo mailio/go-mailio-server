@@ -3,8 +3,10 @@ package api
 import (
 	"crypto/ed25519"
 	"encoding/base64"
+	"errors"
 	"net/http"
 	"net/mail"
+	"net/url"
 	"strings"
 	"time"
 
@@ -25,16 +27,18 @@ type UserAccountApi struct {
 	ssiService         *services.SelfSovereignService
 	userProfileService *services.UserProfileService
 	smartKeyService    *services.SmartKeyService
+	webauthnService    *services.WebAuthnService
 	validate           *validator.Validate
 }
 
-func NewUserAccountApi(userService *services.UserService, userProfileService *services.UserProfileService, nonceService *services.NonceService, ssiService *services.SelfSovereignService, smartKeyService *services.SmartKeyService) *UserAccountApi {
+func NewUserAccountApi(userService *services.UserService, userProfileService *services.UserProfileService, nonceService *services.NonceService, ssiService *services.SelfSovereignService, smartKeyService *services.SmartKeyService, webauthnService *services.WebAuthnService) *UserAccountApi {
 	return &UserAccountApi{
 		userService:        userService,
 		nonceService:       nonceService,
 		ssiService:         ssiService,
 		userProfileService: userProfileService,
 		smartKeyService:    smartKeyService,
+		webauthnService:    webauthnService,
 		validate:           validator.New(),
 	}
 }
@@ -230,7 +234,7 @@ func (ua *UserAccountApi) Register(c *gin.Context) {
 	err := ua.validate.Struct(inputRegister)
 	if err != nil {
 		msg := ValidatorErrorToUser(err.(validator.ValidationErrors))
-		ApiErrorf(c, http.StatusBadRequest, msg)
+		ApiErrorf(c, http.StatusBadRequest, "%s", msg)
 		return
 	}
 
@@ -324,7 +328,8 @@ func (ua *UserAccountApi) Register(c *gin.Context) {
 // @Summary Find user by base64 scrypt email address
 // @Description Returns a mailio address
 // @Tags User Account
-// @Param email query string true "Base64 formatted Scrypt of email address"
+// @Param emailHash query string true "Base64 formatted Scrypt of email address"
+// @Param email query string true "hashed email in clear text"
 // @Success 200 {object} types.OutputUserAddress
 // @Failure 429 {object} api.ApiError "rate limit exceeded"
 // @Accept json
@@ -332,18 +337,56 @@ func (ua *UserAccountApi) Register(c *gin.Context) {
 // @Router /api/v1/findaddress [get]
 func (ua *UserAccountApi) FindUsersAddressByEmail(c *gin.Context) {
 	email := c.Query("email")
+	emailHash := c.Query("emailHash")
 	if email == "" {
 		ApiErrorf(c, http.StatusBadRequest, "scrypt of email is require with params: N=32768, R=8,P=1,Len=32")
 		return
 	}
-
-	mapping, err := ua.userService.FindUserByScryptEmail(email)
+	if emailHash == "" {
+		ApiErrorf(c, http.StatusBadRequest, "email hash is required")
+		return
+	}
+	// check email validity
+	decodedEmail, uErr := url.QueryUnescape(email)
+	decodedHash, hErr := url.QueryUnescape(emailHash)
+	if (errors.Join(uErr, hErr) != nil) || (decodedEmail == "" || decodedHash == "") {
+		ApiErrorf(c, http.StatusBadRequest, "invalid email")
+		return
+	}
+	parsedEmail, err := mail.ParseAddress(decodedEmail)
 	if err != nil {
+		ApiErrorf(c, http.StatusBadRequest, "invalid email")
+		return
+	}
+	mappingNotFound := false
+	webAuthnNotFound := false
+	mapping, err := ua.userService.FindUserByScryptEmail(decodedHash)
+	if err != nil {
+		mappingNotFound = true
+	}
+	// double check on webauth_user (because scrypted email can be different for lowercase/uppercase emails, which is not allowed)
+	waUser, waErr := ua.webauthnService.GetUserByEmail(strings.ToLower(parsedEmail.Address))
+	if waErr != nil {
+		if waErr == types.ErrNotFound {
+			webAuthnNotFound = true
+			ApiErrorf(c, http.StatusNotFound, "email not found")
+			return
+		}
+		ApiErrorf(c, http.StatusInternalServerError, "failed to look for user")
+		return
+	}
+	if mappingNotFound && webAuthnNotFound {
 		ApiErrorf(c, http.StatusNotFound, "email not found")
 		return
 	}
+	var address string
+	if mapping != nil {
+		address = mapping.MailioAddress
+	} else if waUser != nil {
+		address = waUser.Address
+	}
 	output := &types.OutputUserAddress{
-		Address: mapping.MailioAddress,
+		Address: address,
 	}
 	c.JSON(http.StatusOK, output)
 }
@@ -418,4 +461,130 @@ func (ua *UserAccountApi) Logout(c *gin.Context) {
 
 	http.SetCookie(c.Writer, &cookie)
 	c.JSON(http.StatusOK, gin.H{"message": "logged out"})
+}
+
+// Transfer 1/3 password for smartkey to another device
+// @Security Bearer
+// @Summary Transfer 1/3 password for smartkey to another device
+// @Description Returns a nonce for constructing url for QR Code
+// @Tags User Account
+// @Param transferKey body types.DeviceKeyTransferInput true "encrypted shared password"
+// @Success 200 {object} types.DeviceKeyTransferOutput
+// @Failure 401 {object} api.ApiError "Invalid signature"
+// @Failure 404 {object} ApiError "Invalid input parameters"
+// @Failure 409 {object} ApiError "User already exists"
+// @Failure 429 {object} api.ApiError "rate limit exceeded"
+// @Failure 500 {object} ApiError "Internal server error"
+// @Accept json
+// @Produce json
+// @Router /api/v1/devicetransfer [post]
+func (ua *UserAccountApi) StoreEncryptedPasswordForDeviceTransfer(c *gin.Context) {
+	// get the address from the token
+	address := c.GetString("subjectAddress")
+	if address == "" {
+		ApiErrorf(c, http.StatusUnauthorized, "address not found")
+		return
+	}
+	var input types.DeviceKeyTransferInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		ApiErrorf(c, http.StatusBadRequest, "invalid input")
+		return
+	}
+	vErr := ua.validate.Struct(input)
+	if vErr != nil {
+		msg := ValidatorErrorToUser(vErr.(validator.ValidationErrors))
+		ApiErrorf(c, http.StatusBadRequest, "%s", msg)
+		return
+	}
+	// nonce is used as url to find the encrypted password
+	nonce := util.GenerateNonce(16)
+	transferKey := &types.DeviceKeyTransfer{
+		BaseDocument: types.BaseDocument{
+			ID: nonce,
+		},
+		Address:                 address,
+		EncryptedSharedPassword: input.EncryptedSharedPassword,
+		Email:                   input.Email,
+	}
+
+	// store the encrypted password
+	err := ua.smartKeyService.SaveDeviceKeyTransfer(transferKey)
+	if err != nil {
+		ApiErrorf(c, http.StatusInternalServerError, "failed to store encrypted password")
+		return
+	}
+	output := &types.DeviceKeyTransferOutput{
+		Nonce: nonce,
+	}
+	c.JSON(http.StatusOK, output)
+}
+
+// Get encrypted password for device transfer
+// @Security Bearer
+// @Summary Get encrypted password for device transfer
+// @Description Returns the encrypted shared password
+// @Tags User Account
+// @Param id path string true "nonce"
+// @Success 200 {object} types.DeviceKeyTransfer
+// @Failure 401 {object} api.ApiError "Unauthorized"
+// @Failure 404 {object} ApiError "Invalid input parameters"
+// @Failure 409 {object} ApiError "User already exists"
+// @Failure 429 {object} api.ApiError "rate limit exceeded"
+// @Failure 500 {object} ApiError "Internal server error"
+// @Accept json
+// @Produce json
+// @Router /api/v1/devicetransfer/{id} [get]
+func (ua *UserAccountApi) GetEncryptedPasswordForDeviceTransfer(c *gin.Context) {
+	address := c.GetString("subjectAddress")
+	if address == "" {
+		ApiErrorf(c, http.StatusUnauthorized, "address not found")
+		return
+	}
+	nonce := c.Param("id")
+	if nonce == "" {
+		ApiErrorf(c, http.StatusBadRequest, "nonce is required")
+		return
+	}
+	transfer, err := ua.smartKeyService.GetDeviceKeyTransfer(nonce)
+	if err != nil {
+		ApiErrorf(c, http.StatusNotFound, "encrypted password not found")
+		return
+	}
+	if transfer.Address != address {
+		ApiErrorf(c, http.StatusUnauthorized, "not authorized")
+		return
+	}
+	c.JSON(http.StatusOK, transfer)
+}
+
+// Delete password for device transfer
+// @Summary delete password for device transfer
+// @Description delete passord for device transfer
+// @Tags User Account
+// @Param id path string true "nonce"
+// @Success 200
+// @Failure 400 {object} api.ApiError "invalid api call"
+// @Failure 429 {object} api.ApiError "rate limit exceeded"
+// @Failure 500 {object} api.ApiError "error deletin object"
+// @Accept json
+// @Produce json
+// @Router /api/v1/devicetransfer/{id} [delete]
+func (ua *UserAccountApi) DeleteEncryptedPasswordForDeviceTransfer(c *gin.Context) {
+	// get the address from the token
+	address := c.GetString("subjectAddress")
+	if address == "" {
+		ApiErrorf(c, http.StatusUnauthorized, "address not found")
+		return
+	}
+	nonce := c.Param("id")
+	if nonce == "" {
+		ApiErrorf(c, http.StatusBadRequest, "nonce is required")
+		return
+	}
+	err := ua.smartKeyService.DeleteDeviceKeyTransfer(nonce)
+	if err != nil {
+		ApiErrorf(c, http.StatusNotFound, "not found")
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "deleted"})
 }

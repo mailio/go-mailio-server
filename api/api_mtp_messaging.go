@@ -55,7 +55,7 @@ func (ms *MessagingMTPApi) ReceiveMessage(c *gin.Context) {
 	vErr := ms.validate.Struct(input)
 	if vErr != nil {
 		msg := util.ValidationErrorToMessage(vErr)
-		ApiErrorf(c, http.StatusBadRequest, msg)
+		ApiErrorf(c, http.StatusBadRequest, "%s", msg)
 		return
 	}
 

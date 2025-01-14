@@ -41,3 +41,7 @@ type EmailStatisticsOutput struct {
 	Interest  int64 `json:"interest"`
 	SentByDay int64 `json:"sentByDay"`
 }
+
+type DeviceKeyTransferOutput struct {
+	Nonce string `json:"nonce" validate:"required"`
+}

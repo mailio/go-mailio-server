@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
 	"strconv"
 	"strings"
 
@@ -32,8 +31,7 @@ func RegisterSmtpHandlers(conf *global.Config) {
 		if wh.Provider == "mailgun" {
 			for _, domain := range wh.Domains {
 				// development api key not needed for now (but prepared for later versions)
-				handler := mailgunhandler.NewMailgunSmtpHandler(wh.Webhookkey, "", nil)
-				handler.SetDomainAndSendApiKey(domain.Sendapikey, domain.Domain)
+				handler := mailgunhandler.NewMailgunSmtpHandler(wh.Webhookkey, "", domain.SmtpServer, domain.SmtpPort, domain.SmtpUsername, domain.SmtpPassword)
 				smtpmodule.RegisterSmtpHandler(domain.Domain, handler)
 			}
 		}
@@ -55,7 +53,10 @@ func RegisterDiskUsageHandlers(conf *global.Config) {
 // Configure DB Repositories and create DB Selector
 func ConfigDBSelector() repository.DBSelector {
 	// configure Repository (couchDB)
-	repoUrl := global.Conf.CouchDB.Scheme + "://" + global.Conf.CouchDB.Host + ":" + strconv.Itoa(global.Conf.CouchDB.Port)
+	repoUrl := global.Conf.CouchDB.Scheme + "://" + global.Conf.CouchDB.Host
+	if global.Conf.CouchDB.Port != 0 {
+		repoUrl += ":" + strconv.Itoa(global.Conf.CouchDB.Port)
+	}
 	nonceRepo, nonceRepoErr := repository.NewCouchDBRepository(repoUrl, repository.Nonce, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
 	userRepo, userRepoErr := repository.NewCouchDBRepository(repoUrl, repository.User, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
 	mailioMappingRepo, mappingRepoErr := repository.NewCouchDBRepository(repoUrl, repository.MailioMapping, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
@@ -67,11 +68,11 @@ func ConfigDBSelector() repository.DBSelector {
 	webauthnUser, wErr := repository.NewCouchDBRepository(repoUrl, repository.WebAuthnUser, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
 	smartKey, smrtkErr := repository.NewCouchDBRepository(repoUrl, repository.SmartKey, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
 	emailStatisticsRepo, stErr := repository.NewCouchDBRepository(repoUrl, repository.EmailStatistics, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
-
+	deviceKeyTransferRepo, dktErr := repository.NewCouchDBRepository(repoUrl, repository.DeviceKeyTransfer, global.Conf.CouchDB.Username, global.Conf.CouchDB.Password, false)
 	// ensure _users exist
 	users_Err := repository.CreateUsers_IfNotExists(userRepo, repoUrl)
 
-	repoErr := errors.Join(nonceRepoErr, userRepoErr, mappingRepoErr, didRErr, vscrErr, dErr, mdErr, upErr, users_Err, wErr, smrtkErr, stErr)
+	repoErr := errors.Join(nonceRepoErr, userRepoErr, mappingRepoErr, didRErr, vscrErr, dErr, mdErr, upErr, users_Err, wErr, smrtkErr, stErr, dktErr)
 	if repoErr != nil {
 		global.Logger.Log("error", "Failed to create repositories", "error", repoErr.Error())
 		panic(repoErr)
@@ -90,6 +91,7 @@ func ConfigDBSelector() repository.DBSelector {
 	dbSelector.AddDB(webauthnUser)
 	dbSelector.AddDB(smartKey)
 	dbSelector.AddDB(emailStatisticsRepo)
+	dbSelector.AddDB(deviceKeyTransferRepo)
 
 	return dbSelector
 }
@@ -113,6 +115,7 @@ func ConfigDBIndexing(dbSelector *repository.CouchDBSelector, environment *types
 	// CREATE REQUIRED SERVICES
 	nonceService := services.NewNonceService(dbSelector)
 	statisticService := services.NewStatisticsService(dbSelector, environment)
+	userService := services.NewUserService(dbSelector, environment)
 
 	// Create INDEXES
 	vcsRepo, vscErr := dbSelector.ChooseDB(repository.VCS)
@@ -130,10 +133,28 @@ func ConfigDBIndexing(dbSelector *repository.CouchDBSelector, environment *types
 	// create a design document to return all documents older than N minutes
 	repository.CreateDesign_DeleteExpiredRecordsByCreatedDate(repository.Nonce, "nonce", "old")
 
+	repository.CreateDesign_DeleteTransferKeysByCreatedDate(repository.DeviceKeyTransfer, "transferkey", "oldkeys")
+
+	// Create INDEXES
+	webauthnRepo, waErr := dbSelector.ChooseDB(repository.WebAuthnUser)
+	if waErr != nil {
+		panic(waErr)
+	}
+	// create indexes on a webauthn_user database
+	eacErr := repository.CreateWebAuthNNameIndex(webauthnRepo)
+	if eacErr != nil {
+		panic(eacErr)
+	}
+
 	// cron jobs
 	environment.Cron.AddFunc("@every 5m", nonceService.RemoveExpiredNonces) // remove expired tokens every 5 minutes
 	environment.Cron.Start()
 	go nonceService.RemoveExpiredNonces() // run once on startup
+
+	// cron job for deleteing transfer keys after 5 minutes
+	environment.Cron.AddFunc("@every 5m", userService.DeleteExpiredTransferKeys)
+	environment.Cron.Start()
+	go userService.DeleteExpiredTransferKeys() // run once on startup
 
 	// cron job for flushing email statistics into the database
 	environment.Cron.AddFunc(fmt.Sprintf("@every %dm", global.Conf.EmailStatistics.InterestKeyFlush), statisticService.FlushEmailInterests)
@@ -167,21 +188,19 @@ func ConfigS3Storage(conf *global.Config, env *types.Environment) {
 }
 
 func ConfigWebAuthN(conf *global.Config, env *types.Environment) {
-	// configure WebAuthN
-	host, _, err := net.SplitHostPort(global.Conf.Mailio.ServerDomain)
-	if err != nil {
-		if strings.Contains(err.Error(), "missing port in address") {
-			host = global.Conf.Mailio.ServerDomain
-		} else {
-			fmt.Printf("failed to parse server domain: %v", err)
-			panic(err)
-		}
+	if conf.Mailio.WebDomain == "" {
+		fmt.Printf("failed to parse server domain: %v", errors.New("WebDomain is empty"))
+		panic(errors.New("WebDomain is empty"))
+	}
+	scheme := "https"
+	if strings.Contains(conf.Mailio.WebDomain, "localhost") {
+		scheme = "http"
 	}
 	requireResidentKey := true
 	wconfig := &webauthn.Config{
-		RPDisplayName: conf.Mailio.ServerDomain,
-		RPID:          host,
-		RPOrigins:     []string{"https://" + conf.Mailio.ServerDomain, "localhost", "http://localhost:4200"},
+		RPDisplayName: "Mailio e-Mail",
+		RPID:          global.Conf.Mailio.WebDomain, // alowed passkey domains to login from
+		RPOrigins:     []string{scheme + "://" + global.Conf.Mailio.WebDomain},
 		Debug:         true,
 		AuthenticatorSelection: protocol.AuthenticatorSelection{
 			UserVerification:        protocol.VerificationRequired,

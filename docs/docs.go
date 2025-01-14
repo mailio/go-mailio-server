@@ -251,6 +251,187 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/devicetransfer": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Returns a nonce for constructing url for QR Code",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "User Account"
+                ],
+                "summary": "Transfer 1/3 password for smartkey to another device",
+                "parameters": [
+                    {
+                        "description": "encrypted shared password",
+                        "name": "transferKey",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.DeviceKeyTransferInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.DeviceKeyTransferOutput"
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid signature",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "404": {
+                        "description": "Invalid input parameters",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "409": {
+                        "description": "User already exists",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "429": {
+                        "description": "rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/devicetransfer/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Returns the encrypted shared password",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "User Account"
+                ],
+                "summary": "Get encrypted password for device transfer",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "nonce",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.DeviceKeyTransfer"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "404": {
+                        "description": "Invalid input parameters",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "409": {
+                        "description": "User already exists",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "429": {
+                        "description": "rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "delete passord for device transfer",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "User Account"
+                ],
+                "summary": "delete password for device transfer",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "nonce",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "description": "invalid api call",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "429": {
+                        "description": "rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    },
+                    "500": {
+                        "description": "error deletin object",
+                        "schema": {
+                            "$ref": "#/definitions/api.ApiError"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/domains": {
             "get": {
                 "description": "Returns a list of all supported domains",
@@ -400,6 +581,13 @@ const docTemplate = `{
                     {
                         "type": "string",
                         "description": "Base64 formatted Scrypt of email address",
+                        "name": "emailHash",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "hashed email in clear text",
                         "name": "email",
                         "in": "query",
                         "required": true
@@ -2871,6 +3059,69 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/types.DIDLookup"
                     }
+                }
+            }
+        },
+        "types.DeviceKeyTransfer": {
+            "type": "object",
+            "properties": {
+                "_deleted": {
+                    "type": "boolean"
+                },
+                "_id": {
+                    "type": "string"
+                },
+                "_rev": {
+                    "description": "Rev is the revision number returned\n_Rev    string ` + "`" + `json:\"_rev,omitempty\"` + "`" + `",
+                    "type": "string"
+                },
+                "address": {
+                    "type": "string"
+                },
+                "created": {
+                    "type": "integer"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "encryptedSharedPassword": {
+                    "type": "string"
+                },
+                "ok": {
+                    "description": "_ID     string ` + "`" + `json:\"_id,omitempty\"` + "`" + `",
+                    "type": "boolean"
+                },
+                "passwordShare": {
+                    "type": "string"
+                },
+                "smartKeyEncrypted": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.DeviceKeyTransferInput": {
+            "type": "object",
+            "required": [
+                "email",
+                "encryptedSharedPassword"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "encryptedSharedPassword": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.DeviceKeyTransferOutput": {
+            "type": "object",
+            "required": [
+                "nonce"
+            ],
+            "properties": {
+                "nonce": {
+                    "type": "string"
                 }
             }
         },

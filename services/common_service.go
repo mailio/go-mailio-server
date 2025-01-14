@@ -2,8 +2,10 @@ package services
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
+	"log"
 	"net"
 	"net/mail"
 	"net/url"
@@ -27,7 +29,8 @@ const (
 func getUserByScryptEmail(repo repository.Repository, hashedEmail string) (*types.EmailToMailioMapping, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
-	response, eErr := repo.GetByID(ctx, hashedEmail)
+	id := base64.RawStdEncoding.EncodeToString([]byte(hashedEmail))
+	response, eErr := repo.GetByID(ctx, id)
 	if eErr != nil {
 		if eErr != types.ErrNotFound {
 			global.Logger.Log("msg", "error while getting user by email", "err", eErr)
@@ -239,9 +242,8 @@ func getHostWithoutPort(host string) string {
 // remote lookups are those that are in different domains
 // it also checks if all the email addresses are valid
 func getLocalAndRemoteRecipients(lookups []*types.DIDLookup) ([]*types.DIDLookup, map[string][]*types.DIDLookup, error) {
-	localDomainMap := make(map[string]string)
-	for _, localDomain := range global.Conf.Mailio.DomainConfig {
-		localDomainMap[localDomain.Domain] = ""
+	localDomainMap := map[string]string{
+		global.Conf.Mailio.ServerDomain: "",
 	}
 
 	localLookups := []*types.DIDLookup{}
@@ -255,6 +257,12 @@ func getLocalAndRemoteRecipients(lookups []*types.DIDLookup) ([]*types.DIDLookup
 		lookupEmailParsed.Address = strings.ToLower(lookupEmailParsed.Address)
 		lookup.Email = lookupEmailParsed.Address
 		lookupDomain := strings.Split(lookupEmailParsed.Address, "@")[1]
+
+		// check if user has local email domain, if so then the lookup server
+		if lookupDomain == global.Conf.Mailio.EmailDomain {
+			lookupDomain = global.Conf.Mailio.ServerDomain
+		}
+
 		// check if local or remote
 		if _, ok := localDomainMap[lookupDomain]; ok {
 			localLookups = append(localLookups, lookup)
@@ -264,4 +272,79 @@ func getLocalAndRemoteRecipients(lookups []*types.DIDLookup) ([]*types.DIDLookup
 		}
 	}
 	return localLookups, remoteLookups, nil
+}
+
+/**
+ * RemoveExpiredDocuments removes expired documents from the database
+ * @param repo the repository
+ * @param designDoc the design document
+ * @param viewName the view name
+ * @param ttl the time to live in milliseconds
+ * @param bulkDeleteEndpoint the bulk delete endpoint
+ */
+func RemoveExpiredDocuments(repo repository.Repository, designDoc string, viewName string, ttlMinutes int64) error {
+	totalRows := int64(1) // Start value to enter the loop
+	for totalRows > 0 {
+		log.Printf("Removing expired documents from %s/%s", designDoc, viewName)
+
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+		defer cancel()
+
+		time_ago := time.Now().UnixMilli() - (ttlMinutes * 60 * 1000)
+		query := fmt.Sprintf("_design/%s/_view/%s?descending=true&startkey=%d&limit=100", designDoc, viewName, time_ago)
+		response, err := repo.GetByID(ctx, query)
+		if err != nil {
+			if r, ok := response.(*resty.Response); ok {
+				data := r.Body()
+				global.Logger.Log("msg", "error while getting expired documents", "err", err, "couchdb response: ", string(data))
+			}
+			global.Logger.Log("msg", "error while getting expired documents", "err", err)
+			return err
+		}
+
+		var expiredDocs struct {
+			TotalRows int64 `json:"total_rows"`
+			Rows      []struct {
+				ID  string `json:"id"`
+				Key int64  `json:"key"`
+				Rev string `json:"value"`
+			} `json:"rows"`
+		}
+		err = repository.MapToObject(response, &expiredDocs)
+		if err != nil {
+			if r, ok := response.(*resty.Response); ok {
+				data := r.Body()
+				global.Logger.Log("msg", "error while getting expired documents", "err", err, "couchdb response: ", string(data))
+			}
+			global.Logger.Log("msg", "error while getting expired documents", "err", err)
+			return err
+		}
+
+		if len(expiredDocs.Rows) > 0 {
+			global.Logger.Log("msg", "expired documents count", "count", expiredDocs.TotalRows)
+
+			bulkDelete := []types.BaseDocument{}
+			for _, doc := range expiredDocs.Rows {
+				deleteDoc := types.BaseDocument{
+					ID:      doc.ID,
+					Rev:     doc.Rev,
+					Deleted: true,
+				}
+				bulkDelete = append(bulkDelete, deleteDoc)
+			}
+
+			bulkDeleteDocument := map[string]interface{}{
+				"docs": bulkDelete,
+			}
+
+			_, bulkDeleteErr := repo.Update(ctx, "/_bulk_docs", bulkDeleteDocument)
+			if bulkDeleteErr != nil {
+				log.Printf("Error deleting expired documents: %v", bulkDeleteErr)
+				return bulkDeleteErr
+			}
+		}
+
+		totalRows = int64(len(expiredDocs.Rows))
+	}
+	return nil
 }

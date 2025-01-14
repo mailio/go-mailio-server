@@ -27,6 +27,9 @@ func GetHandshakeByID(userRepo repository.Repository, handshakeOwnerAddress stri
 		return nil, err
 	}
 	if resp.StatusCode() < 200 || resp.StatusCode() >= 300 {
+		if resp.StatusCode() == 404 {
+			return nil, types.ErrNotFound
+		}
 		return nil, fmt.Errorf("failed to get handshake by ID")
 	}
 

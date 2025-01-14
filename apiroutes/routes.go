@@ -1,6 +1,7 @@
 package apiroutes
 
 import (
+	"strings"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -30,9 +31,18 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 		authorized.GET("", gin.WrapH(promhttp.Handler()))
 	}
 
+	webScheme := "https"
+	serverScheme := "https"
+	if strings.Contains(global.Conf.Mailio.WebDomain, "localhost") {
+		webScheme = "http"
+	}
+	if strings.Contains(global.Conf.Mailio.ServerDomain, "localhost") {
+		serverScheme = "http"
+	}
+
 	corsConfig := cors.Config{
 		AllowAllOrigins:     false,
-		AllowOrigins:        []string{"http://localhost:4200", "https://" + global.Conf.Host, "https://" + global.Conf.Mailio.ServerDomain, "http://localhost:8080", "https://c4eb-2605-a601-f3fe-2701-28f0-7c2c-dea3-1478.ngrok-free.app"},
+		AllowOrigins:        []string{webScheme + "://" + global.Conf.Mailio.WebDomain, serverScheme + "://" + global.Conf.Mailio.ServerDomain},
 		AllowMethods:        []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"},
 		AllowWildcard:       true,
 		AllowPrivateNetwork: true,
@@ -57,7 +67,7 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 
 	// API definitions
 	handshakeApi := api.NewHandshakeApi(nonceService, mtpService, userService, userProfileService)
-	accountApi := api.NewUserAccountApi(userService, userProfileService, nonceService, ssiService, smartKeyService)
+	accountApi := api.NewUserAccountApi(userService, userProfileService, nonceService, ssiService, smartKeyService, webAuthnService)
 	userProfileApi := api.NewUserProfileApi(userService, userProfileService, webAuthnService)
 	didApi := api.NewDIDApi(ssiService, mtpService)
 	vcApi := api.NewVCApi(ssiService)
@@ -141,6 +151,11 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 		// statistics
 		rootApi.GET("/v1/emailstatistics", statisticsApi.GetEmailStatistics)
 		rootApi.PUT("/v1/emailstatistics/interest", statisticsApi.ReportInterest)
+
+		// tranfer device key (1/3 password for decrypting smartKey)
+		rootApi.POST("/v1/devicetransfer", accountApi.StoreEncryptedPasswordForDeviceTransfer)
+		rootApi.GET("/v1/devicetransfer/:id", accountApi.GetEncryptedPasswordForDeviceTransfer)
+		rootApi.DELETE("/v1/devicetransfer/:id", accountApi.DeleteEncryptedPasswordForDeviceTransfer)
 	}
 
 	// server-to-server communication (aka MTP - Mailio Transfer Protocol)

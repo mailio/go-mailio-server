@@ -69,3 +69,8 @@ type InterestInput struct {
 type UploadPhotoInput struct {
 	PhotoBase64 string `json:"photoBase64" validate:"required"`
 }
+
+type DeviceKeyTransferInput struct {
+	EncryptedSharedPassword string `json:"encryptedSharedPassword" validate:"required"`
+	Email                   string `json:"email" validate:"required"`
+}
