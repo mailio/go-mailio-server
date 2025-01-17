@@ -96,20 +96,6 @@ func (ma *MessagingApi) SendDIDMessage(c *gin.Context) {
 		return
 	}
 
-	totalDiskUsageFromHandlers := util.GetDiskUsageFromDiskHandlers(address.(string))
-	stats, sErr := ma.userProfileService.Stats(address.(string))
-	if sErr != nil {
-		global.Logger.Log("error retrieving disk usage stats", sErr.Error())
-	}
-	activeSize := int64(0)
-	if stats != nil {
-		activeSize = stats.ActiveSize
-	}
-	if totalDiskUsageFromHandlers+activeSize >= up.DiskSpace {
-		ApiErrorf(c, http.StatusRequestEntityTooLarge, "Disk space exceeded")
-		return
-	}
-
 	id, sndErr := ma.sendDIDCommMessage(address.(string), input)
 	if sndErr != nil {
 		ma.handleSendMessageApiError(c, sndErr)
@@ -137,7 +123,7 @@ func (ma *MessagingApi) SendDIDMessage(c *gin.Context) {
 // @Router /api/v1/sendsmtp [post]
 func (ma *MessagingApi) SendSmtpMessage(c *gin.Context) {
 
-	address, exists := c.Get("subjectAddress")
+	_, exists := c.Get("subjectAddress")
 	if !exists {
 		ApiErrorf(c, http.StatusForbidden, "Unauthorized")
 		return
@@ -158,20 +144,6 @@ func (ma *MessagingApi) SendSmtpMessage(c *gin.Context) {
 
 	if !up.Enabled {
 		ApiErrorf(c, http.StatusForbidden, "User disabled")
-		return
-	}
-
-	totalDiskUsageFromHandlers := util.GetDiskUsageFromDiskHandlers(address.(string))
-	stats, sErr := ma.userProfileService.Stats(address.(string))
-	if sErr != nil {
-		global.Logger.Log("error retrieving disk usage stats", sErr.Error())
-	}
-	activeSize := int64(0)
-	if stats != nil {
-		activeSize = stats.ActiveSize
-	}
-	if totalDiskUsageFromHandlers+activeSize >= up.DiskSpace {
-		ApiErrorf(c, http.StatusRequestEntityTooLarge, "Disk space exceeded")
 		return
 	}
 
@@ -252,10 +224,10 @@ func (ma *MessagingApi) validateSmtpSender(c *gin.Context, fromEmailAddress stri
 // func (ma *MessagingApi) sendSMTPMessage(c *gin.Context, mail *smtptypes.Mail, up *types.UserProfile) (*string, error) {
 func (ma *MessagingApi) sendSMTPMessage(c *gin.Context, mailInput *types.SmtpEmailInput, up *types.UserProfile) (*string, error) {
 	// send email
-	// check daily sent limit (default = 10)
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
+	// check if user has sent too many emails today
 	day := time.Now().UTC().Truncate(24 * time.Hour).Unix()
 	countSent, csErr := ma.statisticsService.GetEmailSentByDay(ctx, up.ID, day)
 	if csErr != nil {
@@ -265,8 +237,22 @@ func (ma *MessagingApi) sendSMTPMessage(c *gin.Context, mailInput *types.SmtpEma
 		return nil, types.ErrTooManyRequests
 	}
 
+	// check if user has sufficient disk space
+	address := up.ID
+	totalDiskUsageFromHandlers := util.GetDiskUsageFromDiskHandlers(address)
+	stats, sErr := ma.userProfileService.Stats(address)
+	if sErr != nil {
+		global.Logger.Log("error retrieving disk usage stats", sErr.Error())
+	}
+	activeSize := int64(0)
+	if stats != nil {
+		activeSize = stats.ActiveSize
+	}
+	if totalDiskUsageFromHandlers+activeSize >= up.DiskSpace {
+		return nil, types.ErrQuotaExceeded
+	}
+
 	// validate if sender can send emails
-	//TODO: Add a check if domain is a valid domain to be sent from
 	vsErr := ma.validateSmtpSender(c, mailInput.From)
 	if vsErr != nil {
 		return nil, types.ErrNotAuthorized
@@ -358,6 +344,20 @@ func (ma *MessagingApi) sendDIDCommMessage(senderAddress string, input types.DID
 		return nil, types.ErrNotAuthorized
 	}
 
+	// validate if user has disk space left to send messages
+	totalDiskUsageFromHandlers := util.GetDiskUsageFromDiskHandlers(senderAddress)
+	stats, sErr := ma.userProfileService.Stats(senderAddress)
+	if sErr != nil {
+		global.Logger.Log("error retrieving disk usage stats", sErr.Error())
+	}
+	activeSize := int64(0)
+	if stats != nil {
+		activeSize = stats.ActiveSize
+	}
+	if totalDiskUsageFromHandlers+activeSize >= userProfile.DiskSpace {
+		return nil, types.ErrQuotaExceeded
+	}
+
 	// get the senders domain (which should in the database already, so no resolving needed)
 	senderDidDoc, sndDidErr := ma.ssiService.GetDIDDocument(senderAddress)
 	if sndDidErr != nil {
@@ -374,7 +374,6 @@ func (ma *MessagingApi) sendDIDCommMessage(senderAddress string, input types.DID
 		global.Logger.Log(pUrlErr.Error(), "failed to parse sender domain")
 		return nil, types.ErrInternal
 	}
-	// host, port, _ := net.SplitHostPort(parsedSenderUrl.Host)
 
 	// enforce the from address to be a web DID
 	input.DIDCommMessage.From = fmt.Sprintf("did:web:%s#%s", parsedSenderUrl.Host, senderAddress)
