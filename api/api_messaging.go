@@ -63,7 +63,7 @@ func NewMessagingApi(ssiService *services.SelfSovereignService,
 // @Failure 429 {object} api.ApiError "rate limit exceeded"
 // @Router /api/v1/senddid [post]
 func (ma *MessagingApi) SendDIDMessage(c *gin.Context) {
-	subjectAddress, exists := c.Get("subjectAddress")
+	address, exists := c.Get("subjectAddress")
 	if !exists {
 		ApiErrorf(c, http.StatusInternalServerError, "jwt invalid")
 		return
@@ -80,11 +80,37 @@ func (ma *MessagingApi) SendDIDMessage(c *gin.Context) {
 	err := ma.validate.Struct(input)
 	if err != nil {
 		msg := util.ValidationErrorToMessage(err)
-		ApiErrorf(c, http.StatusBadRequest, msg)
+		ApiErrorf(c, http.StatusBadRequest, "%s", msg)
+		return
+	}
+	// get user profile
+	userProfile, exists := c.Get("userProfile")
+	if !exists {
+		ApiErrorf(c, http.StatusForbidden, "JWT invalid")
+		return
+	}
+	up := userProfile.(*types.UserProfile)
+
+	if !up.Enabled {
+		ApiErrorf(c, http.StatusForbidden, "User disabled")
 		return
 	}
 
-	id, sndErr := ma.sendDIDCommMessage(subjectAddress.(string), input)
+	totalDiskUsageFromHandlers := util.GetDiskUsageFromDiskHandlers(address.(string))
+	stats, sErr := ma.userProfileService.Stats(address.(string))
+	if sErr != nil {
+		global.Logger.Log("error retrieving disk usage stats", sErr.Error())
+	}
+	activeSize := int64(0)
+	if stats != nil {
+		activeSize = stats.ActiveSize
+	}
+	if totalDiskUsageFromHandlers+activeSize >= up.DiskSpace {
+		ApiErrorf(c, http.StatusRequestEntityTooLarge, "Disk space exceeded")
+		return
+	}
+
+	id, sndErr := ma.sendDIDCommMessage(address.(string), input)
 	if sndErr != nil {
 		ma.handleSendMessageApiError(c, sndErr)
 		return
@@ -92,8 +118,6 @@ func (ma *MessagingApi) SendDIDMessage(c *gin.Context) {
 
 	c.JSON(http.StatusAccepted, types.DIDCommApiResponse{DIDCommID: *id})
 }
-
-//TODO: add API for canceling sending tasks
 
 // Send SMTP email
 // @Summary Send SMTP email
@@ -112,6 +136,13 @@ func (ma *MessagingApi) SendDIDMessage(c *gin.Context) {
 // @Failure 429 {object} api.ApiError "rate limit exceeded"
 // @Router /api/v1/sendsmtp [post]
 func (ma *MessagingApi) SendSmtpMessage(c *gin.Context) {
+
+	address, exists := c.Get("subjectAddress")
+	if !exists {
+		ApiErrorf(c, http.StatusForbidden, "Unauthorized")
+		return
+	}
+
 	var mail types.SmtpEmailInput
 	if err := c.ShouldBindJSON(&mail); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -127,6 +158,20 @@ func (ma *MessagingApi) SendSmtpMessage(c *gin.Context) {
 
 	if !up.Enabled {
 		ApiErrorf(c, http.StatusForbidden, "User disabled")
+		return
+	}
+
+	totalDiskUsageFromHandlers := util.GetDiskUsageFromDiskHandlers(address.(string))
+	stats, sErr := ma.userProfileService.Stats(address.(string))
+	if sErr != nil {
+		global.Logger.Log("error retrieving disk usage stats", sErr.Error())
+	}
+	activeSize := int64(0)
+	if stats != nil {
+		activeSize = stats.ActiveSize
+	}
+	if totalDiskUsageFromHandlers+activeSize >= up.DiskSpace {
+		ApiErrorf(c, http.StatusRequestEntityTooLarge, "Disk space exceeded")
 		return
 	}
 

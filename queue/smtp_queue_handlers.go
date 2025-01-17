@@ -14,8 +14,6 @@ import (
 	"time"
 
 	"github.com/hibiken/asynq"
-	diskusagehandler "github.com/mailio/go-mailio-diskusage-handler"
-	"github.com/mailio/go-mailio-server/diskusage"
 	mailiosmtp "github.com/mailio/go-mailio-server/email/smtp"
 	smtptypes "github.com/mailio/go-mailio-server/email/smtp/types"
 	smtpvalidator "github.com/mailio/go-mailio-server/email/validator"
@@ -330,26 +328,15 @@ func (msq *MessageQueue) ReceiveSMTPMessage(email *smtptypes.Mail, taskId string
 		}
 
 		// check if user is over disk space limit on external disk storages
-		totalDiskUsageFromHandlers := int64(0)
-		for _, diskUsageHandler := range diskusage.Handlers() {
-			awsDiskUsage, awsDuErr := diskusage.GetHandler(diskUsageHandler).GetDiskUsage(userMapping.MailioAddress)
-			if awsDuErr != nil {
-				if awsDuErr != diskusagehandler.ErrNotFound {
-					global.Logger.Log("error retrieving disk usage stats", awsDuErr.Error())
-				}
-			}
-			if awsDiskUsage != nil {
-				totalDiskUsageFromHandlers += awsDiskUsage.SizeBytes
-			}
-		}
+		totalDiskUsageFromHandlers := util.GetDiskUsageFromDiskHandlers(userMapping.MailioAddress)
 
 		stats, sErr := msq.userProfileService.Stats(userMapping.MailioAddress)
 		if sErr != nil {
 			global.Logger.Log("error retrieving disk usage stats", sErr.Error())
 		}
 		totalDiskUsage := stats.ActiveSize + totalDiskUsageFromHandlers
-		if totalDiskUsage > userProfile.DiskSpace {
-			sendBounce(to, email, smtpHandler, "5.2.2", "Over disk space limit")
+		if totalDiskUsage >= userProfile.DiskSpace {
+			sendBounce(to, email, smtpHandler, "5.2.2", "mailbox full")
 			continue
 		}
 

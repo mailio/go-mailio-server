@@ -7,11 +7,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
-	diskusagehandlers "github.com/mailio/go-mailio-diskusage-handler"
-	"github.com/mailio/go-mailio-server/diskusage"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/services"
 	"github.com/mailio/go-mailio-server/types"
+	"github.com/mailio/go-mailio-server/util"
 )
 
 type UserProfileApi struct {
@@ -50,18 +49,7 @@ func (a *UserProfileApi) GetUserProfile(c *gin.Context) {
 		ApiErrorf(c, http.StatusUnauthorized, "address not found")
 		return
 	}
-	totalDiskUsageFromHandlers := int64(0)
-	for _, diskUsageHandler := range diskusage.Handlers() {
-		awsDiskUsage, awsDuErr := diskusage.GetHandler(diskUsageHandler).GetDiskUsage(address)
-		if awsDuErr != nil {
-			if awsDuErr != diskusagehandlers.ErrNotFound {
-				global.Logger.Log("error retrieving disk usage stats", awsDuErr.Error())
-			}
-		}
-		if awsDiskUsage != nil {
-			totalDiskUsageFromHandlers += awsDiskUsage.SizeBytes
-		}
-	}
+	totalDiskUsageFromHandlers := util.GetDiskUsageFromDiskHandlers(address)
 	stats, sErr := a.userProfileService.Stats(address)
 	if sErr != nil {
 		global.Logger.Log("error retrieving disk usage stats", sErr.Error())

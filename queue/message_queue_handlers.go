@@ -158,6 +158,32 @@ func (msq *MessageQueue) handleReceivedDIDCommMessage(message *types.DIDCommMess
 	}
 
 	for _, recAddress := range localRecipientsAddresses {
+
+		totalDiskUsageFromHandlers := util.GetDiskUsageFromDiskHandlers(recAddress)
+		stats, sErr := msq.userProfileService.Stats(recAddress)
+		if sErr != nil {
+			global.Logger.Log("error retrieving disk usage stats", sErr.Error())
+		}
+		activeSize := int64(0)
+		if stats != nil {
+			activeSize = stats.ActiveSize
+		}
+		up, upErr := msq.userProfileService.Get(recAddress)
+		if upErr != nil {
+			global.Logger.Log("error retrieving user profile", upErr.Error())
+			deliveryStatuses = append(deliveryStatuses, types.NewMTPStatusCode(2, 3, 5, "internal error retrieving user information", types.WithRecAddress(recAddress)))
+			continue
+		}
+		if !up.Enabled {
+			deliveryStatuses = append(deliveryStatuses, types.NewMTPStatusCode(2, 2, 1, "user disabled", types.WithRecAddress(recAddress)))
+			continue
+		}
+		if totalDiskUsageFromHandlers+activeSize >= up.DiskSpace {
+			deliveryStatuses = append(deliveryStatuses, types.NewMTPStatusCode(2, 2, 2, "mailbox full", types.WithRecAddress(recAddress)))
+			// disk space exceeded
+			continue
+		}
+
 		// in case request is a handshake request
 		var folder string
 		if message.Intent == types.DIDCommIntentHandshake || message.Intent == types.DIDCommIntentHandshakeRequest || message.Intent == types.DIDCommIntentHandshakeResponse {
@@ -226,7 +252,7 @@ func (msq *MessageQueue) handleReceivedDIDCommMessage(message *types.DIDCommMess
 		}
 
 		fmt.Printf("Saving message for user %s, mailio id: %s, didcommid: %s\n", recAddress, mailioMessage.ID, mailioMessage.DIDCommMessage.ID)
-		_, sErr := msq.userService.SaveMessage(recAddress, mailioMessage)
+		_, sErr = msq.userService.SaveMessage(recAddress, mailioMessage)
 		if sErr != nil {
 			global.Logger.Log(sErr.Error(), "(receive message) failed to save message", recAddress)
 			// send error message to sender
