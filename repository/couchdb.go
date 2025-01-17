@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"dario.cat/mergo"
 	"github.com/cenkalti/backoff/v4"
 	"github.com/go-resty/resty/v2"
 	"github.com/jarcoal/httpmock"
@@ -147,9 +146,9 @@ func (c *CouchDBRepository) Save(ctx context.Context, docID string, data interfa
 				// remove BaseDocument from the data due to struct embedding
 				delete(existingDoc, "BaseDocument")
 				// merge on conflict old document with new data
-				if err := mergo.Merge(&existingDoc, incomingData, mergo.WithOverride); err != nil {
-					return types.ErrConflict
-				}
+				// if err := mergo.Merge(&existingDoc, incomingData, mergo.WithOverride); err != nil {
+				// 	return types.ErrConflict
+				// }
 				// Attempt to save the document again
 				resp, rErr := c.client.R().SetBody(existingDoc).SetResult(&ok).SetError(&dbErr).Put(fmt.Sprintf("%s/%s", c.dbName, docID))
 				if rErr != nil {
