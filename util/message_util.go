@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/go-kit/log/level"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/types"
 	"golang.org/x/net/publicsuffix"
@@ -69,14 +70,14 @@ func ExtractRootDomain(domain string) (string, error) {
 func IsSupportedSmtpDomain(domain string) bool {
 	rootDomain, rdErr := ExtractRootDomain(domain)
 	if rdErr != nil {
-		global.Logger.Log(rdErr, "failed to extract root domain")
+		level.Error(global.Logger).Log(rdErr, "failed to extract root domain")
 		return false
 	}
 
 	for _, smtpDomain := range ListSmtpDomains() {
 		smtpDomainRoot, smtpErr := ExtractRootDomain(smtpDomain)
 		if smtpErr != nil {
-			global.Logger.Log(smtpErr, "failed to extract root domain", smtpErr.Error())
+			level.Error(global.Logger).Log(smtpErr, "failed to extract root domain", smtpErr.Error())
 			return false
 		}
 		if smtpDomainRoot == rootDomain {
@@ -90,14 +91,14 @@ func IsSupportedSmtpDomain(domain string) bool {
 func ExtractSmtpSendingDomain(domain string) (string, error) {
 	rootDomain, rdErr := ExtractRootDomain(domain)
 	if rdErr != nil {
-		global.Logger.Log(rdErr, "failed to extract root domain")
+		level.Error(global.Logger).Log(rdErr, "failed to extract root domain")
 		return "", rdErr
 	}
 
 	for _, smtpDomain := range ListSmtpDomains() {
 		smtpDomainRoot, smtpErr := ExtractRootDomain(smtpDomain)
 		if smtpErr != nil {
-			global.Logger.Log(smtpErr, "failed to extract root domain", smtpErr.Error())
+			level.Error(global.Logger).Log(smtpErr, "failed to extract root domain", smtpErr.Error())
 			return "", smtpErr
 		}
 		if smtpDomainRoot == rootDomain {

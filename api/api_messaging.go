@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
+	"github.com/go-kit/log/level"
 	"github.com/go-playground/validator/v10"
 	"github.com/hibiken/asynq"
 	"github.com/mailio/go-mailio-server/global"
@@ -211,7 +212,7 @@ func (ma *MessagingApi) validateSmtpSender(c *gin.Context, fromEmailAddress stri
 			ApiErrorf(c, http.StatusForbidden, "From email address and your address don't match")
 			return err
 		}
-		global.Logger.Log(mErr.Error(), "failed to find user by scryped email")
+		level.Error(global.Logger).Log(mErr.Error(), "failed to find user by scryped email")
 		ApiErrorf(c, http.StatusInternalServerError, "failed to find user by scryped email")
 		return err
 	}
@@ -231,7 +232,7 @@ func (ma *MessagingApi) sendSMTPMessage(c *gin.Context, mailInput *types.SmtpEma
 	day := time.Now().UTC().Truncate(24 * time.Hour).Unix()
 	countSent, csErr := ma.statisticsService.GetEmailSentByDay(ctx, up.ID, day)
 	if csErr != nil {
-		global.Logger.Log("error counting number of sent messages to email", csErr.Error())
+		level.Error(global.Logger).Log("error counting number of sent messages to email", csErr.Error())
 	}
 	if countSent > int64(global.Conf.Mailio.DailySmtpSentLimit) {
 		return nil, types.ErrTooManyRequests
@@ -242,7 +243,7 @@ func (ma *MessagingApi) sendSMTPMessage(c *gin.Context, mailInput *types.SmtpEma
 	totalDiskUsageFromHandlers := util.GetDiskUsageFromDiskHandlers(address)
 	stats, sErr := ma.userProfileService.Stats(address)
 	if sErr != nil {
-		global.Logger.Log("error retrieving disk usage stats", sErr.Error())
+		level.Error(global.Logger).Log("error retrieving disk usage stats", sErr.Error())
 	}
 	activeSize := int64(0)
 	if stats != nil {
@@ -306,10 +307,10 @@ func (ma *MessagingApi) sendSMTPMessage(c *gin.Context, mailInput *types.SmtpEma
 		asynq.ProcessIn(time.Second*time.Duration(taskDelaySeconds)), // delay processing for 5 seconds (user has time to cancel the smtp send)
 		asynq.Unique(time.Second*10))                                 // unique for 10 seconds (preventing multiple equal messages in the queue)
 	if tqErr != nil {
-		global.Logger.Log(tqErr.Error(), "failed to send message")
+		level.Error(global.Logger).Log(tqErr.Error(), "failed to send message")
 		return nil, tqErr
 	}
-	global.Logger.Log(fmt.Sprintf("message SMTP sent: %s", taskInfo.ID), "message queued")
+	level.Info(global.Logger).Log(fmt.Sprintf("message SMTP sent: %s", taskInfo.ID), "message queued")
 	return &id, nil
 }
 
@@ -337,7 +338,7 @@ func (ma *MessagingApi) sendDIDCommMessage(senderAddress string, input types.DID
 	// get the user profile
 	userProfile, upErr := ma.userProfileService.Get(senderAddress)
 	if upErr != nil {
-		global.Logger.Log(upErr.Error(), "failed to get user profile")
+		level.Error(global.Logger).Log(upErr.Error(), "failed to get user profile")
 		return nil, types.ErrInternal
 	}
 	if !userProfile.Enabled {
@@ -348,7 +349,7 @@ func (ma *MessagingApi) sendDIDCommMessage(senderAddress string, input types.DID
 	totalDiskUsageFromHandlers := util.GetDiskUsageFromDiskHandlers(senderAddress)
 	stats, sErr := ma.userProfileService.Stats(senderAddress)
 	if sErr != nil {
-		global.Logger.Log("error retrieving disk usage stats", sErr.Error())
+		level.Error(global.Logger).Log("error retrieving disk usage stats", sErr.Error())
 	}
 	activeSize := int64(0)
 	if stats != nil {
@@ -361,17 +362,18 @@ func (ma *MessagingApi) sendDIDCommMessage(senderAddress string, input types.DID
 	// get the senders domain (which should in the database already, so no resolving needed)
 	senderDidDoc, sndDidErr := ma.ssiService.GetDIDDocument(senderAddress)
 	if sndDidErr != nil {
-		global.Logger.Log(sndDidErr.Error(), "failed to get sender DID document")
+		level.Error(global.Logger).Log(sndDidErr.Error(), "failed to get sender DID document")
 		return nil, types.ErrInternal
 	}
 	senderDomain := util.ExtractDIDMessageEndpoint(senderDidDoc)
 	if senderDomain == "" {
-		global.Logger.Log("sender domain is empty", "failed to get sender domain")
+
+		level.Error(global.Logger).Log("error", "failed to extract sender domain", "sender", senderAddress)
 		return nil, types.ErrInternal
 	}
 	parsedSenderUrl, pUrlErr := url.Parse(senderDomain)
 	if pUrlErr != nil {
-		global.Logger.Log(pUrlErr.Error(), "failed to parse sender domain")
+		level.Error(global.Logger).Log(pUrlErr.Error(), "failed to parse sender domain")
 		return nil, types.ErrInternal
 	}
 
@@ -381,7 +383,7 @@ func (ma *MessagingApi) sendDIDCommMessage(senderAddress string, input types.DID
 	// intended folder for sender is "sent"
 	id, idErr := util.DIDDocumentToUniqueID(&input.DIDCommMessage, types.MailioFolderSent)
 	if idErr != nil {
-		global.Logger.Log(idErr.Error(), "failed to create unique id")
+		level.Error(global.Logger).Log(idErr.Error(), "failed to create unique id")
 		return nil, types.ErrInternal
 	}
 	input.DIDCommMessage.ID = id
@@ -393,7 +395,7 @@ func (ma *MessagingApi) sendDIDCommMessage(senderAddress string, input types.DID
 	}
 	sendTask, tErr := types.NewDIDCommSendTask(task)
 	if tErr != nil {
-		global.Logger.Log(tErr.Error(), "failed to create task")
+		level.Error(global.Logger).Log(tErr.Error(), "failed to create task")
 		return nil, types.ErrInternal
 	}
 
@@ -403,10 +405,10 @@ func (ma *MessagingApi) sendDIDCommMessage(senderAddress string, input types.DID
 		asynq.TaskID(input.DIDCommMessage.ID), // unique task id
 		asynq.Unique(time.Second*10))          // unique for 10 seconds (preventing multiple equal messages in the queue)
 	if tqErr != nil {
-		global.Logger.Log(tqErr.Error(), "failed to send message")
+		level.Error(global.Logger).Log(tqErr.Error(), "failed to send message")
 		return nil, types.ErrInternal
 	}
-	global.Logger.Log(fmt.Sprintf("message sent: %s", taskInfo.ID), "message queued")
+	level.Info(global.Logger).Log(fmt.Sprintf("message sent: %s", taskInfo.ID), "message queued")
 
 	return &id, nil
 }
@@ -432,5 +434,5 @@ func (ma *MessagingApi) handleSendMessageApiError(c *gin.Context, err error) {
 	default:
 		ApiErrorf(c, http.StatusInternalServerError, "Failed to send message")
 	}
-	global.Logger.Log(err.Error(), "Failed to send message")
+	level.Error(global.Logger).Log(err.Error(), "Failed to send message")
 }

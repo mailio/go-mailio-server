@@ -13,6 +13,7 @@ import (
 	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/gin-gonic/gin"
+	"github.com/go-kit/log/level"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/services"
 	"github.com/mailio/go-mailio-server/types"
@@ -62,7 +63,7 @@ func (pa *S3Api) DeleteProfilePhoto(c *gin.Context) {
 			ApiErrorf(c, http.StatusForbidden, "forbidden to delete")
 			return
 		}
-		global.Logger.Log("error", "failed to delete object")
+		level.Error(global.Logger).Log("error", "failed to delete object", "error", dErr)
 		ApiErrorf(c, http.StatusInternalServerError, "failed to delete object")
 		return
 	}
@@ -127,7 +128,7 @@ func (pa *S3Api) UploadProfilePhoto(c *gin.Context) {
 	filepath := address.(string) + "/profile_photo.jpg"
 	url, uErr := pa.s3Service.UploadAttachment(global.Conf.Storage.ProfilePhotoBucket, filepath, imgBytes, mimeType)
 	if uErr != nil {
-		global.Logger.Log("error", "failed to upload photo", "error", uErr)
+		level.Error(global.Logger).Log("error", "failed to upload photo", "error", uErr)
 		ApiErrorf(c, http.StatusInternalServerError, "server error uploading photo")
 		return
 	}
@@ -202,7 +203,7 @@ func (pa *S3Api) GetPresignedUrlPut(c *gin.Context) {
 		err = e
 	}
 	if err != nil {
-		global.Logger.Log("error", "error creating presigned url", "error", err)
+		level.Error(global.Logger).Log("error", "error creating presigned url", "error", err)
 		ApiErrorf(c, http.StatusInternalServerError, "error creating presigned url: %v", err)
 		return
 	}
@@ -247,7 +248,7 @@ func (pa *S3Api) DeleteObjects(c *gin.Context) {
 				ApiErrorf(c, http.StatusForbidden, "forbidden to delete")
 				return
 			}
-			global.Logger.Log("error", "failed to delete object")
+			level.Error(global.Logger).Log("error", "failed to delete object", "error", dErr)
 			ApiErrorf(c, http.StatusInternalServerError, "failed to delete object")
 			return
 		}

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-kit/log/level"
 	"github.com/hibiken/asynq"
 	smtpmodule "github.com/mailio/go-mailio-server/email/smtp"
 	smtptypes "github.com/mailio/go-mailio-server/email/smtp/types"
@@ -76,17 +77,17 @@ func (m *MailReceiveWebhook) ReceiveMail(c *gin.Context) {
 	// ReceiveMail - parsing of the email using the selected SMTP handler
 	email, mErr := smtpHandler.ReceiveMail(*c.Request)
 	if mErr != nil {
-		global.Logger.Log("error parsing mime", mErr.Error())
+		level.Error(global.Logger).Log("error parsing mime", mErr.Error())
 		c.JSON(http.StatusInternalServerError, gin.H{"error parsing mime": mErr.Error()})
 		return
 	}
 	// fmt.Printf("Received mail: %v\n", email.MessageId)
-	global.Logger.Log("Received mail webhook call for message id: ", email.MessageId)
+	level.Info(global.Logger).Log("Received mail webhook call for message id: ", email.MessageId)
 
 	// Check if too many recipients
 	if len(email.To) > 100 {
 		// send bounce
-		global.Logger.Log("too many recipients", len(email.To))
+		level.Warn(global.Logger).Log("too many recipients", len(email.To), "from", email.From)
 		sendBounce(email, c, smtpHandler, "4.5.3", "Too many recipients")
 		return
 	}
@@ -117,7 +118,7 @@ func (m *MailReceiveWebhook) ReceiveMail(c *gin.Context) {
 		extension := filepath.Ext(att.Filename)
 		extension = strings.ReplaceAll(extension, ".", "")
 		if ext, isDenied := DENIED_FILE_EXTENSIONS[extension]; isDenied {
-			global.Logger.Log("attachment filetype not allowed", att.ContentType, att.Filename, ext)
+			level.Warn(global.Logger).Log("attachment filetype not allowed", att.ContentType, att.Filename, ext)
 			// send bounce
 			sendBounce(email, c, smtpHandler, "5.7.1", fmt.Sprintf("Attachment filetype not allowed: %s", ext))
 			return
@@ -127,13 +128,13 @@ func (m *MailReceiveWebhook) ReceiveMail(c *gin.Context) {
 	mailInput, inputErr := util.ConvertFromSmtpEmail(email)
 	if inputErr != nil {
 		if inputErr == types.ErrInvalidFormat {
-			global.Logger.Log("error converting email, invalid format", inputErr.Error())
+			level.Warn(global.Logger).Log("error converting email, invalid format", inputErr.Error())
 			sendBounce(email, c, smtpHandler, "5.6.0", "Error converting email")
 		} else if inputErr == types.ErrInvaidRecipient {
-			global.Logger.Log("error converting email, invalid recipient", inputErr.Error())
+			level.Warn(global.Logger).Log("error converting email, invalid recipient", inputErr.Error())
 			sendBounce(email, c, smtpHandler, "5.6.0", "Error converting email")
 		} else {
-			global.Logger.Log("error converting email", inputErr.Error())
+			level.Warn(global.Logger).Log("error converting email", inputErr.Error())
 			sendBounce(email, c, smtpHandler, "5.6.0", "Error converting email")
 		}
 		return
@@ -144,7 +145,7 @@ func (m *MailReceiveWebhook) ReceiveMail(c *gin.Context) {
 	}
 	receiveTask, tErr := types.NewSmtpCommReceiveTask(task)
 	if tErr != nil {
-		ApiErrorf(c, http.StatusInternalServerError, tErr.Error())
+		ApiErrorf(c, http.StatusInternalServerError, "%s", tErr.Error())
 		return
 	}
 	email.Timestamp = time.Now().UTC().UnixMilli()
@@ -156,12 +157,12 @@ func (m *MailReceiveWebhook) ReceiveMail(c *gin.Context) {
 		asynq.TaskID(email.MessageId),  // unique task id
 		asynq.Unique(time.Second*10))   // unique for 10 seconds (preventing multiple equal messages in the queue)
 	if tqErr != nil {
-		global.Logger.Log(tqErr.Error(), "failed to receive message")
+		level.Error(global.Logger).Log(tqErr.Error(), "failed to receive message")
 		ApiErrorf(c, http.StatusInternalServerError, "failed to receive message")
 		return
 	}
 
-	global.Logger.Log(fmt.Sprintf("message SMTP received: %s", taskInfo.ID), "message queued")
+	level.Info(global.Logger).Log(fmt.Sprintf("message SMTP received: %s", taskInfo.ID), "message queued")
 	c.JSON(200, gin.H{"message": "email queued succesfully under id: " + taskInfo.ID})
 }
 
@@ -169,14 +170,14 @@ func (m *MailReceiveWebhook) ReceiveMail(c *gin.Context) {
 func sendBounce(email *smtptypes.Mail, c *gin.Context, smtpHandler smtpmodule.SmtpHandler, code, message string) {
 	bounceMail, bErr := smtpmodule.ToBounce(email.From, *email, code, message, global.Conf.Mailio.ServerDomain)
 	if bErr != nil {
-		global.Logger.Log("error", bErr.Error())
-		ApiErrorf(c, 500, fmt.Sprintf("error creating bounce email: %s", bErr.Error()))
+		level.Error(global.Logger).Log("error creating bounce email", bErr.Error())
+		ApiErrorf(c, 500, "error creating bounce email: %s", bErr.Error())
 		return
 	}
 	_, sndErr := smtpHandler.SendMimeMail(email.From, bounceMail, []mail.Address{email.From})
 	if sndErr != nil {
-		global.Logger.Log("error sending bounce email", sndErr.Error())
-		ApiErrorf(c, 500, fmt.Sprintf("error sending bounce email: %s", sndErr.Error()))
+		level.Error(global.Logger).Log("error sending bounce email", sndErr.Error())
+		ApiErrorf(c, 500, "error sending bounce email: %s", sndErr.Error())
 	}
 	c.JSON(200, gin.H{"message": "Email size is too large"})
 }

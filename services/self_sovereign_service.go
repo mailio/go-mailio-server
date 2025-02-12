@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-kit/log/level"
 	"github.com/go-resty/resty/v2"
 	"github.com/mailio/go-mailio-did/did"
 	"github.com/mailio/go-mailio-server/global"
@@ -299,20 +300,19 @@ func (ssi *SelfSovereignService) FetchRemoteDID(remoteDid *did.DID) (*did.Docume
 
 	response, rErr := ssi.restyClient.R().SetResult(&didDoc).Get(fmt.Sprintf("%s://%s/%s/did.json", protocol, domain, userAddress))
 	if rErr != nil {
-		global.Logger.Log(rErr.Error(), "failed to validate recipient for ", domain)
+		level.Error(global.Logger).Log(rErr.Error(), "failed to validate recipient for ", domain)
 		return nil, types.ErrBadRequest
 	}
 	if response.IsError() {
 		if response.StatusCode() == http.StatusNotFound {
-
-			global.Logger.Log("recipient not found", "failed to validate recipient for ", domain)
+			level.Error(global.Logger).Log("recipient not found", "failed to validate recipient for ", domain)
 			return nil, types.ErrBadRequest
 		}
 		if response.StatusCode() == http.StatusConflict {
-			global.Logger.Log(response.String(), "rate limit exceeded")
+			level.Error(global.Logger).Log("rate limit exceeded", "failed to validate recipient for ", domain)
 			return nil, types.ErrConflict
 		}
-		global.Logger.Log(response.String(), "failed to validate recipient")
+		level.Error(global.Logger).Log(response.String(), "failed to validate recipient for ", domain)
 		return nil, types.ErrBadRequest
 	}
 
@@ -337,7 +337,7 @@ func (ssi *SelfSovereignService) FetchDIDByWebDID(fromDID did.DID) (*did.Documen
 			if fromDID.Value() == host {
 				r, rErr := ssi.GetDIDDocument(fromDID.Fragment())
 				if rErr != nil {
-					global.Logger.Log(rErr.Error(), "failed to validate recipient", fromDID.Fragment())
+					level.Error(global.Logger).Log(rErr.Error(), "failed to validate recipient", fromDID.Fragment())
 					return nil, rErr
 				} else {
 					result = *r
@@ -346,7 +346,7 @@ func (ssi *SelfSovereignService) FetchDIDByWebDID(fromDID did.DID) (*did.Documen
 				// remote fetch did
 				r, rErr := ssi.FetchRemoteDID(&fromDID)
 				if rErr != nil {
-					global.Logger.Log(rErr.Error(), "failed to validate remote recipient", fromDID.Fragment())
+					level.Error(global.Logger).Log(rErr.Error(), "failed to validate remote recipient", fromDID.Fragment())
 					return nil, rErr
 				} else {
 					result = *r
@@ -355,13 +355,13 @@ func (ssi *SelfSovereignService) FetchDIDByWebDID(fromDID did.DID) (*did.Documen
 			// cache the DID document
 			didBytes, mErr := json.Marshal(result)
 			if mErr != nil {
-				global.Logger.Log(mErr.Error(), "failed to marshal DID document for caching")
+				level.Error(global.Logger).Log(mErr.Error(), "failed to marshal DID document for caching")
 				return nil, mErr
 			}
 			// cache for 24 hours
 			_, cErr := ssi.env.RedisClient.Set(ctx, key, didBytes, global.REDIS_DID_CACHE_TTL).Result()
 			if cErr != nil {
-				global.Logger.Log(cErr.Error(), "failed to cache DID document for caching")
+				level.Error(global.Logger).Log(cErr.Error(), "failed to cache DID document for caching")
 				return nil, cErr
 			}
 			return &result, nil
@@ -370,13 +370,13 @@ func (ssi *SelfSovereignService) FetchDIDByWebDID(fromDID did.DID) (*did.Documen
 	// document already cached, no need to cache, but just extend the expiration time
 	_, cErr := ssi.env.RedisClient.Expire(ctx, key, global.REDIS_DID_CACHE_TTL).Result()
 	if cErr != nil {
-		global.Logger.Log(cErr.Error(), "failed to extend expiration time for cached DID document")
+		level.Error(global.Logger).Log(cErr.Error(), "failed to extend expiration time for cached DID document")
 		return nil, cErr
 	}
 	var didDoc did.Document
 	uErr := json.Unmarshal([]byte(didBytes), &didDoc)
 	if uErr != nil {
-		global.Logger.Log(uErr.Error(), "failed to unmarshal cached DID document")
+		level.Error(global.Logger).Log(uErr.Error(), "failed to unmarshal cached DID document")
 		return nil, uErr
 	}
 	return &didDoc, nil

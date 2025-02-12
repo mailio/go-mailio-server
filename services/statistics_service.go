@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/cespare/xxhash/v2"
+	"github.com/go-kit/log/level"
 	"github.com/go-resty/resty/v2"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/repository"
@@ -55,14 +56,14 @@ func (s *StatisticsService) GetEmailInterest(ctx context.Context, sender string,
 
 	exists, eErr := s.env.RedisClient.Exists(ctx, key).Result()
 	if eErr != nil {
-		global.Logger.Log("CacheError", "StatisticsService.getEmailInterest", eErr.Error())
+		level.Error(global.Logger).Log("CacheError", "StatisticsService.getEmailInterest", eErr.Error())
 		return 0, eErr
 	}
 	if exists == 1 {
 		count, err := s.env.RedisClient.PFCount(ctx, key).Result()
 		if err != nil {
 			if err != redis.Nil {
-				global.Logger.Log("CacheError", "StatisticsService.getEmailInterest failed to do PFCount", err.Error())
+				level.Error(global.Logger).Log("CacheError", "StatisticsService.getEmailInterest failed to do PFCount", err.Error())
 				return 0, fmt.Errorf("failed to do PFCount on key %s, %w", key, err)
 			}
 		}
@@ -72,7 +73,7 @@ func (s *StatisticsService) GetEmailInterest(ctx context.Context, sender string,
 	// get from CouchDB
 	stats, stErr := s.getEmailStatisticsFromDB(ctx, redisPrefixEsint, key)
 	if stErr != nil {
-		global.Logger.Log("CouchDBError", "StatisticsService.getEmailInterest, failed to get email statistcs from DB for sender", sender, " recipient: ", "recipient", stErr.Error())
+		level.Error(global.Logger).Log("CouchDBError", "StatisticsService.getEmailInterest", stErr.Error())
 		return 0, fmt.Errorf("failed to get email statistics from DB for sender %s, recipient: %s, %w", sender, recipient, stErr)
 	}
 	// restore the hyperloglog to redis or initialize it
@@ -81,17 +82,17 @@ func (s *StatisticsService) GetEmailInterest(ctx context.Context, sender string,
 	}
 	hll, hllErr := base64.StdEncoding.DecodeString(stats.Hyperloglog)
 	if hllErr != nil {
-		global.Logger.Log("CacheError", "StatisticsService.getEmailInterest, failed to base64 decode HLL from redis", hllErr.Error())
+		level.Error(global.Logger).Log("CacheError", "StatisticsService.getEmailInterest, failed to base64 decode HLL from redis", hllErr.Error())
 		return 0, fmt.Errorf("failed to base64 decode HLL from redis %w", hllErr)
 	}
 	err := s.env.RedisClient.Set(ctx, key, hll, redisExpire).Err()
 	if err != nil {
-		global.Logger.Log("CacheError", "StatisticsService.getEmailInterest, failed to set key", key, " in redis", err.Error())
+		level.Error(global.Logger).Log("CacheError", "StatisticsService.getEmailInterest, failed to set key", key, " in redis", err.Error())
 		return 0, fmt.Errorf("failed to Set key %s in redis: %w", key, err)
 	}
 	count, err := s.env.RedisClient.PFCount(ctx, key).Result()
 	if err != nil {
-		global.Logger.Log("CacheError", "StatisticsService.getEmailInterest, failed to do PFCount on key", key, err.Error())
+		level.Error(global.Logger).Log("CacheError", "StatisticsService.getEmailInterest, failed to do PFCount on key", key, err.Error())
 		return 0, fmt.Errorf("failed to do PFCount on key %s, %w", key, err)
 	}
 
@@ -148,7 +149,7 @@ func (s *StatisticsService) getEmailStatisticsFromDB(ctx context.Context, redisK
 				Sender:    senderHash,
 			}, nil
 		}
-		global.Logger.Log("CouchDBError", "StatisticsService.getEmailStatisticsFromDB", err.Error())
+		level.Error(global.Logger).Log("CouchDBError", "StatisticsService.getEmailStatisticsFromDB", err.Error())
 		return nil, err
 	}
 	var stats types.EmailStatistics
@@ -324,20 +325,20 @@ func (s *StatisticsService) FlushEmailInterests() {
 		cachedResult, rErr := s.env.RedisClient.Get(ctx, key).Result()
 		if rErr != nil {
 			if rErr != redis.Nil {
-				global.Logger.Log("CacheError", "StatisticsService.FlushEmailInterests", rErr.Error())
+				level.Error(global.Logger).Log("CacheError", "StatisticsService.FlushEmailInterests", rErr.Error())
 			}
 			// count is 0 to skip the processing
 			continue
 		}
 		emailStatsDB, esdbErr := s.getEmailStatisticsFromDB(ctx, redisKeyPrefix, key)
 		if esdbErr != nil {
-			global.Logger.Log("CouchDBError", "StatisticsService.FlushEmailInterests", esdbErr.Error())
+			level.Error(global.Logger).Log("CouchDBError", "StatisticsService.FlushEmailInterests", esdbErr.Error())
 			continue
 		}
 		emailStatsDB.Hyperloglog = base64.StdEncoding.EncodeToString([]byte(cachedResult)) // save to CouchDB HLL
 		cnt, cntErr := s.env.RedisClient.PFCount(ctx, key).Result()
 		if cntErr != nil {
-			global.Logger.Log("CacheError", "StatisticsService.FlushEmailInterests", cntErr.Error())
+			level.Error(global.Logger).Log("CacheError", "StatisticsService.FlushEmailInterests", cntErr.Error())
 			// just log the error and continue (count can be extracted from HLL later)
 		}
 		emailStatsDB.Count = cnt
@@ -347,10 +348,10 @@ func (s *StatisticsService) FlushEmailInterests() {
 	if len(allDocs) > 0 {
 		bsErr := s.bulkSave(allDocs)
 		if bsErr != nil {
-			global.Logger.Log("CouchDBError", "StatisticsService.FlushEmailInterests on bulkSave", bsErr.Error())
+			level.Error(global.Logger).Log("CouchDBError", "StatisticsService.FlushEmailInterests on bulkSave", bsErr.Error())
 		}
 	}
-	global.Logger.Log("Info", "StatisticsService.FlushEmailInterests", "flushed", len(allDocs), "email interests")
+	level.Info(global.Logger).Log("Info", "StatisticsService.FlushEmailInterests", "flushed", len(allDocs), "email interests")
 }
 
 /**
@@ -372,14 +373,14 @@ func (s *StatisticsService) FlushEmailStatistics() {
 		count, rErr := s.env.RedisClient.Get(ctx, key).Int64()
 		if rErr != nil {
 			if rErr != redis.Nil {
-				global.Logger.Log("CacheError", "StatisticsService.FlushEmailStatistics", rErr.Error())
+				level.Error(global.Logger).Log("CacheError", "StatisticsService.FlushEmailStatistics", rErr.Error())
 			}
 			// count is 0, no need to store anything
 			continue
 		}
 		emailStatsDB, esdbErr := s.getEmailStatisticsFromDB(ctx, redisPrefixEs, key)
 		if esdbErr != nil {
-			global.Logger.Log("CouchDBError", "StatisticsService.FlushEmailStatistics", esdbErr.Error())
+			level.Error(global.Logger).Log("CouchDBError", "StatisticsService.FlushEmailStatistics", esdbErr.Error())
 			continue
 		}
 		emailStatsDB.Count = count
@@ -389,10 +390,10 @@ func (s *StatisticsService) FlushEmailStatistics() {
 	if len(allDocs) > 0 {
 		bsErr := s.bulkSave(allDocs)
 		if bsErr != nil {
-			global.Logger.Log("CouchDBError", "StatisticsService.FlushEmailStatistics", bsErr.Error())
+			level.Error(global.Logger).Log("CouchDBError", "StatisticsService.FlushEmailStatistics", bsErr.Error())
 		}
 	}
-	global.Logger.Log("Info", "StatisticsService.FlushEmailStatistics", "flushed", len(allDocs), "email statistics")
+	level.Info(global.Logger).Log("Info", "StatisticsService.FlushEmailStatistics", "flushed", len(allDocs), "email statistics")
 }
 
 /**
@@ -415,14 +416,14 @@ func (s *StatisticsService) FlushSentEmailStatistics() {
 		count, rErr := s.env.RedisClient.Get(ctx, key).Int64()
 		if rErr != nil {
 			if rErr != redis.Nil {
-				global.Logger.Log("CacheError", "StatisticsService.FlushSentEmailStatistics", rErr.Error())
+				level.Error(global.Logger).Log("CacheError", "StatisticsService.FlushSentEmailStatistics", rErr.Error())
 			}
 			// count is 0, no need to store anything
 			continue
 		}
 		emailStatsDB, esdbErr := s.getEmailStatisticsFromDB(ctx, redisKeyPrefix, key)
 		if esdbErr != nil {
-			global.Logger.Log("CouchDBError", "StatisticsService.FlushSentEmailStatistics", esdbErr.Error())
+			level.Error(global.Logger).Log("CouchDBError", "StatisticsService.FlushSentEmailStatistics", esdbErr.Error())
 			continue
 		}
 		emailStatsDB.Count = count
@@ -431,10 +432,10 @@ func (s *StatisticsService) FlushSentEmailStatistics() {
 	if len(allDocs) > 0 {
 		bsErr := s.bulkSave(allDocs)
 		if bsErr != nil {
-			global.Logger.Log("CouchDBError", "StatisticsService.FlushSentEmailStatistics", bsErr.Error())
+			level.Error(global.Logger).Log("CouchDBError", "StatisticsService.FlushSentEmailStatistics", bsErr.Error())
 		}
 	}
-	global.Logger.Log("Info", "StatisticsService.FlushSentEmailStatistics", "flushed", len(allDocs), "sent email statistics")
+	level.Info(global.Logger).Log("Info", "StatisticsService.FlushSentEmailStatistics", "flushed", len(allDocs), "sent email statistics")
 }
 
 type bulkRequest struct {
@@ -468,10 +469,11 @@ func (s *StatisticsService) bulkSave(docs []*types.EmailStatistics) error {
 				Post(fmt.Sprintf("/%s/_bulk_docs", repository.EmailStatistics))
 
 			if err != nil {
-				global.Logger.Log("CouchDBError", "StatisticsService.FlushEmailStatistics", err.Error())
+				level.Error(global.Logger).Log("CouchDBError", "StatisticsService.FlushEmailStatistics", err.Error())
 				return fmt.Errorf("failed to save bulk docs: %w", err)
 			}
 			if resp.StatusCode() >= 400 {
+				level.Error(global.Logger).Log("CouchDBError", "StatisticsService.FlushEmailStatistics", resp.String())
 				return fmt.Errorf("bulk upsert failed: %s", resp.String())
 			}
 		}
@@ -479,7 +481,7 @@ func (s *StatisticsService) bulkSave(docs []*types.EmailStatistics) error {
 	return nil
 }
 
-func (s *StatisticsService) logAndWrapError(level, operation, key string, err error) error {
-	global.Logger.Log(level, operation, "key", key, "error", err.Error())
+func (s *StatisticsService) logAndWrapError(l, operation, key string, err error) error {
+	level.Error(global.Logger).Log("CacheError", operation, "key", key, "error", err.Error())
 	return fmt.Errorf("%s: failed for key %s: %w", operation, key, err)
 }

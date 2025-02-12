@@ -63,7 +63,7 @@ func (mtp *MtpService) LookupHandshakes(senderAddress string, inputLookups []typ
 	for _, lookup := range inputLookups {
 		lookupEmailParsed, lepErr := mail.ParseAddress(lookup.Email)
 		if lepErr != nil {
-			global.Logger.Log("msg", "failed to parse email address", "err", lepErr)
+			level.Error(global.Logger).Log("msg", "failed to parse email address", "err", lepErr)
 			return nil, nil, lepErr
 		}
 		lookupEmailParsed.Address = strings.ToLower(lookupEmailParsed.Address)
@@ -234,11 +234,11 @@ func (mtp *MtpService) GetServerDIDDocument(domain string) (*did.Document, error
 	var serverDIDDocument did.Document
 	serverResponse, srvErr := mtp.restyClient.R().SetResult(&serverDIDDocument).Get(senderServerDIDUrl)
 	if srvErr != nil {
-		global.Logger.Log(srvErr.Error(), "failed to retrieve sender server DID", senderServerDIDUrl)
+		level.Error(global.Logger).Log(srvErr.Error(), "failed to retrieve sender server DID", senderServerDIDUrl)
 		return nil, fmt.Errorf("failed to retrieve sender server DID: %v", srvErr)
 	}
 	if serverResponse.IsError() {
-		global.Logger.Log(serverResponse.String(), "failed to retrieve sender server DID", senderServerDIDUrl)
+		level.Error(global.Logger).Log(serverResponse.String(), "failed to retrieve sender server DID", senderServerDIDUrl)
 		return nil, fmt.Errorf("failed to retrieve sender server DID: %v", serverResponse.Error())
 	}
 	return &serverDIDDocument, nil
@@ -283,7 +283,7 @@ func (mtp *MtpService) GetLocalDIDDocumentsByEmailHash(localLookups []*types.DID
 	for _, lookup := range localLookups {
 		lookupHashedEmail, lErr := url.QueryUnescape(lookup.EmailHash)
 		if lErr != nil {
-			global.Logger.Log("msg", "failed to unescape email hash", "err", lErr)
+			level.Error(global.Logger).Log("msg", "failed to unescape email hash", "err", lErr)
 			notFound = append(notFound, lookup)
 			continue
 		}
@@ -428,7 +428,7 @@ func (mtp *MtpService) FetchRemoteDIDByEmailHash(userMailioAddress string, looku
 		response, rErr := mtp.restyClient.R().SetHeader("Content-Type", "application/json").
 			SetBody(request).SetDebug(true).SetResult(&signedResponse).Post("https://" + resolvedDomain.MailioDIDDomain + "/api/v1/mtp/did")
 		if rErr != nil {
-			global.Logger.Log(rErr.Error(), "failed to request DID document from remote server", resolvedDomain.MailioDIDDomain, " body: ", string(response.Body()))
+			level.Error(global.Logger).Log(rErr.Error(), "failed to request DID document from remote server", resolvedDomain.MailioDIDDomain, " body: ", string(response.Body()))
 			handleDIDLookupError(rErr,
 				*types.NewMTPStatusCode(types.ClassCodeTempFailure, types.SubjectCodeNetwork, 1, "failed to request DID document from remote server"),
 				lookup,
@@ -437,7 +437,7 @@ func (mtp *MtpService) FetchRemoteDIDByEmailHash(userMailioAddress string, looku
 		}
 		if response.IsError() {
 			if response.StatusCode() >= 400 {
-				global.Logger.Log(response.StatusCode(), "failed to request DID document from remote server", resolvedDomain.MailioDIDDomain, " body: ", string(response.Body()))
+				level.Warn(global.Logger).Log(response.StatusCode(), "failed to request DID document from remote server", resolvedDomain.MailioDIDDomain, " body: ", string(response.Body()))
 				handleDIDLookupError(rErr,
 					*types.NewMTPStatusCode(types.ClassCodeTempFailure, types.SubjectCodeNetwork, 0, "received error from remote server: "+resolvedDomain.MailioDIDDomain),
 					lookup,

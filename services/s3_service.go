@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"runtime/debug"
 	"strings"
 	"time"
 
@@ -15,6 +14,7 @@ import (
 	s3Service "github.com/aws/aws-sdk-go-v2/service/s3"
 	s3Types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
+	"github.com/go-kit/log/level"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/types"
 )
@@ -49,9 +49,7 @@ func (s3s *S3Service) UploadAttachment(bucket, path string, content []byte, cont
 
 	_, uErr := s3s.env.S3Uploader.Upload(ctx, input)
 	if uErr != nil {
-		fmt.Printf("Error uploading to S3: %v\n", uErr)
-		debug.PrintStack()
-		global.Logger.Log(uErr.Error(), "failed to upload attachment", path)
+		level.Error(global.Logger).Log("error", uErr.Error())
 		return "", uErr
 	}
 	return fmt.Sprintf("s3://%s/%s", bucket, path), nil
@@ -72,19 +70,19 @@ func (s3s *S3Service) DeleteAttachment(bucket, path string) error {
 		var noKey *s3Types.NoSuchKey
 		var apiErr *smithy.GenericAPIError
 		if errors.As(err, &noKey) {
-			global.Logger.Log("warning", "object does not exist", "objectKey", path)
+			level.Error(global.Logger).Log("object does not exist", "objectKey", path)
 			return types.ErrNotFound
 		} else if errors.As(err, &apiErr) {
 			switch apiErr.ErrorCode() {
 			case "AccessDenied":
-				global.Logger.Log("warning", "access denied", "objectKey", path)
+				level.Warn(global.Logger).Log("access denied", "objectKey", path)
 				return types.ErrNotAuthorized
 			}
-			global.Logger.Log("error", "error deleting object", "error", err)
+			level.Error(global.Logger).Log("error deleting object", "error", err)
 			return err
 		}
 	}
-	global.Logger.Log("info", "object deleted", "objectKey", path)
+	level.Info(global.Logger).Log("info", "object deleted", "objectKey", path)
 	return nil
 }
 
@@ -95,13 +93,13 @@ func (s3 *S3Service) DownloadAttachment(attachmentUrl string) ([]byte, error) {
 	}
 	parsedURL, pErr := url.Parse(attachmentUrl)
 	if pErr != nil {
-		global.Logger.Log(pErr.Error(), "failed to parse attachment url")
+		level.Error(global.Logger).Log(pErr.Error(), "failed to parse attachment url")
 		return nil, pErr
 	}
 	// Extract the file key from the path (after the first "/")
 	fileKey := strings.TrimPrefix(parsedURL.Path, "/")
 	if fileKey == "" {
-		global.Logger.Log("error", "invalid attachment url", "attachmentUrl", attachmentUrl)
+		level.Error(global.Logger).Log("error", "invalid attachment url", "attachmentUrl", attachmentUrl)
 		return nil, types.ErrBadRequest
 	}
 

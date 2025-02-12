@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-kit/log/level"
 	"github.com/go-resty/resty/v2"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/repository"
@@ -24,7 +25,7 @@ func NewWebAuthnService(repoSelector *repository.CouchDBSelector, env *types.Env
 	}
 	webauthnUserRepo, rErr := repoSelector.ChooseDB(repository.WebAuthnUser)
 	if rErr != nil {
-		global.Logger.Log("msg", "failed to choose webauthn user repository", "error", rErr)
+		level.Error(global.Logger).Log("msg", "failed to choose webauthn user repository", "error", rErr)
 		panic(rErr)
 	}
 	return &WebAuthnService{
@@ -41,7 +42,7 @@ func (s *WebAuthnService) GetUser(address string) (*types.WebAuhnUser, error) {
 	resp, err := s.webauthnUserRepo.GetByID(ctx, address)
 	if err != nil {
 		if err != types.ErrNotFound {
-			global.Logger.Log("msg", "failed to get user", "error", err)
+			level.Error(global.Logger).Log("msg", "failed to get user", "error", err)
 		}
 		return nil, err
 	}
@@ -49,7 +50,7 @@ func (s *WebAuthnService) GetUser(address string) (*types.WebAuhnUser, error) {
 	var user types.WebAuthnUserDB
 	mErr := repository.MapToObject(resp, &user)
 	if mErr != nil {
-		global.Logger.Log("msg", "failed to map object", "error", mErr)
+		level.Error(global.Logger).Log("msg", "failed to map object", "error", mErr)
 		return nil, mErr
 	}
 
@@ -66,7 +67,7 @@ func (s *WebAuthnService) SaveUser(user *types.WebAuhnUser) error {
 	resp, uErr := s.webauthnUserRepo.GetByID(ctx, newUserDB.Address)
 	if uErr != nil {
 		if uErr != types.ErrNotFound {
-			global.Logger.Log("msg", "failed to get user", "error", uErr)
+			level.Error(global.Logger).Log("msg", "failed to get user", "error", uErr)
 			return uErr
 		}
 	}
@@ -75,7 +76,7 @@ func (s *WebAuthnService) SaveUser(user *types.WebAuhnUser) error {
 		var existing types.WebAuthnUserDB
 		mErr := repository.MapToObject(resp.(*resty.Response), &existing)
 		if mErr != nil {
-			global.Logger.Log("msg", "failed to map object", "error", mErr)
+			level.Error(global.Logger).Log("msg", "failed to map object", "error", mErr)
 			return mErr
 		}
 		newUserDB.ID = existing.ID
@@ -84,7 +85,7 @@ func (s *WebAuthnService) SaveUser(user *types.WebAuhnUser) error {
 
 	err := s.webauthnUserRepo.Save(ctx, newUserDB.Address, newUserDB)
 	if err != nil {
-		global.Logger.Log("msg", "failed to save user", "error", err)
+		level.Error(global.Logger).Log("msg", "failed to save user", "error", err)
 		return err
 	}
 	return nil
@@ -108,14 +109,14 @@ func (s *WebAuthnService) GetUserByEmail(email string) (*types.WebAuthnUserDB, e
 		})
 	resp, err := client.Post(fmt.Sprintf("%s/_find", repository.WebAuthnUser))
 	if err != nil {
-		global.Logger.Log("msg", "failed to get user by email", "error", err)
+		level.Error(global.Logger).Log("msg", "failed to get user by email", "error", err)
 		return nil, err
 	}
 	if resp.Error() != nil {
 		if resp.StatusCode() == 404 {
 			return nil, types.ErrNotFound
 		}
-		global.Logger.Log("msg", "failed to get user by email", "error", resp.Error())
+		level.Error(global.Logger).Log("msg", "failed to get user by email", "error", resp.Error())
 		return nil, types.ErrInternal
 	}
 
@@ -125,7 +126,7 @@ func (s *WebAuthnService) GetUserByEmail(email string) (*types.WebAuthnUserDB, e
 	var existing map[string]interface{}
 	mErr := json.Unmarshal(resp.Body(), &existing)
 	if mErr != nil {
-		global.Logger.Log("msg", "failed to map object", "error", mErr)
+		level.Error(global.Logger).Log("msg", "failed to map object", "error", mErr)
 		return nil, mErr
 	}
 	// Ensure "docs" is a slice of interfaces and check if it's not empty
@@ -136,13 +137,13 @@ func (s *WebAuthnService) GetUserByEmail(email string) (*types.WebAuthnUserDB, e
 	// Convert the first element of "docs" to JSON for unmarshaling
 	docBytes, err := json.Marshal(docs[0])
 	if err != nil {
-		global.Logger.Log("msg", "failed to marshal document", "error", err)
+		level.Error(global.Logger).Log("msg", "failed to marshal document", "error", err)
 		return nil, err
 	}
 	// Unmarshal the JSON into the WebAuthnUserDB struct
 	var user types.WebAuthnUserDB
 	if err := json.Unmarshal(docBytes, &user); err != nil {
-		global.Logger.Log("msg", "failed to unmarshal document into user", "error", err)
+		level.Error(global.Logger).Log("msg", "failed to unmarshal document into user", "error", err)
 		return nil, err
 	}
 

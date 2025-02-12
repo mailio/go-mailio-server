@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/go-kit/log/level"
 	"github.com/go-redis/redis_rate/v10"
 	"github.com/hibiken/asynq"
 	"github.com/mailio/go-mailio-server/apiroutes"
@@ -162,7 +163,6 @@ func main() {
 	// loading configuration file
 	err := cfg.NewYamlConfig(configFile, &global.Conf)
 	if err != nil {
-		global.Logger.Log(err, "conf.yaml failed to load")
 		panic(fmt.Sprintf("%s: %v", "Failed to load conf.yaml", err.Error()))
 	}
 
@@ -236,7 +236,7 @@ func main() {
 		taskServer.Shutdown()
 	}()
 
-	global.Logger.Log("Server is ready to handle requests on port", global.Conf.Port)
+	level.Info(global.Logger).Log("Server is ready to handle requests on port", global.Conf.Port)
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		panic(fmt.Sprintf("%v\n", err))
 	}

@@ -9,10 +9,10 @@ import (
 	"fmt"
 	"net/mail"
 	"net/url"
-	"runtime/debug"
 	"strings"
 	"time"
 
+	"github.com/go-kit/log/level"
 	"github.com/hibiken/asynq"
 	mailiosmtp "github.com/mailio/go-mailio-server/email/smtp"
 	smtptypes "github.com/mailio/go-mailio-server/email/smtp/types"
@@ -37,16 +37,16 @@ func (msq *MessageQueue) SendSMTPMessage(fromMailioAddress string, email *types.
 	taskCanceled, tsErr := msq.env.RedisClient.Get(ctx, fmt.Sprintf("cancel:%s", taskId)).Result()
 	if tsErr != nil {
 		if tsErr != redis.Nil {
-			global.Logger.Log(tsErr.Error(), "failed to retrieve task status", taskId)
+			level.Error(global.Logger).Log("msg", "failed to retrieve task status", "taskId", taskId, "error", tsErr)
 		}
 	}
 	// if the user canceled the email sending, terminate function
 	if taskCanceled != "" {
 		_, tcdErr := msq.env.RedisClient.Del(ctx, fmt.Sprintf("cancel:%s", taskId)).Result()
 		if tcdErr != nil {
-			global.Logger.Log(tcdErr.Error(), "failed to delete task status", taskId)
+			level.Error(global.Logger).Log("msg", "failed to delete task status", "taskId", taskId, "error", tcdErr)
 		}
-		global.Logger.Log("task canceled", "task canceled", taskId)
+		level.Info(global.Logger).Log("msg", "task canceled", "taskId", taskId)
 		return nil
 	}
 
@@ -56,17 +56,17 @@ func (msq *MessageQueue) SendSMTPMessage(fromMailioAddress string, email *types.
 	// parse users from address
 	from, fromErr := mail.ParseAddress(email.From)
 	if fromErr != nil {
-		global.Logger.Log(fromErr.Error(), "failed to parse email address", email.From)
+		level.Error(global.Logger).Log("msg", "failed to parse email address", "from", email.From)
 		return fmt.Errorf("failed parsing email address: %v: %w", fromErr, asynq.SkipRetry)
 	}
 	domain := strings.Split(from.Address, "@")[1]
 	sendingDomain, sndErr := util.ExtractSmtpSendingDomain(domain)
 	if sndErr != nil {
-		global.Logger.Log(sndErr.Error(), "failed to extract sending domain from", email.From)
+		level.Error(global.Logger).Log("msg", "failed to extract sending domain", "from", email.From)
 		return fmt.Errorf("failed extracting sending domain: %v: %w", sndErr, asynq.SkipRetry)
 	}
 	if sendingDomain != domain {
-		global.Logger.Log("sending domain is different from the domain in the from address", "sendingDomain", sendingDomain, "fromDomain", domain)
+		level.Error(global.Logger).Log("msg", "sending domain is different from the domain in the from address", "sendingDomain", sendingDomain, "fromDomain", domain)
 		return fmt.Errorf("sending domain is different from the domain in the from address: %w", asynq.SkipRetry)
 	}
 	email.From = from.Address
@@ -74,7 +74,7 @@ func (msq *MessageQueue) SendSMTPMessage(fromMailioAddress string, email *types.
 	// include the senders name if in profile and user allows it
 	up, upErr := msq.userProfileService.Get(fromMailioAddress)
 	if upErr != nil {
-		global.Logger.Log(upErr.Error(), "failed to get user profile")
+		level.Error(global.Logger).Log("msg", "failed to get user profile", "error", upErr)
 	} else {
 		if strings.Contains(up.WhatToShare, "displayName") {
 			email.From = fmt.Sprintf("%q <%s>", up.DisplayName, from.Address)
@@ -83,7 +83,7 @@ func (msq *MessageQueue) SendSMTPMessage(fromMailioAddress string, email *types.
 
 	smtpEmail, smtpConvErr := util.ConvertToSmtpEmail(*email)
 	if smtpConvErr != nil {
-		global.Logger.Log(smtpConvErr.Error(), "failed to convert email")
+		level.Error(global.Logger).Log("msg", "failed to convert email", "error", smtpConvErr)
 		return fmt.Errorf("failed converting email: %v: %w", smtpConvErr, asynq.SkipRetry)
 	}
 
@@ -94,7 +94,7 @@ func (msq *MessageQueue) SendSMTPMessage(fromMailioAddress string, email *types.
 		for _, name := range smtpValidatorHandlers {
 			smtpVErr := smtpvalidator.GetHandler(name).Validate(smtpEmail)
 			if smtpVErr != nil {
-				global.Logger.Log(smtpVErr.Error(), "failed to validate email")
+				level.Error(global.Logger).Log("msg", "failed to validate email", "error", smtpVErr)
 				return fmt.Errorf("failed validating email: %v: %w", smtpVErr, asynq.SkipRetry)
 			}
 		}
@@ -103,14 +103,14 @@ func (msq *MessageQueue) SendSMTPMessage(fromMailioAddress string, email *types.
 	// finding the supported SMTP email handler from the senders email domain
 	mgHandler := mailiosmtp.GetHandler(sendingDomain)
 	if mgHandler == nil {
-		global.Logger.Log("failed retrieving an smtp handler")
+		level.Error(global.Logger).Log("msg", "failed retrieving an smtp handler")
 		return fmt.Errorf("failed retrieving an smtp handler: %w", asynq.SkipRetry)
 	}
 
 	// generate message ID
 	rfc2822MessageID, idErr := mailiosmtp.GenerateRFC2822MessageID(domain)
 	if idErr != nil {
-		global.Logger.Log(idErr.Error(), "failed to generate message ID")
+		level.Error(global.Logger).Log("msg", "failed to generate message ID", "error", idErr)
 		return fmt.Errorf("failed generating message ID: %v: %w", idErr, asynq.SkipRetry)
 	}
 	// set the message ID
@@ -120,14 +120,14 @@ func (msq *MessageQueue) SendSMTPMessage(fromMailioAddress string, email *types.
 	// download attachments from s3 and store in the email object
 	paErr := msq.processSendAttachments(smtpEmail)
 	if paErr != nil {
-		global.Logger.Log(paErr.Error(), "failed processing attachments")
+		level.Error(global.Logger).Log("msg", "failed processing attachments", "error", paErr)
 		return fmt.Errorf("failed processing attachments: %v: %w", paErr, asynq.SkipRetry)
 	}
 
 	// convert email to mime
 	mime, mErr := mailiosmtp.ToMime(smtpEmail, rfc2822MessageID)
 	if mErr != nil {
-		global.Logger.Log(mErr.Error(), "failed to create mime")
+		level.Error(global.Logger).Log("msg", "failed to create mime", "error", mErr)
 		return fmt.Errorf("failed converting email to mime: %v: %w", mErr, asynq.SkipRetry)
 	}
 
@@ -142,7 +142,7 @@ func (msq *MessageQueue) SendSMTPMessage(fromMailioAddress string, email *types.
 	// store the email in the database
 	emailBytes, ebErr := json.Marshal(email)
 	if ebErr != nil {
-		global.Logger.Log(ebErr.Error(), "failed to marshal email")
+		level.Error(global.Logger).Log("msg", "failed to marshal email", "error", ebErr)
 		return fmt.Errorf("failed marshaling email: %v: %w", ebErr, asynq.SkipRetry)
 	}
 	plainBody := base64.StdEncoding.EncodeToString(emailBytes)
@@ -177,7 +177,7 @@ func (msq *MessageQueue) SendSMTPMessage(fromMailioAddress string, email *types.
 	}
 	_, msErr := msq.userService.SaveMessage(fromMailioAddress, mm)
 	if msErr != nil {
-		global.Logger.Log(msErr.Error(), "failed to save message")
+		level.Error(global.Logger).Log("msg", "failed to save message", "error", msErr)
 		return fmt.Errorf("failed saving message: %v: %w", msErr, asynq.SkipRetry)
 	}
 
@@ -188,7 +188,7 @@ func (msq *MessageQueue) SendSMTPMessage(fromMailioAddress string, email *types.
 	for _, to := range tos {
 		pTo, pErr := mail.ParseAddress(to)
 		if pErr != nil {
-			global.Logger.Log(pErr.Error(), "failed to parse email address")
+			level.Error(global.Logger).Log("msg", "failed to parse email address", "error", pErr)
 			continue
 		}
 		msq.statisticsService.ProcessEmailStatistics(localUsersWebDID, pTo.Address)
@@ -206,32 +206,32 @@ func (msq *MessageQueue) SendSMTPMessage(fromMailioAddress string, email *types.
 	}
 	docID, err := mgHandler.SendMimeMail(smtpEmail.From, mime, allTos)
 	if err != nil {
-		global.Logger.Log(err.Error(), "failed to send smtp email")
+		level.Error(global.Logger).Log(err.Error(), "failed to send smtp email")
 		//TODO: store the email in the inbox folder if sending fails
 		return fmt.Errorf("failed sending smtp email: %v: %w", err, asynq.SkipRetry)
 	}
-	global.Logger.Log(fmt.Sprintf("smtp message sent: %s", docID), "message sent")
+	level.Info(global.Logger).Log(fmt.Sprintf("smtp message sent: %s", docID), "message sent")
 
 	// remove possible attachments to be removed (the cient reports those when only 1 type of recipient is present, but both encrypted and plain attachments is uploaded)
 	for _, att := range email.DeleteAttachments {
 		// delete the attachment
-		global.Logger.Log("deleting attachment", att)
+		level.Info(global.Logger).Log("deleting attachment", att)
 		parsedURL, pErr := url.Parse(att)
 		if pErr != nil {
-			global.Logger.Log(pErr.Error(), "failed to parse attachment url")
+			level.Error(global.Logger).Log(pErr.Error(), "failed to parse attachment url")
 			continue
 		}
 		// Extract the file key from the path (after the first "/")
 		split := strings.Split(parsedURL.Path, "/")
 		fileKey := fromMailioAddress + "/" + split[len(split)-1]
 		if fileKey == "" {
-			global.Logger.Log("error", "invalid attachment url", "attachmentUrl", att)
+			level.Error(global.Logger).Log("error", "invalid attachment url", "attachmentUrl", att)
 			continue
 		}
 		fileKey = strings.ReplaceAll(fileKey, "?enc=1", "")
 		dErr := msq.s3Service.DeleteAttachment(global.Conf.Storage.Bucket, fileKey)
 		if dErr != nil {
-			global.Logger.Log(dErr.Error(), "failed to delete attachment", att)
+			level.Error(global.Logger).Log(dErr.Error(), "failed to delete attachment", att)
 			continue
 		}
 	}
@@ -295,7 +295,7 @@ func (msq *MessageQueue) ReceiveSMTPMessage(email *smtptypes.Mail, taskId string
 		toDomain := strings.Split(to.Address, "@")[1]
 		smtpHandler := mailiosmtp.GetHandler(toDomain)
 		if smtpHandler == nil {
-			global.Logger.Log("failed retrieving an smtp handler")
+			level.Error(global.Logger).Log("msg", "failed retrieving an smtp handler")
 			return fmt.Errorf("failed retrieving an smtp handler: %w", asynq.SkipRetry)
 		}
 
@@ -308,7 +308,7 @@ func (msq *MessageQueue) ReceiveSMTPMessage(email *smtptypes.Mail, taskId string
 		userMapping, umErr := msq.userService.FindUserByScryptEmail(scryptedMail)
 		if umErr != nil {
 			if umErr == types.ErrNotFound {
-				global.Logger.Log("error, find user by scrypt not found", to.Address, umErr.Error())
+				level.Error(global.Logger).Log("error", "find user by scrypt not found", to.Address, umErr)
 				sendBounce(to, email, smtpHandler, "4.3.0", fmt.Sprintf("Recipient not found: %s", to.Address))
 				continue
 			}
@@ -317,12 +317,12 @@ func (msq *MessageQueue) ReceiveSMTPMessage(email *smtptypes.Mail, taskId string
 		// retrieve users profile
 		userProfile, upErr := msq.userProfileService.Get(userMapping.MailioAddress)
 		if upErr != nil {
-			global.Logger.Log("error", upErr.Error())
+			level.Error(global.Logger).Log("error", "failed to get user profile", to.Address, upErr)
 			sendBounce(to, email, smtpHandler, "4.3.0", fmt.Sprintf("Recipient not found: %s", to.Address))
 			continue
 		}
 		if !userProfile.Enabled {
-			global.Logger.Log("user disabled", userMapping.MailioAddress)
+			level.Error(global.Logger).Log("user disabled", userMapping.MailioAddress)
 			sendBounce(to, email, smtpHandler, "5.1.1", "Mailbox unavailable")
 			continue
 		}
@@ -332,7 +332,7 @@ func (msq *MessageQueue) ReceiveSMTPMessage(email *smtptypes.Mail, taskId string
 
 		stats, sErr := msq.userProfileService.Stats(userMapping.MailioAddress)
 		if sErr != nil {
-			global.Logger.Log("error retrieving disk usage stats", sErr.Error())
+			level.Error(global.Logger).Log("retrieving disk usage stats", sErr)
 		}
 		totalDiskUsage := stats.ActiveSize + totalDiskUsageFromHandlers
 		if totalDiskUsage >= userProfile.DiskSpace {
@@ -344,17 +344,17 @@ func (msq *MessageQueue) ReceiveSMTPMessage(email *smtptypes.Mail, taskId string
 		paErr := msq.processReceiveAttachments(email, userMapping.MailioAddress)
 		if paErr != nil {
 			if paErr == types.ErrMessageTooLarge {
-				global.Logger.Log("attachment too large", "messageId", email.MessageId)
+				level.Warn(global.Logger).Log("error", "attachment too large", "messageId", email.MessageId)
 				sendBounce(to, email, smtpHandler, "5.3.4", "Message too large")
 				continue
 			}
 			if paErr.Error() == "malware detected" {
-				global.Logger.Log("malware detected", "messageId", email.MessageId)
+				level.Warn(global.Logger).Log("error", "malware detected", "messageId", email.MessageId)
 				sendBounce(to, email, smtpHandler, "5.6.1", "Malware detected")
 				isSpam = true
 				securityStatus = "malware"
 			}
-			global.Logger.Log("error processing attachments", paErr.Error())
+			level.Error(global.Logger).Log("error processing attachments", paErr.Error())
 			sendBounce(to, email, smtpHandler, "4.5.1", "Local error in processing")
 			continue
 		}
@@ -365,7 +365,7 @@ func (msq *MessageQueue) ReceiveSMTPMessage(email *smtptypes.Mail, taskId string
 			handshake, hErr := services.GetHandshakeByID(msq.userRepo, userMapping.MailioAddress, to.Address)
 			if hErr != nil {
 				if hErr != types.ErrNotFound {
-					global.Logger.Log("error finding handshake to ", to.Address, userMapping.MailioAddress, hErr.Error())
+					level.Info(global.Logger).Log("error finding handshake to ", to.Address, userMapping.MailioAddress)
 					// ignore the error
 				}
 			}
@@ -379,7 +379,7 @@ func (msq *MessageQueue) ReceiveSMTPMessage(email *smtptypes.Mail, taskId string
 				// if handshake hasn't deemed the email to be in the inbox, then check statistics
 				f, fErr := msq.selectMailFolder(email.From.Address, userMapping.MailioAddress)
 				if fErr != nil {
-					global.Logger.Log("error selecting mail folder", fErr.Error())
+					level.Error(global.Logger).Log("error selecting mail folder", fErr.Error())
 					folder = types.MailioFolderInbox // default to inbox
 				} else {
 					folder = f
@@ -390,7 +390,7 @@ func (msq *MessageQueue) ReceiveSMTPMessage(email *smtptypes.Mail, taskId string
 		// prepare the parsed email to be stored in database
 		emailMarshalled, mErr := json.Marshal(email)
 		if mErr != nil {
-			global.Logger.Log("error marshalling email", mErr.Error())
+			level.Error(global.Logger).Log("error marshalling email", mErr.Error())
 			return nil
 		}
 		// prepare the "DIDComm" extended message for regular SMTP emails (which is not technically DIDComm, only for client main json structure compatibility)
@@ -417,10 +417,10 @@ func (msq *MessageQueue) ReceiveSMTPMessage(email *smtptypes.Mail, taskId string
 		}
 		mm, mErr := msq.userService.SaveMessage(userMapping.MailioAddress, mailioMessage)
 		if mErr != nil {
-			global.Logger.Log("error saving message", mErr.Error())
+			level.Error(global.Logger).Log("error saving message", mErr.Error())
 			return mErr
 		}
-		global.Logger.Log("message saved", mm.ID)
+		level.Info(global.Logger).Log("message saved", mm.ID)
 
 		// process received email statistics (for local recipient always use full web did for statistics)
 		localUsersWebDID := "did:web:" + global.Conf.Mailio.ServerDomain + "#" + userMapping.MailioAddress
@@ -441,12 +441,12 @@ func (msq *MessageQueue) ReceiveSMTPMessage(email *smtptypes.Mail, taskId string
 func sendBounce(bounceFromEmail mail.Address, email *smtptypes.Mail, smtpHandler mailiosmtp.SmtpHandler, code, message string) error {
 	bounceMail, bErr := mailiosmtp.ToBounce(email.From, *email, code, message, global.Conf.Mailio.ServerDomain)
 	if bErr != nil {
-		global.Logger.Log("error", bErr.Error())
+		level.Error(global.Logger).Log("bounce preparation", bErr.Error())
 		return bErr
 	}
 	_, sndErr := smtpHandler.SendMimeMail(bounceFromEmail, bounceMail, []mail.Address{email.From})
 	if sndErr != nil {
-		global.Logger.Log("error sending bounce email", sndErr.Error())
+		level.Error(global.Logger).Log("error sending bounce email", sndErr.Error())
 		return sndErr
 	}
 	return nil
@@ -507,13 +507,13 @@ func (msq *MessageQueue) processReceiveAttachments(email *smtptypes.Mail, recipi
 		uploadedAttachments := make([]*smtptypes.SmtpAttachment, 0)
 		for _, att := range email.Attachments {
 			if att.Content == nil {
-				global.Logger.Log("attachment content is nil", att.ContentID, "filename:", att.Filename, "messageId", email.MessageId)
+				level.Error(global.Logger).Log("attachment content is nil", att.ContentID, "filename:", att.Filename, "messageId", email.MessageId)
 				continue
 			}
 			if att.Content != nil {
 
 				if len(att.Content) > 30*1024*1024 {
-					global.Logger.Log("attachment content is too large", att.ContentID, "filename:", att.Filename, "messageId", email.MessageId, "size: ", len(att.Content))
+					level.Warn(global.Logger).Log("attachment content is too large", att.ContentID, "filename:", att.Filename, "messageId", email.MessageId, "size: ", len(att.Content))
 					// deny attachments larger than 30MB
 					return types.ErrMessageTooLarge
 				}
@@ -541,15 +541,13 @@ func (msq *MessageQueue) processReceiveAttachments(email *smtptypes.Mail, recipi
 				// check for malware of the attachment
 				if msq.malwareService.IsMalware(fileMd5) {
 					// TODO: store email but with warning of malware?
-					global.Logger.Log("malware detected", "filename", att.Filename, "md5", fileMd5)
+					level.Error(global.Logger).Log("malware detected", "filename", att.Filename, "md5", fileMd5)
 					return fmt.Errorf("malware detected: %w", asynq.SkipRetry)
 				}
 				path := recipientAddress + "/" + fileMd5 + "_" + now
 				p, err := msq.s3Service.UploadAttachment(global.Conf.Storage.Bucket, path, att.Content, att.ContentType)
 				if err != nil {
-					fmt.Printf("Error uploading to S3: %v\n", err)
-					debug.PrintStack()
-					global.Logger.Log(err.Error(), "failed to upload attachment", path)
+					level.Error(global.Logger).Log(err.Error(), "failed to upload attachment", path)
 					return fmt.Errorf("failed uploading attachment: %v", err)
 				}
 				uploadedAttachment.ContentURL = &p
@@ -580,12 +578,12 @@ func (msq *MessageQueue) processSendAttachments(email *smtptypes.Mail) error {
 			var newAtt smtptypes.SmtpAttachment
 			dcErr := util.DeepCopy(att, &newAtt)
 			if dcErr != nil {
-				global.Logger.Log(dcErr.Error(), "failed to copy attachment")
+				level.Error(global.Logger).Log(dcErr.Error(), "failed to copy attachment")
 				return fmt.Errorf("failed copying attachment: %v: %w", dcErr, asynq.SkipRetry)
 			}
 			content, dErr := msq.s3Service.DownloadAttachment(*att.ContentURL)
 			if dErr != nil {
-				global.Logger.Log(dErr.Error(), "failed to download attachment")
+				level.Error(global.Logger).Log(dErr.Error(), "failed to download attachment")
 				return fmt.Errorf("failed downloading attachment: %v: %w", dErr, asynq.SkipRetry)
 			}
 			newAtt.Content = content

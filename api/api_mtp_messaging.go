@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
+	"github.com/go-kit/log/level"
 	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
 	"github.com/hibiken/asynq"
@@ -72,13 +73,13 @@ func (ms *MessagingMTPApi) ReceiveMessage(c *gin.Context) {
 	}
 	cbBytes, cbErr := util.CborEncode(resp.DIDCommRequest)
 	if cbErr != nil {
-		global.Logger.Log(cbErr.Error(), "failed to cbor encode response")
+		level.Error(global.Logger).Log(cbErr.Error(), "failed to cbor encode response")
 		ApiErrorf(c, http.StatusInternalServerError, "failed to cbor encode response")
 		return
 	}
 	signature, sErr := util.Sign(cbBytes, global.PrivateKey)
 	if sErr != nil {
-		global.Logger.Log(sErr.Error(), "failed to sign response")
+		level.Error(global.Logger).Log(sErr.Error(), "failed to sign response")
 		ApiErrorf(c, http.StatusInternalServerError, "failed to sign response")
 		return
 	}
@@ -97,7 +98,7 @@ func (ms *MessagingMTPApi) ReceiveMessage(c *gin.Context) {
 
 	receiveTask, tErr := types.NewDIDCommReceiveTask(task)
 	if tErr != nil {
-		global.Logger.Log(tErr.Error(), "failed to create task")
+		level.Error(global.Logger).Log(tErr.Error(), "failed to create task")
 		ApiErrorf(c, http.StatusInternalServerError, "failed to create task")
 		return
 	}
@@ -108,11 +109,11 @@ func (ms *MessagingMTPApi) ReceiveMessage(c *gin.Context) {
 		asynq.Timeout(60*time.Second), // max time to process the task
 		asynq.TaskID(uniqueTaskId))    // unique task id
 	if tqErr != nil {
-		global.Logger.Log(tqErr.Error(), "failed to send message")
+		level.Error(global.Logger).Log(tqErr.Error(), "failed to send message")
 		ApiErrorf(c, http.StatusInternalServerError, "failed to send message")
 		return
 	}
-	global.Logger.Log("message received", input.DIDCommRequest.DIDCommMessage.ID, "task id", taskInfo.ID)
+	level.Info(global.Logger).Log("message received", input.DIDCommRequest.DIDCommMessage.ID, "task id", taskInfo.ID)
 
 	c.JSON(http.StatusAccepted, resp)
 }

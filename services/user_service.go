@@ -7,11 +7,11 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"runtime/debug"
 	"strconv"
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
+	"github.com/go-kit/log/level"
 	"github.com/go-resty/resty/v2"
 	"github.com/mailio/go-mailio-did/did"
 	"github.com/mailio/go-mailio-server/global"
@@ -63,7 +63,7 @@ func (us *UserService) CreateDatabase(user *types.User, databasePassword string)
 
 	userRepo, rErr := us.repoSelector.ChooseDB(repository.User)
 	if rErr != nil {
-		global.Logger.Log(rErr, "Failed to choose repository")
+		level.Error(global.Logger).Log(rErr, "Failed to choose repository")
 		return rErr
 	}
 	err := userRepo.Save(ctx,
@@ -76,7 +76,7 @@ func (us *UserService) CreateDatabase(user *types.User, databasePassword string)
 			"encryptedEmail": user.EncryptedEmail,
 			"created":        user.Created})
 	if err != nil {
-		global.Logger.Log(err, "Failed to register user")
+		level.Error(global.Logger).Log(err, "Failed to register user")
 		return err
 	}
 
@@ -89,7 +89,7 @@ func (us *UserService) CreateDatabase(user *types.User, databasePassword string)
 
 		headResponse, hErr := c.R().Get(hexUser)
 		if hErr != nil {
-			global.Logger.Log(hErr, "failed to create user database")
+			level.Error(global.Logger).Log(hErr, "failed to create user database")
 			return errors.New("failed to create user database")
 		}
 		if headResponse.StatusCode() == 200 {
@@ -102,7 +102,7 @@ func (us *UserService) CreateDatabase(user *types.User, databasePassword string)
 			time.Sleep(time.Duration(backoff) * time.Millisecond)
 			continue
 		} else {
-			global.Logger.Log(headResponse.String(), "failed to create user database")
+			level.Error(global.Logger).Log(headResponse.String(), "failed to create user database")
 			return errors.New("failed to create user database")
 		}
 	}
@@ -110,7 +110,7 @@ func (us *UserService) CreateDatabase(user *types.User, databasePassword string)
 	// Create folder index: created, folder
 	indErr := repository.CreateFolderIndex(userRepo, hexUser)
 	if indErr != nil {
-		global.Logger.Log(indErr, "failed to create folder index")
+		level.Error(global.Logger).Log(indErr, "failed to create folder index")
 		return indErr
 	}
 	return nil
@@ -130,7 +130,7 @@ func (us *UserService) CreateUser(user *types.User, mk *did.MailioKey, databaseP
 
 	dbErr := us.CreateDatabase(user, databasePassword)
 	if dbErr != nil {
-		global.Logger.Log(dbErr, "failed to create database")
+		level.Error(global.Logger).Log(dbErr, "failed to create database")
 		return nil, dbErr
 	}
 
@@ -142,13 +142,13 @@ func (us *UserService) CreateUser(user *types.User, mk *did.MailioKey, databaseP
 		Modified:  time.Now().UTC().UnixMilli(),
 	})
 	if upErr != nil {
-		global.Logger.Log(upErr, "failed to save user profile")
+		level.Error(global.Logger).Log(upErr, "failed to save user profile")
 		return nil, upErr
 	}
 
 	ssiErr := us.ssiService.StoreRegistrationSSI(mk)
 	if ssiErr != nil {
-		global.Logger.Log(ssiErr, "failed to store registration SSI")
+		level.Error(global.Logger).Log(ssiErr, "failed to store registration SSI")
 		return nil, ssiErr
 	}
 
@@ -199,7 +199,7 @@ func (us *UserService) MapEmailToMailioAddress(user *types.User) (*types.EmailTo
 func (us *UserService) FindUserByScryptEmail(scryptEmail string) (*types.EmailToMailioMapping, error) {
 	repo, err := us.repoSelector.ChooseDB(repository.MailioMapping)
 	if err != nil {
-		global.Logger.Log(err, "failed to choose repository")
+		level.Error(global.Logger).Log(err, "failed to choose repository")
 		return nil, err
 	}
 	return getUserByScryptEmail(repo, scryptEmail)
@@ -220,25 +220,24 @@ func (us *UserService) SaveMessage(userAddress string, mailioMessage *types.Mail
 		var getError types.CouchDBError
 		getResponse, getErr := us.restyClient.R().SetError(getError).Get(url)
 		if getErr != nil {
-			global.Logger.Log(getErr.Error(), "failed to get message", hexUser)
+			level.Error(global.Logger).Log(getErr, "failed to get message", hexUser)
 			return nil, getErr
 		}
 		if getResponse.StatusCode() != 404 {
 			// only "good" response is 404
-			global.Logger.Log(getResponse.String(), "failed to get message", hexUser, "msg id: ", mailioMessage.ID)
+			level.Error(global.Logger).Log(getResponse.String(), "failed to get message", hexUser, "msg id: ", mailioMessage.ID)
 			return nil, backoff.Permanent(types.ErrRecordExists) // Wrap in backoff.Permanent to stop retries
 		}
 		var postResult types.CouchDBResponse
 		var postError types.CouchDBError
 		httpResp, httpErr := us.restyClient.R().SetBody(mailioMessage).SetResult(&postResult).SetError(&postError).Put(url)
 		if httpErr != nil {
-			global.Logger.Log(httpErr.Error(), "failed to save message", hexUser)
+			level.Error(global.Logger).Log(httpErr, "failed to save message", hexUser)
 			return nil, httpErr
 		}
 		if httpResp.IsError() {
-			stackTrace := string(debug.Stack())
-			global.Logger.Log(httpResp.String(), "failed to save message", hexUser, "msgId: ", mailioMessage.ID, postError.Error, postError.Reason)
-			return nil, fmt.Errorf("code: %s, reason: %s, trace: %v", postError.Error, postError.Reason, stackTrace)
+			level.Error(global.Logger).Log(httpResp.String(), "failed to save message", hexUser, "msgId: ", mailioMessage.ID)
+			return nil, fmt.Errorf("code: %s, reason: %s", postError.Error, postError.Reason)
 		}
 		return mailioMessage, nil
 	}
@@ -262,16 +261,16 @@ func (us *UserService) SaveMessage(userAddress string, mailioMessage *types.Mail
 		},
 		backoff.WithContext(b, ctx),
 		func(err error, d time.Duration) {
-			global.Logger.Log("retrying message save ", "delay", d, "docID", mailioMessage.ID, "error", err)
+			level.Error(global.Logger).Log("retrying message save ", "delay", d, "docID", mailioMessage.ID, "error", err)
 		},
 	)
 
 	if err != nil {
 		if errors.Is(err, types.ErrRecordExists) {
-			global.Logger.Log("record already exists, no retries attempted", "docID", mailioMessage.ID)
+			level.Error(global.Logger).Log("record already exists, no retries attempted", "docID", mailioMessage.ID)
 			return mailioMessage, nil
 		}
-		global.Logger.Log("operation failed after retries", "error", err)
+		level.Error(global.Logger).Log("operation failed after retries", "error", err)
 		return nil, err
 	}
 
@@ -284,11 +283,11 @@ func (us *UserService) SaveMessage(userAddress string, mailioMessage *types.Mail
 func (us *UserService) DeleteExpiredTransferKeys() {
 	transferKeyRepo, trErr := us.repoSelector.ChooseDB(repository.DeviceKeyTransfer)
 	if trErr != nil {
-		global.Logger.Log(trErr, "failed to choose repository")
+		level.Error(global.Logger).Log(trErr, "failed to choose repository")
 		return
 	}
 	err := RemoveExpiredDocuments(transferKeyRepo, "transferkey", "oldkeys", 5)
 	if err != nil {
-		global.Logger.Log("Error removing expired transfer keys", "%s", err.Error())
+		level.Error(global.Logger).Log(err, "failed to remove expired transfer keys")
 	}
 }

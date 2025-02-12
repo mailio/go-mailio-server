@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-kit/log/level"
 	"github.com/go-playground/validator/v10"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/services"
@@ -52,7 +53,7 @@ func (a *UserProfileApi) GetUserProfile(c *gin.Context) {
 	totalDiskUsageFromHandlers := util.GetDiskUsageFromDiskHandlers(address)
 	stats, sErr := a.userProfileService.Stats(address)
 	if sErr != nil {
-		global.Logger.Log("error retrieving disk usage stats", sErr.Error())
+		level.Error(global.Logger).Log("error retrieving disk usage stats", sErr.Error())
 	}
 	up, err := a.userProfileService.Get(address)
 	if err != nil {

@@ -33,14 +33,14 @@ func getUserByScryptEmail(repo repository.Repository, hashedEmail string) (*type
 	response, eErr := repo.GetByID(ctx, id)
 	if eErr != nil {
 		if eErr != types.ErrNotFound {
-			global.Logger.Log("msg", "error while getting user by email", "err", eErr)
+			level.Warn(global.Logger).Log("msg", "error while getting user by email", "err", eErr)
 		}
 		return nil, eErr
 	}
 	var userMapping types.EmailToMailioMapping
 	mErr := repository.MapToObject(response, &userMapping)
 	if mErr != nil {
-		global.Logger.Log("msg", "error while mapping object", "err", mErr)
+		level.Error(global.Logger).Log("msg", "error while mapping object", "err", mErr)
 		return nil, mErr
 	}
 	return &userMapping, nil
@@ -59,7 +59,7 @@ func resolveDomain(domainRepo repository.Repository, domain string, forceDiscove
 	// check local database
 	response, err := domainRepo.GetByID(ctx, domain)
 	if err != nil && err != types.ErrNotFound {
-		global.Logger.Log("msg", "error while getting domain", "err", err)
+		level.Error(global.Logger).Log("msg", "error while getting domain", "err", err)
 		return nil, err
 	}
 
@@ -69,7 +69,7 @@ func resolveDomain(domainRepo repository.Repository, domain string, forceDiscove
 		resp := response.(*resty.Response)
 		if resp.StatusCode() == 200 {
 			if err := repository.MapToObject(response, &domainObj); err != nil {
-				global.Logger.Log("msg", "error while mapping object", "err", err)
+				level.Error(global.Logger).Log("msg", "error while mapping object", "err", err)
 				return nil, err
 			}
 		}
@@ -122,7 +122,7 @@ func resolveDomain(domainRepo repository.Repository, domain string, forceDiscove
 		}
 		newDomainObj.MailioCheckError = uErr.Error()
 		saveDomain(ctx, domainRepo, domain, newDomainObj)
-		global.Logger.Log("msg", "error while updating domain", "err", uErr)
+		level.Error(global.Logger).Log("msg", "error while updating domain", "err", uErr)
 		return nil, uErr
 	}
 	saveDomain(ctx, domainRepo, domain, newDomainObj)
@@ -147,7 +147,7 @@ func updateMailioInfo(domainObj *types.Domain, discovery *types.Discovery) {
 func updateDomain(domainObj *types.Domain, domain string) error {
 	supportsStandard, cErr := util.CheckMXRecords(domain)
 	if cErr != nil {
-		global.Logger.Log("msg", "error while checking MX records", "err", cErr)
+		level.Error(global.Logger).Log("msg", "error while checking MX records", "err", cErr)
 		return fmt.Errorf("failed to check MX record for domain %s: %w", domain+", "+cErr.Error(), types.ErrMxRecordCheckFailed)
 	}
 	domainObj.SupportsStandardEmails = supportsStandard
@@ -196,7 +196,7 @@ func tryDiscoverMailio(domain string) (*types.Discovery, error) {
 	host := formatHost(domain)
 	lookupHost, err := idna.Lookup.ToASCII(getHostWithoutPort(host))
 	if err != nil {
-		global.Logger.Log(err.Error(), "error converting host to IDNA")
+		level.Error(global.Logger).Log(err.Error(), "error converting host to IDNA")
 		return nil, err
 	}
 
@@ -226,7 +226,7 @@ func formatHost(domain string) string {
 func getHostWithoutPort(host string) string {
 	parsedHost, err := url.Parse(host)
 	if err != nil {
-		global.Logger.Log(err.Error(), "error while parsing host")
+		level.Error(global.Logger).Log(err.Error(), "error while parsing host")
 		return host
 	}
 
@@ -251,7 +251,7 @@ func getLocalAndRemoteRecipients(lookups []*types.DIDLookup) ([]*types.DIDLookup
 	for _, lookup := range lookups {
 		lookupEmailParsed, lepErr := mail.ParseAddress(lookup.Email)
 		if lepErr != nil {
-			global.Logger.Log("msg", "failed to parse email address", "err", lepErr)
+			level.Error(global.Logger).Log("msg", "failed to parse email address", "err", lepErr)
 			return nil, nil, lepErr
 		}
 		lookupEmailParsed.Address = strings.ToLower(lookupEmailParsed.Address)
@@ -296,9 +296,9 @@ func RemoveExpiredDocuments(repo repository.Repository, designDoc string, viewNa
 		if err != nil {
 			if r, ok := response.(*resty.Response); ok {
 				data := r.Body()
-				global.Logger.Log("msg", "error while getting expired documents", "err", err, "couchdb response: ", string(data))
+				level.Error(global.Logger).Log("msg", "error while getting expired documents", "err", err, "couchdb response: ", string(data))
 			}
-			global.Logger.Log("msg", "error while getting expired documents", "err", err)
+			level.Error(global.Logger).Log("msg", "error while getting expired documents", "err", err)
 			return err
 		}
 
@@ -314,14 +314,14 @@ func RemoveExpiredDocuments(repo repository.Repository, designDoc string, viewNa
 		if err != nil {
 			if r, ok := response.(*resty.Response); ok {
 				data := r.Body()
-				global.Logger.Log("msg", "error while getting expired documents", "err", err, "couchdb response: ", string(data))
+				level.Error(global.Logger).Log("msg", "error while getting expired documents", "err", err, "couchdb response: ", string(data))
 			}
-			global.Logger.Log("msg", "error while getting expired documents", "err", err)
+			level.Error(global.Logger).Log("msg", "error while getting expired documents", "err", err)
 			return err
 		}
 
 		if len(expiredDocs.Rows) > 0 {
-			global.Logger.Log("msg", "expired documents count", "count", expiredDocs.TotalRows)
+			level.Info(global.Logger).Log("msg", "expired documents count", "count", expiredDocs.TotalRows)
 
 			bulkDelete := []types.BaseDocument{}
 			for _, doc := range expiredDocs.Rows {

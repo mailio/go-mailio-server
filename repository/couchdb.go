@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
+	"github.com/go-kit/log/level"
 	"github.com/go-resty/resty/v2"
 	"github.com/jarcoal/httpmock"
 	"github.com/mailio/go-mailio-server/global"
@@ -179,13 +180,13 @@ func (c *CouchDBRepository) Save(ctx context.Context, docID string, data interfa
 		},
 		backoff.WithContext(b, ctx),
 		func(err error, d time.Duration) {
-			global.Logger.Log("retrying save after conflict", "delay", d, "docID", docID, "error", err)
+			level.Warn(global.Logger).Log("retrying save after conflict", "delay", d, "docID", docID, "error", err)
 		},
 	)
 
 	// Final error after retries
 	if err != nil {
-		global.Logger.Log("save operation failed", "docID", docID, "error", err.Error())
+		level.Error(global.Logger).Log("save operation failed", "docID", docID, "error", err.Error())
 		return types.ErrConflict
 	}
 	return nil

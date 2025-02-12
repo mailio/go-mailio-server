@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-kit/log/level"
 	"github.com/go-playground/validator/v10"
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwt"
@@ -223,7 +224,7 @@ func (da *DIDApi) FetchDIDByWebDID(c *gin.Context) {
 		fromDID, fdErr := did.ParseDID(webDid)
 		if fdErr != nil {
 			//the sender cannot be validated, no retryies are allowed. Message fails permanently
-			global.Logger.Log(fdErr.Error(), "failed to parse sender DID", webDid)
+			level.Error(global.Logger).Log("msg", fdErr.Error(), "context", "failed to parse sender DID", "webDid", webDid)
 			ApiErrorf(c, http.StatusBadRequest, "invalid DID")
 			return
 		}

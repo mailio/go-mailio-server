@@ -9,6 +9,7 @@ import (
 	"net/mail"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-kit/log/level"
 
 	"github.com/mailio/go-mailio-did/did"
 	"github.com/mailio/go-mailio-server/global"
@@ -69,7 +70,7 @@ func validateSignature(inputChallenge string, ed25519PublicKeyBase64 string, sig
 func ValidateMailioKeys(email string, ed25519PublicKey string, challengeNonce string, mailioAddress string) error {
 	_, err := mail.ParseAddress(email)
 	if err != nil {
-		global.Logger.Log("error", "invalid email address", "email", email, "error", err)
+		level.Error(global.Logger).Log("error", "invalid email address", "email", email, "error", err)
 		return err
 	}
 	if !util.IsEd25519PublicKey(ed25519PublicKey) {

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 
+	"github.com/go-kit/log/level"
 	"github.com/go-resty/resty/v2"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/types"
@@ -20,7 +21,7 @@ func handleError(reqErr *resty.Response) error {
 		var mytest map[string]interface{}
 		uErr := json.Unmarshal(reqErr.Body(), &mytest)
 		if uErr != nil {
-			global.Logger.Log(uErr, "Failed to unmarshal response")
+			level.Error(global.Logger).Log(uErr, "Failed to unmarshal response")
 			return uErr
 		}
 		if errDesc, ok := mytest["error"]; ok {

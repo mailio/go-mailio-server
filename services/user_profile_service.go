@@ -8,6 +8,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/go-kit/log/level"
 	"github.com/go-resty/resty/v2"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/repository"
@@ -37,14 +38,14 @@ func (s *UserProfileService) GetFromCache(address string) *types.UserProfile {
 	val, cErr := s.env.RedisClient.Get(ctx, address).Result()
 	if cErr != nil {
 		if cErr != redis.Nil {
-			global.Logger.Log("CacheError", "UserProfileService.Get", cErr.Error())
+			level.Error(global.Logger).Log("CacheError", "UserProfileService.Get", cErr.Error())
 		}
 		return nil
 	}
 	var userProfile types.UserProfile
 	err := json.Unmarshal([]byte(val), &userProfile)
 	if err != nil {
-		global.Logger.Log("CacheError", "UserProfileService.Get Unmarshal error", err.Error())
+		level.Error(global.Logger).Log("CacheError", "UserProfileService.Get Unmarshal error", err.Error())
 		return nil
 	}
 	if userProfile.BaseDocument.ID != "" {
@@ -59,7 +60,7 @@ func (s *UserProfileService) DeleteFromCache(address string) error {
 
 	cErr := s.env.RedisClient.Del(ctx, address).Err()
 	if cErr != nil {
-		global.Logger.Log("CacheError", "UserProfileService.Delete", cErr.Error())
+		level.Error(global.Logger).Log("CacheError", "UserProfileService.Delete", cErr.Error())
 		return cErr
 	}
 	return nil
@@ -71,13 +72,13 @@ func (s *UserProfileService) SaveToCache(address string, profile *types.UserProf
 
 	profileString, mErr := json.Marshal(profile)
 	if mErr != nil {
-		global.Logger.Log("CacheError", "UserProfileService.Set", "failed to marshal", mErr.Error())
+		level.Error(global.Logger).Log("CacheError", "UserProfileService.Set", "failed to marshal", mErr.Error())
 		return mErr
 	}
 	// save to cache
 	cErr := s.env.RedisClient.Set(ctx, address, profileString, 0).Err()
 	if cErr != nil {
-		global.Logger.Log("CacheError", "UserProfileService.Set", "failed to store to cache", cErr.Error())
+		level.Error(global.Logger).Log("CacheError", "UserProfileService.Set", "failed to store to cache", cErr.Error())
 		return cErr
 	}
 	return nil
@@ -123,7 +124,7 @@ func (s *UserProfileService) Save(address string, profile *types.UserProfile) (*
 
 	existing, eErr := s.Get(address)
 	if eErr != nil && eErr != types.ErrNotFound {
-		global.Logger.Log("UserProfileService.Save", "failed to get", eErr.Error())
+		level.Error(global.Logger).Log("UserProfileService.Save", "failed to get", eErr.Error())
 		return nil, eErr
 	}
 	if existing != nil {
@@ -135,7 +136,7 @@ func (s *UserProfileService) Save(address string, profile *types.UserProfile) (*
 		if err.Error() == "conflict" {
 			return nil, types.ErrConflict
 		}
-		global.Logger.Log("UserProfileService.Save", "failed to save", err.Error())
+		level.Error(global.Logger).Log("UserProfileService.Save", "failed to save", err.Error())
 		return nil, err
 	}
 	// delete from cache user profile (should be refreshed on the Get next request)
@@ -164,7 +165,7 @@ func (s *UserProfileService) Stats(address string) (*types.UserProfileStats, err
 	var statsMap map[string]interface{}
 	uErr := json.Unmarshal(response.Body(), &statsMap)
 	if uErr != nil {
-		global.Logger.Log("UserProfileService.Stats", "failed to unmarshal", uErr.Error())
+		level.Error(global.Logger).Log("UserProfileService.Stats", "failed to unmarshal", uErr.Error())
 		return nil, uErr
 	}
 	upStats := types.UserProfileStats{}
@@ -205,7 +206,7 @@ func (s *UserProfileService) Delete(address string) error {
 
 	err := s.userProfileRepo.Delete(ctx, address)
 	if err != nil {
-		global.Logger.Log("UserProfileService.Delete", "failed to delete", err.Error())
+		level.Error(global.Logger).Log("UserProfileService.Delete", "failed to delete", err.Error())
 		return err
 	}
 	// delete from cache user profile

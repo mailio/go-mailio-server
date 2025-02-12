@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-kit/log/level"
 	"github.com/go-playground/validator/v10"
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
@@ -120,7 +121,7 @@ func (a *WebAuthnApi) RegistrationOptions(c *gin.Context) {
 	}
 	redStatus := a.env.RedisClient.Set(ctx, redisSesskey, sessionBytes, time.Minute*5)
 	if redStatus.Err() != nil {
-		global.Logger.Log("error", fmt.Sprintf("failed to save session: %s", redStatus.Err()))
+		level.Error(global.Logger).Log("error", fmt.Sprintf("failed to save session: %s", redStatus.Err()))
 		ApiErrorf(c, http.StatusInternalServerError, "failed to store session")
 		return
 	}
@@ -159,14 +160,14 @@ func (a *WebAuthnApi) VerifyRegistration(c *gin.Context) {
 	redisSesskey := "webauthn_user_sess_" + strings.Replace(req.SmartKeyPayload.Address, "0x", "", -1)
 	sessBytes, err := a.env.RedisClient.Get(ctx, redisSesskey).Result()
 	if err != nil {
-		global.Logger.Log("error", fmt.Sprintf("failed to get session: %s", err))
+		level.Error(global.Logger).Log("error", fmt.Sprintf("failed to get session: %s", err))
 		ApiErrorf(c, http.StatusForbidden, "session not found")
 		return
 	}
 	var session webauthn.SessionData
 	err = json.Unmarshal([]byte(sessBytes), &session)
 	if err != nil {
-		global.Logger.Log("error", fmt.Sprintf("failed to unmarshal session: %s", err))
+		level.Error(global.Logger).Log("error", fmt.Sprintf("failed to unmarshal session: %s", err))
 		ApiErrorf(c, http.StatusInternalServerError, "failed to unmarshal session")
 		return
 	}
@@ -250,13 +251,13 @@ func (a *WebAuthnApi) VerifyRegistration(c *gin.Context) {
 	reader := io.NopCloser(bytes.NewReader(attRespMrsh))
 	pcc, pccErr := protocol.ParseCredentialCreationResponseBody(reader)
 	if pccErr != nil {
-		global.Logger.Log("error", fmt.Sprintf("failed to parse credential creation response: %s", pccErr))
+		level.Error(global.Logger).Log("error", fmt.Sprintf("failed to parse credential creation response: %s", pccErr))
 		ApiErrorf(c, http.StatusForbidden, "failed to finish registration")
 		return
 	}
 	credential, cErr := a.env.WebAuthN.CreateCredential(user, session, pcc)
 	if cErr != nil {
-		global.Logger.Log("error", fmt.Sprintf("failed to create credential: %s", cErr))
+		level.Error(global.Logger).Log("error", fmt.Sprintf("failed to create credential: %s", cErr))
 		ApiErrorf(c, http.StatusInternalServerError, "Failed to finish registration. Please contact support.")
 		return
 	}
@@ -277,14 +278,14 @@ func (a *WebAuthnApi) VerifyRegistration(c *gin.Context) {
 
 	suErr := a.webauthnService.SaveUser(user)
 	if suErr != nil {
-		global.Logger.Log("error", fmt.Sprintf("failed to save user: %s", suErr))
+		level.Error(global.Logger).Log("error", fmt.Sprintf("failed to save user: %s", suErr))
 		ApiErrorf(c, http.StatusInternalServerError, "failed to save user")
 		return
 	}
 	// remove the session from redis
 	_, delErr := a.env.RedisClient.Del(ctx, redisSesskey).Result()
 	if delErr != nil {
-		global.Logger.Log("error", fmt.Sprintf("failed to delete session: %s", delErr))
+		level.Error(global.Logger).Log("error", fmt.Sprintf("failed to delete session: %s", delErr))
 	}
 
 	// create the uses database, indexes, mapping, Verifiable Credentials (proof that is Mailio user) and public DID
@@ -373,7 +374,7 @@ func (a *WebAuthnApi) LoginOptions(c *gin.Context) {
 	}
 	redStatus := a.env.RedisClient.Set(ctx, redisSesskey, sessionBytes, time.Minute*5)
 	if redStatus.Err() != nil {
-		global.Logger.Log("error", fmt.Sprintf("failed to save session: %s", redStatus.Err()))
+		level.Error(global.Logger).Log("error", fmt.Sprintf("failed to save session: %s", redStatus.Err()))
 		ApiErrorf(c, http.StatusInternalServerError, "failed to store session")
 		return
 	}
@@ -422,14 +423,14 @@ func (a *WebAuthnApi) LoginVerify(c *gin.Context) {
 		ApiErrorf(c, http.StatusForbidden, "session not found")
 		return
 	} else if rErr != nil {
-		global.Logger.Log("error", fmt.Sprintf("failed to save session: %s", rErr.Error()))
+		level.Error(global.Logger).Log("error", fmt.Sprintf("failed to save session: %s", rErr.Error()))
 		ApiErrorf(c, http.StatusInternalServerError, "failed to retrieve session")
 		return
 	}
 	var session webauthn.SessionData
 	uErr := json.Unmarshal([]byte(redStatus), &session)
 	if uErr != nil {
-		global.Logger.Log("error", fmt.Sprintf("failed to unmarshal session: %s", uErr))
+		level.Error(global.Logger).Log("error", fmt.Sprintf("failed to unmarshal session: %s", uErr))
 		ApiErrorf(c, http.StatusInternalServerError, "failed to unmarshal session")
 		return
 	}

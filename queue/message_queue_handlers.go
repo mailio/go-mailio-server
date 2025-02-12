@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-kit/log/level"
 	"github.com/hibiken/asynq"
 	"github.com/mailio/go-mailio-did/did"
 	"github.com/mailio/go-mailio-server/global"
@@ -32,7 +33,7 @@ func (msq *MessageQueue) selectMailFolder(fromAddress string, recipientAddress s
 	// GET handshake by fromDID address
 	handshake, hErr := services.GetHandshakeByMailioAddress(msq.userRepo, recipientAddress, fromAddress)
 	if hErr != nil && hErr != types.ErrNotFound {
-		global.Logger.Log(hErr.Error(), "failed to get handshake", recipientAddress, fromAddress)
+		level.Error(global.Logger).Log(hErr.Error(), "failed to get handshake", recipientAddress, fromAddress)
 		// do nothing, continue to statistics
 	}
 	if handshake != nil && handshake.Content.Status == types.HANDSHAKE_STATUS_ACCEPTED {
@@ -49,7 +50,7 @@ func (msq *MessageQueue) selectMailFolder(fromAddress string, recipientAddress s
 
 	totalMessagesSent, err := msq.statisticsService.GetEmailStatistics(ctx, fromAddress, recipientAddress)
 	if err != nil {
-		global.Logger.Log(err.Error(), "failed to count number of read messages", recipientAddress, fromAddress)
+		level.Error(global.Logger).Log(err.Error(), "failed to count number of sent messages", recipientAddress, fromAddress)
 		return types.MailioFolderInbox, err
 	}
 
@@ -61,12 +62,12 @@ func (msq *MessageQueue) selectMailFolder(fromAddress string, recipientAddress s
 	// 4. check the read vs received ratio
 	totalMessagesReceived, err := msq.statisticsService.GetEmailStatistics(ctx, fromAddress, recipientAddress)
 	if err != nil {
-		global.Logger.Log(err.Error(), "failed to count number of received messages", recipientAddress, fromAddress)
+		level.Error(global.Logger).Log(err.Error(), "failed to count number of received messages", recipientAddress, fromAddress)
 		return types.MailioFolderInbox, err
 	}
 	totalInterest, err := msq.statisticsService.GetEmailInterest(ctx, fromAddress, recipientAddress)
 	if err != nil {
-		global.Logger.Log(err.Error(), "failed to count number of read messages", recipientAddress, fromAddress)
+		level.Error(global.Logger).Log(err.Error(), "failed to count number of read messages", recipientAddress, fromAddress)
 		return types.MailioFolderInbox, err
 	}
 
@@ -97,26 +98,27 @@ func (msq *MessageQueue) handleReceivedDIDCommMessage(message *types.DIDCommMess
 	fromDID, fdErr := did.ParseDID(message.From)
 	if fdErr != nil {
 		//the sender cannot be validated, no retryies are allowed. Message fails permanently
-		global.Logger.Log(fdErr.Error(), "failed to parse sender DID", message.From)
+		level.Error(global.Logger).Log(fdErr.Error(), "failed to parse sender DID", message.From)
 		return fmt.Errorf("failed to parse sender DID: %v: %w", fdErr, asynq.SkipRetry)
 	}
 
 	// get and cache the senders DID document
 	_, cErr := msq.ssiService.FetchDIDByWebDID(fromDID)
 	if cErr != nil {
-		global.Logger.Log(cErr.Error(), "failed to cache sender DID document", message.From)
+		level.Error(global.Logger).Log(cErr.Error(), "failed to cache sender DID document", message.From)
 		// continue processing the message regardless of the error. Client can get the missing did document later
 	}
 
 	domain := fromDID.Value()
 	serverDID, didErr := msq.mtpService.GetServerDIDDocument(domain)
 	if didErr != nil {
-		global.Logger.Log(didErr.Error(), "failed retrieving Mailio DID document", domain)
+		level.Error(global.Logger).Log(didErr.Error(), "failed retrieving Mailio DID document", domain)
 		return fmt.Errorf("failed retrieving Mailio DID document: %v: %w", didErr, asynq.SkipRetry)
 	}
 	endpoint := util.ExtractDIDMessageEndpoint(serverDID)
 	if endpoint == "" {
 		// Bad destination address syntax
+		level.Error(global.Logger).Log("unable to route message to", endpoint, "for", serverDID.ID.String())
 		return fmt.Errorf("unable to route message to %s for %s: %w", endpoint, serverDID.ID.String(), asynq.SkipRetry)
 	}
 
@@ -136,7 +138,7 @@ func (msq *MessageQueue) handleReceivedDIDCommMessage(message *types.DIDCommMess
 		parsedDid, pErr := did.ParseDID(recAddress)
 		if pErr != nil {
 			// skip if parsing fails
-			global.Logger.Log(pErr.Error(), "failed to parse recipient DID", recAddress)
+			level.Error(global.Logger).Log(pErr.Error(), "failed to parse recipient DID", recAddress)
 			continue
 		}
 
@@ -162,7 +164,7 @@ func (msq *MessageQueue) handleReceivedDIDCommMessage(message *types.DIDCommMess
 		totalDiskUsageFromHandlers := util.GetDiskUsageFromDiskHandlers(recAddress)
 		stats, sErr := msq.userProfileService.Stats(recAddress)
 		if sErr != nil {
-			global.Logger.Log("error retrieving disk usage stats", sErr.Error())
+			level.Error(global.Logger).Log(sErr.Error(), "error retrieving disk usage stats")
 		}
 		activeSize := int64(0)
 		if stats != nil {
@@ -170,7 +172,7 @@ func (msq *MessageQueue) handleReceivedDIDCommMessage(message *types.DIDCommMess
 		}
 		up, upErr := msq.userProfileService.Get(recAddress)
 		if upErr != nil {
-			global.Logger.Log("error retrieving user profile", upErr.Error())
+			level.Error(global.Logger).Log("error retrieving user profile", upErr.Error())
 			deliveryStatuses = append(deliveryStatuses, types.NewMTPStatusCode(2, 3, 5, "internal error retrieving user information", types.WithRecAddress(recAddress)))
 			continue
 		}
@@ -191,7 +193,7 @@ func (msq *MessageQueue) handleReceivedDIDCommMessage(message *types.DIDCommMess
 			// also check the nonce and if it is a valid handshake request
 			if !msq.isNonceValid(message.PlainBodyBase64) {
 				// invalid nonce (drop the message)
-				global.Logger.Log("invalid nonce", "failed to validate nonce", recAddress, "msg id: ", message.ID, "from: ", message.From)
+				level.Error(global.Logger).Log("invalid nonce", "failed to validate nonce", recAddress, "msg id: ", message.ID, "from: ", message.From)
 				continue
 			}
 		} else {
@@ -216,7 +218,7 @@ func (msq *MessageQueue) handleReceivedDIDCommMessage(message *types.DIDCommMess
 			for _, att := range message.Attachments {
 				content, dErr := base64.StdEncoding.DecodeString(att.Data.Base64)
 				if dErr != nil {
-					global.Logger.Log(dErr.Error(), "failed to decode attachment")
+					level.Error(global.Logger).Log(dErr.Error(), "failed to decode attachment")
 					// TODO: store message_delivery error?
 				}
 				// calc the hash
@@ -229,10 +231,9 @@ func (msq *MessageQueue) handleReceivedDIDCommMessage(message *types.DIDCommMess
 
 				link, uErr := msq.s3Service.UploadAttachment(global.Conf.Storage.Bucket, path, content, "")
 				if uErr != nil {
-					global.Logger.Log(uErr.Error(), "failed to upload attachment")
+					level.Error(global.Logger).Log(uErr.Error(), "failed to upload attachment")
 					//TODO: store message_delivery error?
 				}
-				fmt.Printf("Attachment uploaded to %s\n", link)
 				if att.Data.Links == nil {
 					att.Data.Links = []string{}
 				}
@@ -254,7 +255,7 @@ func (msq *MessageQueue) handleReceivedDIDCommMessage(message *types.DIDCommMess
 		fmt.Printf("Saving message for user %s, mailio id: %s, didcommid: %s\n", recAddress, mailioMessage.ID, mailioMessage.DIDCommMessage.ID)
 		_, sErr = msq.userService.SaveMessage(recAddress, mailioMessage)
 		if sErr != nil {
-			global.Logger.Log(sErr.Error(), "(receive message) failed to save message", recAddress)
+			level.Error(global.Logger).Log(sErr.Error(), "(receive message) failed to save message", recAddress)
 			// send error message to sender
 			deliveryStatuses = append(deliveryStatuses, types.NewMTPStatusCode(5, 4, 4, fmt.Sprintf("failed to save message for %s", recAddress), types.WithRecAddress(recAddress)))
 		} else {
@@ -275,12 +276,12 @@ func (msq *MessageQueue) handleReceivedDIDCommMessage(message *types.DIDCommMess
 		}
 		deliveryMsgStr, delErr := json.Marshal(deliveryMsg)
 		if delErr != nil {
-			global.Logger.Log(delErr.Error(), "failed to marshal delivery message")
+			level.Error(global.Logger).Log(delErr.Error(), "failed to marshal delivery message")
 			return fmt.Errorf("failed to marshal delivery message: %v: %w", delErr, asynq.SkipRetry)
 		}
 		thisServerDIDDoc, err := util.CreateMailioDIDDocument()
 		if err != nil {
-			global.Logger.Log(err.Error(), "failed to create Mailio DID document")
+			level.Error(global.Logger).Log(err.Error(), "failed to create Mailio DID document")
 			return fmt.Errorf("failed to create Mailio DID document: %v: %w", err, asynq.SkipRetry)
 		}
 		didMessage := &types.DIDCommMessage{
@@ -293,7 +294,7 @@ func (msq *MessageQueue) handleReceivedDIDCommMessage(message *types.DIDCommMess
 		}
 		sndCode, sndErr := msq.httpSend(didMessage, endpoint)
 		if sndErr != nil {
-			global.Logger.Log(sndErr.Error(), "failed to send message to sender", sndCode.Class, sndCode.Subject, sndCode.Detail, sndCode.Description, sndCode.Address)
+			level.Error(global.Logger).Log(sndErr.Error(), "failed to send message to sender", sndCode.Class, sndCode.Subject, sndCode.Detail, sndCode.Description, sndCode.Address)
 			return fmt.Errorf("failed to send message to sender: %v: %w", sndErr, asynq.SkipRetry)
 		}
 	}
@@ -314,13 +315,13 @@ func (msq *MessageQueue) handleDIDCommDelivery(message *types.DIDCommMessage) er
 	// extract the delivery MTPCodes
 	body, bErr := base64.StdEncoding.DecodeString(message.PlainBodyBase64)
 	if bErr != nil {
-		global.Logger.Log(bErr.Error(), "failed to decode delivery message")
+		level.Error(global.Logger).Log(bErr.Error(), "failed to decode delivery message")
 		return fmt.Errorf("failed to decode delivery message: %v: %w", bErr, asynq.SkipRetry)
 	}
 	var plainBody types.PlainBodyDelivery
 	pErr := json.Unmarshal(body, &plainBody)
 	if pErr != nil {
-		global.Logger.Log(pErr.Error(), "failed to unmarshal delivery message")
+		level.Error(global.Logger).Log(pErr.Error(), "failed to unmarshal delivery message")
 		return fmt.Errorf("failed to unmarshal delivery message: %v: %w", pErr, asynq.SkipRetry)
 	}
 	if len(plainBody.StatusCodes) > 0 {
@@ -339,7 +340,7 @@ It handles attachments, validates recipient addresses, and routes the message to
 */
 func (msq *MessageQueue) DIDCommSendMessage(userAddress string, input *types.DIDCommMessageInput) error {
 	message := input.DIDCommMessage
-	global.Logger.Log("sending from", userAddress, "intent", message.Intent)
+	level.Info(global.Logger).Log("sending message", message.ID, "from", userAddress, "to", message.To, "intent", message.Intent)
 
 	if message.Thid == "" {
 		message.Thid = message.ID // if there is no thid, use message id
@@ -396,7 +397,7 @@ func (msq *MessageQueue) DIDCommSendMessage(userAddress string, input *types.DID
 	var messageDeepCopy types.DIDCommMessage
 	cpErr := util.DeepCopy(&message, &messageDeepCopy)
 	if cpErr != nil {
-		global.Logger.Log(cpErr.Error(), "failed to copy message")
+		level.Error(global.Logger).Log(cpErr.Error(), "failed to copy message")
 		return fmt.Errorf("failed to copy message: %v: %w", cpErr, asynq.SkipRetry)
 	}
 	for _, att := range messageDeepCopy.Attachments {
@@ -406,7 +407,7 @@ func (msq *MessageQueue) DIDCommSendMessage(userAddress string, input *types.DID
 					url := strings.Replace(link, "?enc=1", "", 1)
 					content, dErr := msq.s3Service.DownloadAttachment(url)
 					if dErr != nil {
-						global.Logger.Log(dErr.Error(), "failed to download attachment")
+						level.Error(global.Logger).Log(dErr.Error(), "failed to download attachment")
 						// TODO: store message_delivery error?
 						return fmt.Errorf("failed downloading attachment: %v: %w", dErr, asynq.SkipRetry)
 					}
@@ -437,7 +438,7 @@ func (msq *MessageQueue) DIDCommSendMessage(userAddress string, input *types.DID
 	if message.Intent != types.DIDCommIntentHandshakeRequest && message.Intent != types.DIDCommIntentHandshakeResponse {
 		_, sErr := msq.userService.SaveMessage(userAddress, &mailioMessage)
 		if sErr != nil {
-			global.Logger.Log(sErr.Error(), "(sendMessage) failed to save message", userAddress)
+			level.Error(global.Logger).Log(sErr.Error(), "(sendMessage) failed to save message", userAddress)
 			return sErr
 		}
 		msq.deliveryService.SaveBulkMtpStatusCodes(message.ID, mtpStatusErrors)
@@ -458,19 +459,19 @@ func (msq *MessageQueue) DIDCommSendMessage(userAddress string, input *types.DID
 		// delete attachment
 		link, lpErr := url.Parse(att)
 		if lpErr != nil {
-			global.Logger.Log(lpErr.Error(), "failed to parse attachment link", att)
+			level.Error(global.Logger).Log(lpErr.Error(), "failed to parse attachment link", att)
 			continue
 		}
 		// extract bucket and path (the path is not completely trusted. So only in userSender folder can it be deleted)
 		parts := strings.Split(link.Path, "/")
 		fileKey := userAddress + "/" + parts[len(parts)-1]
 		if fileKey == "" {
-			global.Logger.Log("error", "invalid attachment url", "attachmentUrl", att)
+			level.Error(global.Logger).Log("error", "invalid attachment url", "attachmentUrl", att)
 			return fmt.Errorf("invalid attachment url: %v: %w", lpErr, asynq.SkipRetry)
 		}
 		dErr := msq.s3Service.DeleteAttachment(global.Conf.Storage.Bucket, fileKey)
 		if dErr != nil {
-			global.Logger.Log(dErr.Error(), "failed to delete attachment", att)
+			level.Error(global.Logger).Log(dErr.Error(), "failed to delete attachment", att)
 		}
 	}
 	return nil

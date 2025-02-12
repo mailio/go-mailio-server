@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/go-kit/log/level"
 	"github.com/go-resty/resty/v2"
 	"github.com/hibiken/asynq"
 	"github.com/mailio/go-mailio-server/global"
@@ -44,7 +45,7 @@ func NewMessageQueue(dbSelector *repository.CouchDBSelector, env *types.Environm
 
 	userRepo, urErr := dbSelector.ChooseDB(repository.User)
 	if urErr != nil {
-		global.Logger.Log("msg", "error while choosing db", "err", urErr)
+		level.Error(global.Logger).Log("msg", "error while choosing db", "err", urErr)
 		panic(urErr)
 	}
 
@@ -73,7 +74,7 @@ func (mqs *MessageQueue) ProcessSMTPTask(ctx context.Context, t *asynq.Task) err
 
 	email, meErr := util.ConvertToSmtpEmail(*task.Mail)
 	if meErr != nil {
-		global.Logger.Log(meErr.Error(), "failed to convert to smtp email", task.Mail)
+		level.Error(global.Logger).Log(meErr.Error(), "failed to convert to smtp email", task.Mail)
 		return fmt.Errorf("failed to convert to smtp email: %v: %w", meErr, asynq.SkipRetry)
 	}
 
@@ -121,7 +122,7 @@ func (mqs *MessageQueue) ProcessDIDCommTask(ctx context.Context, t *asynq.Task) 
 
 // SendMessage sends encrypted DIDComm message to recipient
 func (msq *MessageQueue) DidCommReceiveMessage(message *types.DIDCommMessage) error {
-	global.Logger.Log("received msg intent", message.Intent, "id", message.ID, "from", message.From)
+	level.Error(global.Logger).Log("received msg intent", message.Intent, "id", message.ID, "from", message.From)
 	fmt.Printf("received msg intent %s id %s from %s\n", message.Intent, message.ID, message.From)
 	switch message.Intent {
 	case types.DIDCommIntentMessage, types.DIDCommIntentHandshake, types.DIDCommIntentHandshakeRequest, types.DIDCommIntentHandshakeResponse:

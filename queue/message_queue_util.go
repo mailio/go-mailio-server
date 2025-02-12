@@ -69,7 +69,7 @@ func (msq *MessageQueue) validateRecipientDIDs(message *types.DIDCommMessage) (m
 	for _, recipient := range message.To {
 		rec, didErr := did.ParseDID(recipient)
 		if didErr != nil {
-			global.Logger.Log(didErr.Error(), "recipient verification failed", rec.Fragment())
+			level.Error(global.Logger).Log(didErr.Error(), "recipient verification failed", rec.Fragment())
 			mtpStatusErrors = append(mtpStatusErrors, types.NewMTPStatusCode(5, 1, 1, "failed to validate recipient", types.WithRecAddress(rec.Fragment())))
 			continue
 		}
@@ -80,7 +80,7 @@ func (msq *MessageQueue) validateRecipientDIDs(message *types.DIDCommMessage) (m
 		if rec.Value() == host {
 			r, rErr := msq.ssiService.GetDIDDocument(rec.Fragment())
 			if rErr != nil {
-				global.Logger.Log(rErr.Error(), "failed to validate recipient", rec.Fragment())
+				level.Error(global.Logger).Log(rErr.Error(), "failed to validate recipient", rec.Fragment())
 				mtpStatusErrors = append(mtpStatusErrors, types.NewMTPStatusCode(5, 1, 1, "failed to validate recipient", types.WithRecAddress(rec.Fragment())))
 				continue
 			} else {
@@ -90,7 +90,7 @@ func (msq *MessageQueue) validateRecipientDIDs(message *types.DIDCommMessage) (m
 			// remote fetch did
 			r, rErr := msq.ssiService.FetchRemoteDID(&rec)
 			if rErr != nil {
-				global.Logger.Log(rErr.Error(), "failed to validate remote recipient", rec.Fragment())
+				level.Error(global.Logger).Log(rErr.Error(), "failed to validate remote recipient", rec.Fragment())
 				mtpCode := types.MTPStatusCode{}
 				switch rErr {
 				case types.ErrNotFound:
@@ -159,7 +159,7 @@ func (msq *MessageQueue) httpSend(message *types.DIDCommMessage,
 
 	response, rErr := msq.restyClient.R().SetBody(signedRequest).SetResult(&responseResult).Post(endpoint)
 	if rErr != nil {
-		global.Logger.Log(rErr.Error(), "failed to send message", endpoint)
+		level.Error(global.Logger).Log(rErr.Error(), "failed to send message", endpoint)
 		return types.NewMTPStatusCode(5, 4, 4, "failed to send message"), types.ErrContinue
 	}
 	if response.IsError() {
@@ -168,19 +168,19 @@ func (msq *MessageQueue) httpSend(message *types.DIDCommMessage,
 		// } else {
 
 		// }
-		global.Logger.Log(response.String(), "failed to send message", endpoint, "code", response.StatusCode(), "body", string(response.Body()))
+		level.Error(global.Logger).Log(response.String(), "failed to send message", endpoint, "code", response.StatusCode(), "body", string(response.Body()))
 		return types.NewMTPStatusCode(4, 4, 4, "failed to send message"), types.ErrContinue
 	}
 	// validate response receipt
 	responseId := responseResult.DIDCommRequest.DIDCommMessage.ID
 	if responseId != message.ID {
-		global.Logger.Log("response ID", responseId, "message ID", message.ID, "message ids don't match", endpoint)
+		level.Error(global.Logger).Log("response ID", responseId, "message ID", message.ID, "message ids don't match", endpoint)
 		return types.NewMTPStatusCode(5, 4, 4, "failed to send message"), types.ErrContinue
 	}
 	cbor, rcErr := base64.StdEncoding.DecodeString(responseResult.CborPayloadBase64)
 	signature, rsErr := base64.StdEncoding.DecodeString(responseResult.SignatureBase64)
 	if errors.Join(rcErr, rsErr) != nil {
-		global.Logger.Log(errors.Join(cErr, sErr).Error(), "failed to decode cbor payload or signature")
+		level.Error(global.Logger).Log(errors.Join(rcErr, rsErr).Error(), "failed to decode cbor payload or signature")
 		return types.NewMTPStatusCode(5, 4, 4, fmt.Sprintf("failed to decode cbor or signature response from %s", endpoint)), types.ErrContinue
 	}
 
@@ -189,24 +189,24 @@ func (msq *MessageQueue) httpSend(message *types.DIDCommMessage,
 	if !strings.Contains(endpoint, "localhost") {
 		urlParsed, pErr := url.Parse(endpoint)
 		if pErr != nil {
-			global.Logger.Log(pErr.Error(), "failed to parse endpoint", endpoint)
+			level.Error(global.Logger).Log(pErr.Error(), "failed to parse endpoint", endpoint)
 			return types.NewMTPStatusCode(5, 4, 4, fmt.Sprintf("failed to parse endpoint %s", endpoint)), types.ErrContinue
 		}
 
 		d, dErr := msq.mtpService.ResolveDomain(urlParsed.Host, false)
 		if dErr != nil {
-			global.Logger.Log(dErr.Error(), "failed to get public key for", endpoint)
+			level.Error(global.Logger).Log(dErr.Error(), "failed to get public key for", endpoint)
 			return types.NewMTPStatusCode(5, 4, 4, fmt.Sprintf("failed to get public key for endpoint %s", endpoint)), types.ErrContinue
 		}
 		discovery = d
 	}
 	isValid, vErr := util.Verify(cbor, signature, discovery.MailioPublicKey)
 	if vErr != nil {
-		global.Logger.Log(vErr.Error(), "failed to verify response")
+		level.Error(global.Logger).Log(vErr.Error(), "failed to verify response")
 		return types.NewMTPStatusCode(5, 4, 4, fmt.Sprintf("failed to verify response from %s", endpoint)), types.ErrContinue
 	}
 	if !isValid {
-		global.Logger.Log("response signature is invalid", "failed to verify response")
+		level.Error(global.Logger).Log("response signature is invalid", "failed to verify response")
 		return types.NewMTPStatusCode(5, 4, 4, fmt.Sprintf("failed to verify response from %s", endpoint)), types.ErrContinue
 	}
 	return nil, nil

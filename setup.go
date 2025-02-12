@@ -74,7 +74,6 @@ func ConfigDBSelector() repository.DBSelector {
 
 	repoErr := errors.Join(nonceRepoErr, userRepoErr, mappingRepoErr, didRErr, vscrErr, dErr, mdErr, upErr, users_Err, wErr, smrtkErr, stErr, dktErr)
 	if repoErr != nil {
-		global.Logger.Log("error", "Failed to create repositories", "error", repoErr.Error())
 		panic(repoErr)
 	}
 
@@ -100,7 +99,6 @@ func loadMalwareList() {
 	malwareService := services.NewMalwareService()
 	err := malwareService.LoadInMemoryMalwareList()
 	if err != nil {
-		global.Logger.Log("error", "Failed to load malware list", "error", err.Error())
 		panic(err)
 	}
 }

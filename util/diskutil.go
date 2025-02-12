@@ -1,6 +1,7 @@
 package util
 
 import (
+	"github.com/go-kit/log/level"
 	diskusagehandlers "github.com/mailio/go-mailio-diskusage-handler"
 	"github.com/mailio/go-mailio-server/diskusage"
 	"github.com/mailio/go-mailio-server/global"
@@ -16,7 +17,7 @@ func GetDiskUsageFromDiskHandlers(address string) int64 {
 		awsDiskUsage, awsDuErr := diskusage.GetHandler(diskUsageHandler).GetDiskUsage(address)
 		if awsDuErr != nil {
 			if awsDuErr != diskusagehandlers.ErrNotFound {
-				global.Logger.Log("error retrieving disk usage stats", awsDuErr.Error())
+				level.Error(global.Logger).Log("error retrieving disk usage stats", awsDuErr.Error())
 			}
 		}
 		if awsDiskUsage != nil {

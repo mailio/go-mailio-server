@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-jose/go-jose/v3"
+	"github.com/go-kit/log/level"
 	"github.com/mailio/go-mailio-did/did"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/services"
@@ -58,7 +59,7 @@ func JWSMiddleware(userProfileService *services.UserProfileService) gin.HandlerF
 		// get user profile
 		userProfile, upErr := userProfileService.Get(subjectAddress)
 		if upErr != nil {
-			global.Logger.Log("JWSMiddleware", "failed to find user profile", upErr.Error())
+			level.Error(global.Logger).Log("JWSMiddleware", "failed to find user profile", "error", upErr.Error())
 		}
 		if userProfile == nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "User account not found"})

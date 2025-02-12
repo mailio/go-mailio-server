@@ -35,7 +35,7 @@ func SignatureMiddleware(env *types.Environment, mtpService *services.MtpService
 
 		var commonSignature types.CommonSignature
 		if csErr := json.Unmarshal(bodyBytes, &commonSignature); csErr != nil {
-			global.Logger.Log("error unmarshalling request body", csErr.Error())
+			level.Error(global.Logger).Log("error unmarshalling request body", csErr.Error())
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 			c.Abort()
 			return

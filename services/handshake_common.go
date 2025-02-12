@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/go-kit/log/level"
 	"github.com/go-resty/resty/v2"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/repository"
@@ -23,7 +24,7 @@ func GetHandshakeByID(userRepo repository.Repository, handshakeOwnerAddress stri
 
 	resp, err := userRepo.GetClient().(*resty.Client).R().Get(url)
 	if err != nil {
-		global.Logger.Log("HandshakeService.GetByID", "failed to get", err.Error())
+		level.Error(global.Logger).Log("HandshakeService.GetByID", "failed to get", err.Error())
 		return nil, err
 	}
 	if resp.StatusCode() < 200 || resp.StatusCode() >= 300 {

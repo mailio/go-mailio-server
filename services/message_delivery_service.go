@@ -59,11 +59,11 @@ func (mds *MessageDeliveryService) SaveBulkMtpStatusCodes(messageID string, stat
 		var couchdbError types.CouchDBError
 		response, err := mds.restyClient.R().SetBody(docs).SetError(&couchdbError).Post(repository.MessageDelivery + "/_bulk_docs")
 		if err != nil {
-			global.Logger.Log("error while saving bulk message deliveries", "err", err)
+			level.Error(global.Logger).Log("error while saving bulk message deliveries", "err", err)
 			return
 		}
 		if response.IsError() {
-			global.Logger.Log("error while saving bulk message deliveries", "response", response.String())
+			level.Error(global.Logger).Log("error while saving bulk message deliveries", "response", response.String())
 			return
 		}
 	}

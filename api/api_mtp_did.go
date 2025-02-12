@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-kit/log/level"
 	"github.com/go-playground/validator/v10"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/services"
@@ -48,9 +49,9 @@ func (didMtp *DIDMtpApi) GetLocalDIDDocuments(c *gin.Context) {
 	if err := c.ShouldBindJSON(&input); err != nil {
 		body, bErr := c.GetRawData()
 		if bErr != nil {
-			global.Logger.Log("error getting raw data", bErr.Error())
+			level.Error(global.Logger).Log("error getting raw data", bErr.Error())
 		}
-		global.Logger.Log("error binding json", err.Error(), " request body: ", string(body))
+		level.Error(global.Logger).Log("error binding json", err.Error(), " request body: ", string(body))
 		ApiErrorf(c, http.StatusBadRequest, "invalid format")
 		return
 	}

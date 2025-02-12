@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/go-kit/log/level"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/repository"
 	"github.com/mailio/go-mailio-server/types"
@@ -58,7 +59,7 @@ func (ns *NonceService) CreateCustomNonce(nonceSizeInBytes int) (*types.Nonce, e
 	}
 	neErr := ns.nonceRepo.Save(ctx, n, nonce)
 	if neErr != nil {
-		global.Logger.Log("nonce creation failed", neErr)
+		level.Error(global.Logger).Log("nonce creation failed", neErr)
 	}
 	return nonce, neErr
 }
@@ -102,6 +103,6 @@ func (ns *NonceService) DeleteNonce(nonce string) error {
 func (ns *NonceService) RemoveExpiredNonces() {
 	err := RemoveExpiredDocuments(ns.nonceRepo, "nonce", "old", 5)
 	if err != nil {
-		global.Logger.Log("Error removing expired nonces", "%s", err.Error())
+		level.Error(global.Logger).Log("Error removing expired nonces", "%s", err.Error())
 	}
 }
