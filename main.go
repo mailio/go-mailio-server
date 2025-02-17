@@ -17,6 +17,7 @@ import (
 	"github.com/go-kit/log/level"
 	"github.com/go-redis/redis_rate/v10"
 	"github.com/hibiken/asynq"
+	"github.com/joho/godotenv"
 	"github.com/mailio/go-mailio-server/apiroutes"
 	"github.com/mailio/go-mailio-server/docs"
 	"github.com/mailio/go-mailio-server/global"
@@ -140,6 +141,47 @@ func initAsyncQueue(dbSelector *repository.CouchDBSelector, env *types.Environme
 	return taskServer, taskClient
 }
 
+// mergeSecretsToConfig merges secrets from environment variables to the configuration
+func mergeSecretsToConfig(conf *global.Config) error {
+	// merge secrets from environment variables to the configuration
+	envVars := map[string]string{
+		"COUCH_DB_PASSWORD":   os.Getenv("COUCH_DB_PASSWORD"),
+		"REDIS_PASSWORD":      os.Getenv("REDIS_PASSWORD"),
+		"PROMETHEUS_PASSWORD": os.Getenv("PROMETHEUS_PASSWORD"),
+		"SMTP_WEBHOOK_KEY":    os.Getenv("SMTP_WEBHOOK_KEY"),
+		"SMTP_PASSWORD":       os.Getenv("SMTP_PASSWORD"),
+		"AWS_SECRET":          os.Getenv("AWS_SECRET"),
+	}
+	// Check for empty values
+	for key, value := range envVars {
+		if value == "" {
+			panic(fmt.Sprintf("Environment variable %s is missing", key))
+		}
+	}
+
+	// merge secrets to the configuration
+	conf.CouchDB.Password = envVars["COUCH_DB_PASSWORD"]
+	conf.Redis.Password = envVars["REDIS_PASSWORD"]
+	conf.Prometheus.Password = envVars["PROMETHEUS_PASSWORD"]
+
+	// find "mailgun" smtp server and merge secrets
+	for _, smtpServer := range conf.SmtpServers {
+		if smtpServer.Provider == "mailgun" {
+			smtpServer.Webhookkey = envVars["SMTP_WEBHOOK_KEY"]
+			if len(smtpServer.Domains) == 0 {
+				panic(fmt.Sprintf("SMTP server %s has no domains", smtpServer.Provider))
+			}
+			// set password for all domains
+			for _, domain := range smtpServer.Domains {
+				domain.SmtpPassword = envVars["SMTP_PASSWORD"]
+			}
+		}
+	}
+	conf.Storage.Secret = envVars["AWS_SECRET"]
+
+	return nil
+}
+
 // @title Mailio Server API
 // @version 1.0
 // @description Implements the Mailio server based on https://mirs.mail.io/ specifications
@@ -164,6 +206,21 @@ func main() {
 	err := cfg.NewYamlConfig(configFile, &global.Conf)
 	if err != nil {
 		panic(fmt.Sprintf("%s: %v", "Failed to load conf.yaml", err.Error()))
+	}
+
+	err = godotenv.Load(".env.local")
+	if err != nil {
+		level.Info(global.Logger).Log("No .env.local file found... Loading .env file")
+	}
+	// load secrets from environment variables
+	err = godotenv.Load()
+	if err != nil {
+		panic(fmt.Sprintf("Error loading .env file: %s", err.Error()))
+	}
+
+	mergeErr := mergeSecretsToConfig(&global.Conf)
+	if mergeErr != nil {
+		panic(mergeErr.Error())
 	}
 
 	// loads server keys into global variables for signing and signature validation

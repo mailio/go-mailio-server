@@ -28,3 +28,4 @@ test_server_keys.json
 deployment/couchdb/data
 deployment/redis/data
 __debug_bin*
+.env.local

@@ -1,6 +1,7 @@
 version: "3.2"
 
 services:
+
   couchserver:
     image: couchdb
     restart: always
@@ -17,3 +18,24 @@ services:
       - "6379:6379"
     volumes:
       - ./deployment/redis/data:/data
+
+  mailio-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    depends_on:
+      - couchserver
+      - redis
+    ports:
+      - "8080:8080"
+    environment:
+      COUCH_DB_PASSWORD: YOURPASSWORD
+      REDIS_PASSWORD: YOURPASSWORD
+      SMTP_PASSWORD: YOURPASSWORD
+      PROMETHEUS_PASSWORD: YOURPASSWORD
+      AWS_SECRET: YOURPASSWORD
+      AI_SEARCH_USERNAME: YOURUSERNAME
+      AI_SEARCH_PASSWORD: YOURPASSWORD
+    volumes:
+      - ./conf.yaml:/app/config/conf.yaml

@@ -3,7 +3,6 @@ module github.com/mailio/go-mailio-server
 go 1.23.2
 
 require (
-	dario.cat/mergo v1.0.1
 	github.com/aws/aws-sdk-go-v2 v1.30.3
 	github.com/aws/aws-sdk-go-v2/config v1.27.27
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.27
@@ -24,6 +23,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/hibiken/asynq v0.24.1
 	github.com/jarcoal/httpmock v1.3.0
+	github.com/joho/godotenv v1.5.1
 	github.com/lestrrat-go/jwx/v2 v2.0.19
 	github.com/mailio/go-mailio-did v0.0.0-20240219171524-88713f84b09d
 	github.com/mailio/go-mailio-diskusage-handler v1.0.0

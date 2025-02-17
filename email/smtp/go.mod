@@ -1,6 +1,6 @@
 module github.com/mailio/go-mailio-server/email/smtp
 
-go 1.22.1
+go 1.23.2
 
 require (
 	github.com/jhillyerd/enmime v1.2.0

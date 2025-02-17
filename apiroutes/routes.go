@@ -76,6 +76,7 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 	webauthnApi := api.NewWebAuthnApi(nonceService, webAuthnService, userService, userProfileService, smartKeyService, ssiService, environment)
 	s3Api := api.NewS3Api(s3Service, environment)
 	statisticsApi := api.NewAPIStatistics(statsService)
+	healthCheckApi := api.NewHealthCheckAPI()
 
 	// WEBHOOK API definitions
 	webhookApi := api.NewMailReceiveWebhook(userService, userProfileService, environment)
@@ -91,6 +92,7 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 		rootPublicApi.GET(".well-known/did.json", didApi.CreateServerDID)
 		rootPublicApi.GET(".well-known/did-configuration.json", didApi.CreateServerDIDConfiguration)
 		rootPublicApi.GET(":address/did.json", didApi.GetDIDDocument)
+		rootPublicApi.GET("/api/healthcheck", healthCheckApi.HealthCheck)
 	}
 
 	// PUBLIC API
