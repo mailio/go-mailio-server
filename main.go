@@ -155,7 +155,7 @@ func mergeSecretsToConfig(conf *global.Config) error {
 	// Check for empty values
 	for key, value := range envVars {
 		if value == "" {
-			panic(fmt.Sprintf("Environment variable %s is missing", key))
+			return fmt.Errorf("environment variable %s is empty", key)
 		}
 	}
 
@@ -208,14 +208,18 @@ func main() {
 		panic(fmt.Sprintf("%s: %v", "Failed to load conf.yaml", err.Error()))
 	}
 
+	localEnvLoaded := true
 	err = godotenv.Load(".env.local")
 	if err != nil {
+		localEnvLoaded = false
 		level.Info(global.Logger).Log("No .env.local file found... Loading .env file")
 	}
 	// load secrets from environment variables
-	err = godotenv.Load()
-	if err != nil {
-		panic(fmt.Sprintf("Error loading .env file: %s", err.Error()))
+	if !localEnvLoaded {
+		err = godotenv.Load()
+		if err != nil {
+			level.Info(global.Logger).Log("No .env file found... Loading secrets from environment variables")
+		}
 	}
 
 	mergeErr := mergeSecretsToConfig(&global.Conf)

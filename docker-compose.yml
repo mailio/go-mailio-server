@@ -1,5 +1,3 @@
-version: "3.2"
-
 services:
 
   couchserver:
@@ -10,6 +8,11 @@ services:
     volumes:
       - ./deployment/couchdb/couchdb_local.ini:/opt/couchdb/etc/local.ini
       - ./deployment/couchdb/data:/opt/couchdb/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5984"]
+      interval: 10s
+      retries: 5
+      start_period: 5s
   redis:
     image: redis:7.0.12-alpine
     restart: always
@@ -18,6 +21,11 @@ services:
       - "6379:6379"
     volumes:
       - ./deployment/redis/data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "YOURPASSWORD", "ping"]
+      interval: 5s
+      retries: 5
+      start_period: 5s
 
   mailio-server:
     build:
@@ -25,11 +33,13 @@ services:
       dockerfile: Dockerfile
     restart: always
     depends_on:
-      - couchserver
-      - redis
+      couchserver:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
       - "8080:8080"
-    environment:
+    environment: # option 1
       COUCH_DB_PASSWORD: YOURPASSWORD
       REDIS_PASSWORD: YOURPASSWORD
       SMTP_PASSWORD: YOURPASSWORD
@@ -38,4 +48,8 @@ services:
       AI_SEARCH_USERNAME: YOURUSERNAME
       AI_SEARCH_PASSWORD: YOURPASSWORD
     volumes:
+      - ./test_server_keys.json:/app/test_server_keys.json
       - ./conf.yaml:/app/config/conf.yaml
+      - ./.env:/app/.env # option 2
+      - ./.env.local:/app/.env.local # option 3
+    command: ["/app/mioserver", "-c", "/app/config/conf.yaml"]

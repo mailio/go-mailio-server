@@ -13,20 +13,27 @@ Mailio Server implementation based on [Mailio MIRs](https://mirs.mail.io) specif
 
 ```yml
 version: 1.0
-scheme: http # http or https
+scheme: https # http or https
 port: 8080
-title: Mailio Server
+title: Mailio
 description: Mailio Server implementation based on mirs.mail.io specification
 swagger: true
-mode: release # "debug": or "release"
+mode: debug # "debug": or "release"
+
+# queue for parallel processing of incoming and outgoing messages (DIDComm and SMTP)
+queue:
+  concurrency: 30
 
 mailio:
+  dailySmtpSentLimit: 5 # number of daily SMTP emails to be sent for users
   diskSpace: 524288000 # initial maximum disk size in bytes (500 MB)
   authenticationPath: /api/v1/didauth # don't change unless you know what you're doing
   messagingPath: /api/v1/mtp/message # don't change unless you know what you're doing
   serverKeysPath: test_server_keys.json
-  readVsReceived: 30 # 30% read makes a message go to goodreads, less to other
-  serverDomain: mio.example.com # where this server is located on the internet
+  readVsReceived: 30 # 30% of read emails from same sender makes a message go to goodreads, less to other
+  webDomain: web.example.com # domain of the web console #!important! must match the NX_PUBLIC_WEB_DOMAIN in web project configuration
+  emailDomain: example.com # !importan! must be root domain of serverDomain and match NX_PUBLIC_EMAIL_DOMAIN in web configuration
+  serverDomain: mio.example.com # domain of this server
   serverSubdomainQueryList: # standard subdomains for the mail server. e.g. mio.example.com, mailio.example.com, ...
     - prefix: mio
     - prefix: mailio
@@ -48,54 +55,63 @@ mailio:
         frequencyMinutes: 43800 # 30 days
       - subtype: 6
         frequencyMinutes: 43800 # 30 days
-  domains:
-    - domain: example.io # e.g. example.com
-    - domain: example.com # e.g. otherdomain.com
 
 couchdb:
-  host: localhost
+  host: couchserver
   port: 5984
   scheme: http
   username: admin
-  password: YOURPASSWORD
 
 redis:
-  host: localhost
+  host: redis
   port: 6379
   username: default
-  password: YOURPASSWORD
-
-queue:
-  concurrency: 50
 
 prometheus:
   enabled: true
   username: prometheus
-  password: YOURPASSWORD
 
 # currently only mailgun supported
 # check docs to implement: https://github.com/mailio/go-mailio-mailgun-smtp-handler
 smtpservers:
   - provider: mailgun
     webhookurl: /webhook/mailgun_mime
-    webhookkey: a55...
     domains:
-    - domain: example.com
-      sendapikey: 78...
-    - domain: otherexample.com
-      sendapikey: 674...
+    - domain: example.com # the sending users domain
+      smtpServer: smtp.mailgun.org # smtp server to relay message through
+      smtpPort: 587 # recommended 587 port (TLS connection or upgrade to TLS)
+      smtpUsername: postmaster@example.com # smtp server username
 
 storage:
   type: s3
-  key: ATR...
-  secret: D+...
-  bucket: mailio-bucket
-  region: us-east-1
+  key: key...
+  bucket: my-attachment-bucket
+  profilePhotoBucket: mybucket-profilephotos
+  region: us-west-2
   
 diskusagehandlers:
   - provider: aws
-    path: mailio-attachments/mailio-attachments/user-attachment-inventory
+    path: my-attachment-bucket/my-attachment-bucket/my-attachment-inventory
 
+# all values are in minutes
+emailstatistics: 
+  sentKeyExpiry: 2880 # redis key expires in 48 hours
+  sentKeyFlush: 60 # flush to database every hour
+  interestKeyExpiry: 15 # redis key expires after 15 minutes
+  interestKeyFlush: 5 # flush to database every 5 minutes
+  sentRecvBySenderExpiry: 15 # redis key expires in 15 minutes
+  sentRecvBySenderFlush: 5 # flush to database every 5 minutes
+```
+
+Configure secrets in `.env` or `.env.local` file or within the `docker-compose.yaml`:
+
+```bash
+COUCH_DB_PASSWORD=YOURPASSWORD
+REDIS_PASSWORD=YOURPASSWORD
+PROMETHEUS_PASSWORD=YOURPASSWORD
+SMTP_WEBHOOK_KEY=YOURPASSWORD
+SMTP_PASSWORD=YOURPASSWORD
+AWS_SECRET=YOURPASSWORD
 ```
 
 ### Mailio Server Configuration Explained
