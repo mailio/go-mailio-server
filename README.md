@@ -1,5 +1,8 @@
 # Mailio Server
 
+[!WARNING]
+> The project is still under development and testing!
+
 Mailio Server implementation based on [Mailio MIRs](https://mirs.mail.io) specifications. 
 
 ## Install
@@ -141,7 +144,7 @@ TDB (Kubernetes) or Helm chart maybe
 1. Clone this repository
 2. Create `conf.yaml` file
 3. `swag init --parseDependency=true` to re-create swagger documentation
-4. `go run environment.go main.go` to run the app
+4. `go run setup.go main.go` to run the app
 
 
 ### Adding SMTP handler implementation
