@@ -1,6 +1,6 @@
 # Mailio Server
 
-[!WARNING]
+> [!WARNING]  
 > The project is still under development and testing!
 
 Mailio Server implementation based on [Mailio MIRs](https://mirs.mail.io) specifications. 
