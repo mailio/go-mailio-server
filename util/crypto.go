@@ -81,22 +81,6 @@ func IsEd25519PublicKey(b64Key string) bool {
 }
 
 func PublicKeyToMailioAddress(pubKeyRaw []byte) (string, error) {
-	// decoded, err := base64.StdEncoding.DecodeString(pubKeyBase64)
-	// if err != nil {
-	// 	return "", err
-	// }
-	// hash := sha256.New()
-	// _, werr := hash.Write(decoded)
-	// if werr != nil {
-	// 	return "", err
-	// }
-	// sh256Bytes := hash.Sum(nil)
-	// ma := BytesToAddress(sh256Bytes)
-	// return hex.EncodeToString(ma[:]), nil
-	// pubKey, err := base64.RawURLEncoding.DecodeString(pubKeyBase64)
-	// if err != nil {
-	// return "", err
-	// }
 	return RawPublicKeyToMailioAddress(pubKeyRaw)
 }
 

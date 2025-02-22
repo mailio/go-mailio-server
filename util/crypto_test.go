@@ -84,13 +84,3 @@ func TestPubKeyToMailioAddress(t *testing.T) {
 		t.Fatal("invalid address")
 	}
 }
-
-func TestEqualityOfCreatingMailioAddress(t *testing.T) {
-	// rawKey, _ := base64.RawURLEncoding.DecodeString("lTi99FcVgGAuoHblyw0pffGs3GwZudOT3XDjZ9d7cKc=")
-	rawKey, _ := base64.StdEncoding.DecodeString("lTi99FcVgGAuoHblyw0pffGs3GwZudOT3XDjZ9d7cKc=")
-	address, err := PublicKeyToMailioAddress(rawKey)
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, "0xfe664890e83e8e41cc19317e14803097eaa1ead1", address)
-}

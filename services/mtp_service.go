@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/mail"
-	"net/url"
 	"strings"
 	"time"
 
@@ -281,13 +280,7 @@ func (mtp *MtpService) GetLocalDIDDocumentsByEmailHash(localLookups []*types.DID
 
 	// resolve local lookups
 	for _, lookup := range localLookups {
-		lookupHashedEmail, lErr := url.QueryUnescape(lookup.EmailHash)
-		if lErr != nil {
-			level.Error(global.Logger).Log("msg", "failed to unescape email hash", "err", lErr)
-			notFound = append(notFound, lookup)
-			continue
-		}
-		mapping, mErr := getUserByScryptEmail(mtp.mappingRepo, lookupHashedEmail)
+		mapping, mErr := getUserByScryptEmail(mtp.mappingRepo, lookup.EmailHash)
 		if mErr != nil {
 			if mErr == types.ErrNotFound {
 				notFound = append(notFound, lookup)

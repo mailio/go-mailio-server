@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -17,6 +16,7 @@ import (
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/repository"
 	"github.com/mailio/go-mailio-server/types"
+	"github.com/mailio/go-mailio-server/util"
 )
 
 type UserService struct {
@@ -159,7 +159,11 @@ func (us *UserService) CreateUser(user *types.User, mk *did.MailioKey, databaseP
 func (us *UserService) MapEmailToMailioAddress(user *types.User) (*types.EmailToMailioMapping, error) {
 
 	// since it's base64 encoded, we need to escape it
-	id := base64.RawStdEncoding.EncodeToString([]byte(user.EncryptedEmail))
+	id, idErr := util.ScrpyBase64ToMappingId(user.EncryptedEmail)
+	if idErr != nil {
+		level.Error(global.Logger).Log("msg", "error while converting hashed email to id", "err", idErr, "hashedEmail", user.EncryptedEmail)
+		return nil, idErr
+	}
 
 	mapping := &types.EmailToMailioMapping{
 		EncryptedEmail: user.EncryptedEmail,

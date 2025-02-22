@@ -1,6 +1,7 @@
 package util
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -106,4 +107,13 @@ func ExtractSmtpSendingDomain(domain string) (string, error) {
 		}
 	}
 	return "", types.ErrBadRequest
+}
+
+// Converting Scrypted base64 encoded email to mailio_mapping id
+func ScrpyBase64ToMappingId(base64ScryptEmail string) (string, error) {
+	decoded, dErr := base64.StdEncoding.DecodeString(base64ScryptEmail)
+	if dErr != nil {
+		return "", dErr
+	}
+	return Sha256Hex(decoded), nil
 }

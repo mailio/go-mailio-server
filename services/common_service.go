@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"log"
@@ -29,7 +28,11 @@ const (
 func getUserByScryptEmail(repo repository.Repository, hashedEmail string) (*types.EmailToMailioMapping, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
-	id := base64.RawStdEncoding.EncodeToString([]byte(hashedEmail))
+	id, idErr := util.ScrpyBase64ToMappingId(hashedEmail)
+	if idErr != nil {
+		level.Error(global.Logger).Log("msg", "error while converting hashed email to id", "err", idErr, "hashedEmail", hashedEmail)
+		return nil, types.ErrNotFound
+	}
 	response, eErr := repo.GetByID(ctx, id)
 	if eErr != nil {
 		if eErr != types.ErrNotFound {
