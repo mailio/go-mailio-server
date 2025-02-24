@@ -87,7 +87,7 @@ func resolveDomain(domainRepo repository.Repository, domain string, forceDiscove
 			shouldSave = true
 		}
 		if shouldUpdateMailio(ageInMillis) {
-			discovery, disErr := checkIfMailioServer(domain)
+			discovery, disErr := CheckIfMailioServer(domain)
 			if disErr != nil {
 				if disErr != types.ErrNotFound {
 					return nil, disErr
@@ -154,7 +154,7 @@ func updateDomain(domainObj *types.Domain, domain string) error {
 		return fmt.Errorf("failed to check MX record for domain %s: %w", domain+", "+cErr.Error(), types.ErrMxRecordCheckFailed)
 	}
 	domainObj.SupportsStandardEmails = supportsStandard
-	discovery, err := checkIfMailioServer(domain)
+	discovery, err := CheckIfMailioServer(domain)
 	if err != nil {
 		if err != types.ErrNotFound {
 			return err
@@ -172,7 +172,7 @@ func saveDomain(ctx context.Context, domainRepo repository.Repository, domain st
 	}
 }
 
-func checkIfMailioServer(domain string) (*types.Discovery, error) {
+func CheckIfMailioServer(domain string) (*types.Discovery, error) {
 	allDomains := getAllPossibleDomains(domain)
 	for _, possibleDomain := range allDomains {
 		discovery, err := tryDiscoverMailio(possibleDomain)

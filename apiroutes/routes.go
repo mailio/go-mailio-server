@@ -1,11 +1,13 @@
 package apiroutes
 
 import (
+	"net/url"
 	"strings"
 	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/go-kit/log/level"
 	"github.com/hibiken/asynq"
 	"github.com/mailio/go-mailio-server/api"
 	restinterceptors "github.com/mailio/go-mailio-server/api/interceptors"
@@ -31,28 +33,6 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 		authorized.GET("", gin.WrapH(promhttp.Handler()))
 	}
 
-	webScheme := "https"
-	serverScheme := "https"
-	if strings.Contains(global.Conf.Mailio.WebDomain, "localhost") {
-		webScheme = "http"
-	}
-	if strings.Contains(global.Conf.Mailio.ServerDomain, "localhost") {
-		serverScheme = "http"
-	}
-
-	corsConfig := cors.Config{
-		AllowAllOrigins:     false,
-		AllowOrigins:        []string{webScheme + "://" + global.Conf.Mailio.WebDomain, serverScheme + "://" + global.Conf.Mailio.ServerDomain},
-		AllowMethods:        []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"},
-		AllowWildcard:       true,
-		AllowPrivateNetwork: true,
-		AllowHeaders:        []string{"Origin", "Content-Type", "Content-Length", "Authorization", " Access-Control-Allow-Headers"},
-		ExposeHeaders:       []string{"Content-Length", "Set-Cookie"},
-		AllowCredentials:    true,
-		MaxAge:              24 * time.Hour * 30, // 30 days is max
-	}
-	router.Use(cors.New(corsConfig))
-
 	// SERVICE definitions
 	userService := services.NewUserService(dbSelector, environment)
 	nonceService := services.NewNonceService(dbSelector)
@@ -64,6 +44,49 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 	smartKeyService := services.NewSmartKeyService(dbSelector)
 	s3Service := services.NewS3Service(environment)
 	statsService := services.NewStatisticsService(dbSelector, environment)
+
+	// define CORS (Cross-Origin Resource Sharing) origins
+	// the idea is only Mailio Servers can access the API
+	// and the WebApp can access the API
+	corsConfig := cors.Config{
+		AllowOriginWithContextFunc: func(c *gin.Context, origin string) bool {
+			// check if smtp webhook url if called (no origin)
+			urlPath := c.Request.URL.Path
+			for _, smtpPath := range global.Conf.SmtpServers {
+				if strings.HasPrefix(urlPath, smtpPath.Webhookurl) {
+					return true
+				}
+			}
+			// check if origin is another (or this) Mailio Server
+			parsedUrl, purlErr := url.Parse(origin)
+			if purlErr != nil {
+				level.Error(global.Logger).Log("msg", "CORS Failed to parse origin", "error", purlErr.Error())
+				return false
+			}
+			// if origin is the same as any of the servers (web, server or email hostname), allow
+			if parsedUrl.Hostname() == global.Conf.Mailio.WebDomain || parsedUrl.Hostname() == global.Conf.Mailio.ServerDomain || parsedUrl.Hostname() == global.Conf.Mailio.EmailDomain {
+				return true
+			}
+			// otherwise resolve domain to check if it is a Mailio server
+			resolvedDomain, rdErr := domainService.ResolveDomain(parsedUrl.Hostname(), false)
+			if rdErr != nil {
+				level.Error(global.Logger).Log("msg", "CORS Failed to resolve domain", "error", rdErr.Error())
+				return false
+			}
+			if !resolvedDomain.SupportsMailio {
+				return false
+			}
+			return true
+		},
+		AllowMethods:        []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"},
+		AllowWildcard:       true,
+		AllowPrivateNetwork: true,
+		AllowHeaders:        []string{"Origin", "Content-Type", "Content-Length", "Authorization", " Access-Control-Allow-Headers"},
+		ExposeHeaders:       []string{"Content-Length", "Set-Cookie"},
+		AllowCredentials:    true,
+		MaxAge:              24 * time.Hour * 30, // 30 days is max
+	}
+	router.Use(cors.New(corsConfig))
 
 	// API definitions
 	handshakeApi := api.NewHandshakeApi(nonceService, mtpService, userService, userProfileService)
