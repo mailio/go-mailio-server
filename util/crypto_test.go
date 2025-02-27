@@ -84,3 +84,42 @@ func TestPubKeyToMailioAddress(t *testing.T) {
 		t.Fatal("invalid address")
 	}
 }
+
+func TestEqualityOfCreatingMailioAddress(t *testing.T) {
+	// rawKey, _ := base64.RawURLEncoding.DecodeString("lTi99FcVgGAuoHblyw0pffGs3GwZudOT3XDjZ9d7cKc=")
+	rawKey, _ := base64.StdEncoding.DecodeString("lTi99FcVgGAuoHblyw0pffGs3GwZudOT3XDjZ9d7cKc=")
+	address, err := PublicKeyToMailioAddress(rawKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, "0xfe664890e83e8e41cc19317e14803097eaa1ead1", address)
+}
+
+func TestStripDownToRawEmailOrMailioAddress(t *testing.T) {
+	testAddress := "0x139d1fe7306dd2b22c95c8e8343e5163fcc8aa09"
+	address, err := StripDownToRawEmailOrMailioAddress(testAddress)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, testAddress, address)
+
+	testAddress = "did:web:example.com#0x139d1fe7306dd2b22c95c8e8343e5163fcc8aa09"
+	address, err = StripDownToRawEmailOrMailioAddress(testAddress)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, "0x139d1fe7306dd2b22c95c8e8343e5163fcc8aa09", address)
+	testAddress = "Example <test@example.com>"
+	address, err = StripDownToRawEmailOrMailioAddress(testAddress)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, "test@example.com", address)
+
+	testAddress = "test.user@example.com"
+	address, err = StripDownToRawEmailOrMailioAddress(testAddress)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, "test.user@example.com", address)
+}
