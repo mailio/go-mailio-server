@@ -45,3 +45,18 @@ func DeepCopy(src, dest interface{}) error {
 	}
 	return json.Unmarshal(data, dest)
 }
+
+// IsNumber checks if a given string represents a valid number (integer or float)
+func IsNumber(s string) bool {
+	// Try parsing as an integer
+	if _, err := strconv.Atoi(s); err == nil {
+		return true
+	}
+
+	// Try parsing as a float
+	if _, err := strconv.ParseFloat(s, 64); err == nil {
+		return true
+	}
+
+	return false
+}

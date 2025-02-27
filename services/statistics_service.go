@@ -14,6 +14,7 @@ import (
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/repository"
 	"github.com/mailio/go-mailio-server/types"
+	"github.com/mailio/go-mailio-server/util"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -45,8 +46,18 @@ func NewStatisticsService(dbSelector *repository.CouchDBSelector, env *types.Env
  * @param recipient string
  */
 func (s *StatisticsService) GetEmailInterest(ctx context.Context, sender string, recipient string) (int64, error) {
-	recipientHash := xxhash.Sum64String(recipient)
-	senderHash := xxhash.Sum64String(sender)
+	senderRaw, srErr := util.StripDownToRawEmailOrMailioAddress(sender)
+	if srErr != nil {
+		level.Error(global.Logger).Log("stripping to raw address error of sender", sender, "errormsg", srErr.Error())
+		return 0, srErr
+	}
+	recipientRaw, rrErr := util.StripDownToRawEmailOrMailioAddress(recipient)
+	if rrErr != nil {
+		level.Error(global.Logger).Log("stripping to raw address error of recipient", recipient, "errormsg", rrErr.Error())
+		return 0, rrErr
+	}
+	recipientHash := xxhash.Sum64String(recipientRaw)
+	senderHash := xxhash.Sum64String(senderRaw)
 
 	const (
 		redisExpire = 15 * time.Minute
@@ -106,8 +117,18 @@ func (s *StatisticsService) GetEmailInterest(ctx context.Context, sender string,
  * @param recipient string
  */
 func (s *StatisticsService) GetEmailStatistics(ctx context.Context, sender string, recipient string) (int64, error) {
-	recipientHash := xxhash.Sum64String(recipient)
-	senderHash := xxhash.Sum64String(sender)
+	senderRaw, srErr := util.StripDownToRawEmailOrMailioAddress(sender)
+	if srErr != nil {
+		level.Error(global.Logger).Log("stripping to raw address error of sender", sender, "errormsg", srErr.Error())
+		return 0, srErr
+	}
+	recipientRaw, rrErr := util.StripDownToRawEmailOrMailioAddress(recipient)
+	if rrErr != nil {
+		level.Error(global.Logger).Log("stripping to raw address error of recipient", recipient, "errormsg", rrErr.Error())
+		return 0, rrErr
+	}
+	recipientHash := xxhash.Sum64String(recipientRaw)
+	senderHash := xxhash.Sum64String(senderRaw)
 
 	key := fmt.Sprintf("%s:%x:%x", redisPrefixEs, senderHash, recipientHash)
 
@@ -166,7 +187,12 @@ func (s *StatisticsService) getEmailStatisticsFromDB(ctx context.Context, redisK
  * @param day int64
  */
 func (s *StatisticsService) GetEmailSentByDay(ctx context.Context, sender string, day int64) (int64, error) {
-	senderHash := xxhash.Sum64String(sender)
+	senderRaw, srErr := util.StripDownToRawEmailOrMailioAddress(sender)
+	if srErr != nil {
+		level.Error(global.Logger).Log("stripping to raw address error of sender", sender, "errormsg", srErr.Error())
+		return 0, srErr
+	}
+	senderHash := xxhash.Sum64String(senderRaw)
 	dayHash := xxhash.Sum64String(strconv.FormatInt(day, 10))
 	key := fmt.Sprintf("%s:%x:%x", redisPrefixEds, senderHash, dayHash)
 
@@ -194,11 +220,23 @@ func (s *StatisticsService) ProcessEmailInterest(sender string, recipient string
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
+	senderRaw, srErr := util.StripDownToRawEmailOrMailioAddress(sender)
+	if srErr != nil {
+		level.Error(global.Logger).Log("stripping to raw address error of sender", sender, "errormsg", srErr.Error())
+		return srErr
+	}
+
+	recipientRaw, rrErr := util.StripDownToRawEmailOrMailioAddress(recipient)
+	if rrErr != nil {
+		level.Error(global.Logger).Log("stripping to raw address error of recipient", recipient, "errormsg", rrErr.Error())
+		return rrErr
+	}
+
 	redisExpireTime := time.Duration(global.Conf.EmailStatistics.InterestKeyExpiry) * time.Minute
 
 	// hash recipient and sender to sha265
-	recipientHash := xxhash.Sum64String(recipient)
-	senderHash := xxhash.Sum64String(sender)
+	recipientHash := xxhash.Sum64String(recipientRaw)
+	senderHash := xxhash.Sum64String(senderRaw)
 
 	// esint:senderHash:recipientHash (esint as in email statistics interest)
 	redisKey := fmt.Sprintf("%s:%x:%x", redisPrefixEsint, senderHash, recipientHash)
@@ -256,9 +294,24 @@ func (s *StatisticsService) processStatistics(
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
+	senderRaw, srErr := util.StripDownToRawEmailOrMailioAddress(sender)
+	if srErr != nil {
+		level.Error(global.Logger).Log("stripping to raw address error of sender", sender, "errormsg", srErr.Error())
+		return srErr
+	}
+	recipientRaw := recipientOrDay
+	if !util.IsNumber(recipientOrDay) {
+		rr, rrErr := util.StripDownToRawEmailOrMailioAddress(recipientOrDay)
+		if rrErr != nil {
+			level.Error(global.Logger).Log("stripping to raw address error of recipient", recipientOrDay, "errormsg", rrErr.Error())
+			return rrErr
+		}
+		recipientRaw = rr
+	}
+
 	// Calculate hashes for Redis key
-	senderHash := xxhash.Sum64String(sender)
-	keyPart := xxhash.Sum64String(recipientOrDay)
+	senderHash := xxhash.Sum64String(senderRaw)
+	keyPart := xxhash.Sum64String(recipientRaw)
 
 	redisKey := fmt.Sprintf("%s:%x:%x", redisPrefix, senderHash, keyPart)
 
@@ -293,7 +346,19 @@ func (s *StatisticsService) processStatistics(
  */
 func (s *StatisticsService) ProcessEmailStatistics(sender string, recipient string) error {
 	redisExpire := time.Duration(global.Conf.EmailStatistics.SentRecvBySenderExpiry) * time.Minute
-	return s.processStatistics(redisPrefixEs, sender, recipient, redisExpire)
+
+	// strip down addresses to "bare bones" (e.g. web did com to mailio address, full email to email address)
+	senderRaw, srErr := util.StripDownToRawEmailOrMailioAddress(sender)
+	if srErr != nil {
+		level.Error(global.Logger).Log("stripping to raw address error of sender", sender, "errormsg", srErr.Error())
+		return srErr
+	}
+	recipientRaw, rrErr := util.StripDownToRawEmailOrMailioAddress(recipient)
+	if rrErr != nil {
+		level.Error(global.Logger).Log("stripping to raw address error of recipient", recipient, "errormsg", rrErr.Error())
+	}
+
+	return s.processStatistics(redisPrefixEs, senderRaw, recipientRaw, redisExpire)
 }
 
 /**
@@ -303,7 +368,13 @@ func (s *StatisticsService) ProcessEmailStatistics(sender string, recipient stri
 func (s *StatisticsService) ProcessEmailsSentStatistics(sender string) error {
 	redisExpire := time.Duration(global.Conf.EmailStatistics.SentKeyExpiry) * time.Minute
 	day := strconv.FormatInt(time.Now().UTC().Truncate(24*time.Hour).Unix(), 10)
-	return s.processStatistics(redisPrefixEds, sender, day, redisExpire)
+
+	senderRaw, srErr := util.StripDownToRawEmailOrMailioAddress(sender)
+	if srErr != nil {
+		level.Error(global.Logger).Log("stripping to raw address error of sender", sender, "errormsg", srErr.Error())
+		return srErr
+	}
+	return s.processStatistics(redisPrefixEds, senderRaw, day, redisExpire)
 }
 
 /**
@@ -351,7 +422,6 @@ func (s *StatisticsService) FlushEmailInterests() {
 			level.Error(global.Logger).Log("CouchDBError", "StatisticsService.FlushEmailInterests on bulkSave", bsErr.Error())
 		}
 	}
-	level.Info(global.Logger).Log("Info", "StatisticsService.FlushEmailInterests", "flushed", len(allDocs), "email interests")
 }
 
 /**
@@ -393,7 +463,6 @@ func (s *StatisticsService) FlushEmailStatistics() {
 			level.Error(global.Logger).Log("CouchDBError", "StatisticsService.FlushEmailStatistics", bsErr.Error())
 		}
 	}
-	level.Info(global.Logger).Log("Info", "StatisticsService.FlushEmailStatistics", "flushed", len(allDocs), "email statistics")
 }
 
 /**
@@ -435,7 +504,6 @@ func (s *StatisticsService) FlushSentEmailStatistics() {
 			level.Error(global.Logger).Log("CouchDBError", "StatisticsService.FlushSentEmailStatistics", bsErr.Error())
 		}
 	}
-	level.Info(global.Logger).Log("Info", "StatisticsService.FlushSentEmailStatistics", "flushed", len(allDocs), "sent email statistics")
 }
 
 type bulkRequest struct {

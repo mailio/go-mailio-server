@@ -6,9 +6,11 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	src "math/rand"
+	"net/mail"
 	"regexp"
 	"strings"
 
+	"github.com/mailio/go-mailio-did/did"
 	"github.com/mailio/go-mailio-server/types"
 	"golang.org/x/crypto/scrypt"
 )
@@ -163,4 +165,28 @@ func GenerateEd25519KeyPair() (*string, *string, error) {
 func IsValidMailioAddress(address string) bool {
 	re := regexp.MustCompile("^0x[0-9a-fA-F]{40}$")
 	return re.MatchString(address)
+}
+
+// helper to strip down the email address to raw email or mailio address
+func StripDownToRawEmailOrMailioAddress(address string) (string, error) {
+	if address == "" {
+		return address, types.ErrBadRequest
+	}
+	// if email address
+	if strings.Contains(address, "@") {
+		emailAddr, eaErr := mail.ParseAddress(address)
+		if eaErr != nil {
+			return "", eaErr
+		}
+		return emailAddr.Address, nil
+	}
+	// if mailio address
+	if IsValidMailioAddress(address) {
+		return address, nil
+	}
+	parsedDID, dErr := did.ParseDID(address)
+	if dErr != nil {
+		return "", dErr
+	}
+	return parsedDID.Fragment(), nil
 }
