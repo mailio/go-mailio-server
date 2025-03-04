@@ -335,7 +335,7 @@ func (msq *MessageQueue) ReceiveSMTPMessage(email *smtptypes.Mail, taskId string
 			level.Error(global.Logger).Log("retrieving disk usage stats", sErr)
 		}
 		totalDiskUsage := stats.ActiveSize + totalDiskUsageFromHandlers
-		if totalDiskUsage >= userProfile.DiskSpace {
+		if totalDiskUsage >= global.Conf.Mailio.DiskSpace {
 			sendBounce(to, email, smtpHandler, "5.2.2", "mailbox full")
 			continue
 		}

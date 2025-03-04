@@ -355,7 +355,7 @@ func (ma *MessagingApi) sendDIDCommMessage(senderAddress string, input types.DID
 	if stats != nil {
 		activeSize = stats.ActiveSize
 	}
-	if totalDiskUsageFromHandlers+activeSize >= userProfile.DiskSpace {
+	if totalDiskUsageFromHandlers+activeSize >= global.Conf.Mailio.DiskSpace {
 		return nil, types.ErrQuotaExceeded
 	}
 
@@ -431,6 +431,8 @@ func (ma *MessagingApi) handleSendMessageApiError(c *gin.Context, err error) {
 		ApiErrorf(c, http.StatusUnprocessableEntity, "Too many recipients")
 	case types.ErrBadRequestMissingSubjectOrBody:
 		ApiErrorf(c, http.StatusUnprocessableEntity, "Missing subject or body")
+	case types.ErrQuotaExceeded:
+		ApiErrorf(c, http.StatusTooManyRequests, "Quota exceeded")
 	default:
 		ApiErrorf(c, http.StatusInternalServerError, "Failed to send message")
 	}

@@ -16,6 +16,7 @@ import (
 	"github.com/mailio/go-mailio-server/repository"
 	"github.com/mailio/go-mailio-server/services"
 	"github.com/mailio/go-mailio-server/types"
+	"github.com/mailio/go-mailio-server/util"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -63,18 +64,28 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 				level.Error(global.Logger).Log("msg", "CORS Failed to parse origin", "error", purlErr.Error())
 				return false
 			}
+			rootHost, rhErr := util.ExtractRootDomain(parsedUrl.Hostname())
+			if rhErr != nil {
+				level.Error(global.Logger).Log("msg", "CORS Failed to extract root domain", parsedUrl.Hostname(), "error", rhErr.Error())
+				return false
+			}
+			serverRoot, srErr := util.ExtractRootDomain(global.Conf.Mailio.ServerDomain)
+			if srErr != nil {
+				level.Error(global.Logger).Log("msg", "CORS Failed to extract root domain", global.Conf.Mailio.ServerDomain, "error", srErr.Error())
+				return false
+			}
 			// if origin is the same as any of the servers (web, server or email hostname), allow
-			if parsedUrl.Hostname() == global.Conf.Mailio.WebDomain || parsedUrl.Hostname() == global.Conf.Mailio.ServerDomain || parsedUrl.Hostname() == global.Conf.Mailio.EmailDomain {
+			if rootHost == serverRoot {
 				return true
 			}
 			// otherwise resolve domain to check if it is a Mailio server
-			resolvedDomain, rdErr := domainService.ResolveDomain(parsedUrl.Hostname(), false)
+			resolvedDomain, rdErr := domainService.ResolveDomain(rootHost, false)
 			if rdErr != nil {
 				level.Error(global.Logger).Log("msg", "CORS Failed to resolve domain", "error", rdErr.Error())
 				return false
 			}
 			if !resolvedDomain.SupportsMailio {
-				level.Error(global.Logger).Log("msg", "CORS Domain does not support Mailio", "domain", parsedUrl.Hostname())
+				level.Error(global.Logger).Log("msg", "CORS Domain does not support Mailio", "domain", rootHost, "resolvedDomain supports Mailio ", resolvedDomain.SupportsMailio, "resolvedDomain", resolvedDomain.MailioCheckError)
 				return false
 			}
 			return true

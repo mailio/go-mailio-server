@@ -195,7 +195,7 @@ func (msq *MessageQueue) handleReceivedDIDCommMessage(message *types.DIDCommMess
 			// also check the nonce and if it is a valid handshake request
 			if !msq.isNonceValid(message.PlainBodyBase64) {
 				// invalid nonce (drop the message)
-				level.Error(global.Logger).Log("invalid nonce", "failed to validate nonce", recAddress, "msg id: ", message.ID, "from: ", message.From)
+				level.Error(global.Logger).Log("invalid nonce for handshake intent", message.Intent, recAddress, "msg id: ", message.ID, "from: ", message.From)
 				continue
 			}
 		} else {
@@ -450,7 +450,7 @@ func (msq *MessageQueue) DIDCommSendMessage(userAddress string, input *types.DID
 	msq.statisticsService.ProcessEmailsSentStatistics(userAddress)
 	// store all recipients in statistics
 	for _, didDoc := range recipientDidMap {
-		msq.statisticsService.ProcessEmailStatistics(userAddress, didDoc.ID.Fragment())
+		msq.statisticsService.ProcessEmailStatistics(userAddress, didDoc.ID.Value())
 	}
 
 	// delete attachments that client wants to delete
