@@ -228,6 +228,7 @@ func (msq *MessageQueue) isNonceValid(nonceBase64Object string) bool {
 		return false
 	}
 	nonceString := nonceMap["nonce"]
+	level.Info(global.Logger).Log("nonce", nonceString)
 	if len([]byte(nonceString)) != 16 {
 		return false
 	}

@@ -66,7 +66,7 @@ func (a *UserProfileApi) GetUserProfile(c *gin.Context) {
 	}
 	output := &types.OutputBasicUserInfo{
 		Address:     address,
-		TotalDisk:   up.DiskSpace,
+		TotalDisk:   global.Conf.Mailio.DiskSpace,
 		UsedDisk:    totalDiskUsageFromHandlers + activeSize,
 		Created:     up.Created,
 		DisplayName: up.DisplayName,
@@ -126,7 +126,7 @@ func (a *UserProfileApi) UpdateUserProfile(c *gin.Context) {
 	// these fields are not allowed to be changed (always copy from existing)
 	input.Domain = strings.Split(webauthNUser.Name, "@")[1]
 	input.Enabled = true
-	input.DiskSpace = existingUp.DiskSpace
+	input.DiskSpace = global.Conf.Mailio.DiskSpace
 	input.Modified = time.Now().UTC().UnixMilli()
 	input.Created = existingUp.Created
 	input.ID = existingUp.ID

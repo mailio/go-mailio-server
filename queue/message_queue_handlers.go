@@ -48,7 +48,7 @@ func (msq *MessageQueue) selectMailFolder(fromAddress string, recipientAddress s
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
 
-	totalMessagesSent, err := msq.statisticsService.GetEmailStatistics(ctx, fromAddress, recipientAddress)
+	totalMessagesSent, err := msq.statisticsService.GetEmailStatistics(ctx, recipientAddress, fromAddress)
 	if err != nil {
 		level.Error(global.Logger).Log(err.Error(), "failed to count number of sent messages", recipientAddress, fromAddress)
 		return types.MailioFolderInbox, err
@@ -161,6 +161,8 @@ func (msq *MessageQueue) handleReceivedDIDCommMessage(message *types.DIDCommMess
 
 	for _, recAddress := range localRecipientsAddresses {
 
+		//TODO: get available disk space of the recipient
+
 		totalDiskUsageFromHandlers := util.GetDiskUsageFromDiskHandlers(recAddress)
 		stats, sErr := msq.userProfileService.Stats(recAddress)
 		if sErr != nil {
@@ -180,7 +182,7 @@ func (msq *MessageQueue) handleReceivedDIDCommMessage(message *types.DIDCommMess
 			deliveryStatuses = append(deliveryStatuses, types.NewMTPStatusCode(2, 2, 1, "user disabled", types.WithRecAddress(recAddress)))
 			continue
 		}
-		if totalDiskUsageFromHandlers+activeSize >= up.DiskSpace {
+		if totalDiskUsageFromHandlers+activeSize >= global.Conf.Mailio.DiskSpace {
 			deliveryStatuses = append(deliveryStatuses, types.NewMTPStatusCode(2, 2, 2, "mailbox full", types.WithRecAddress(recAddress)))
 			// disk space exceeded
 			continue
@@ -193,7 +195,7 @@ func (msq *MessageQueue) handleReceivedDIDCommMessage(message *types.DIDCommMess
 			// also check the nonce and if it is a valid handshake request
 			if !msq.isNonceValid(message.PlainBodyBase64) {
 				// invalid nonce (drop the message)
-				level.Error(global.Logger).Log("invalid nonce", "failed to validate nonce", recAddress, "msg id: ", message.ID, "from: ", message.From)
+				level.Error(global.Logger).Log("invalid nonce for handshake intent", message.Intent, recAddress, "msg id: ", message.ID, "from: ", message.From)
 				continue
 			}
 		} else {
@@ -445,11 +447,10 @@ func (msq *MessageQueue) DIDCommSendMessage(userAddress string, input *types.DID
 	}
 
 	// statistics (including handshake requests)
-	sender := "did:web:" + global.Conf.Mailio.ServerDomain + "#" + userAddress
-	msq.statisticsService.ProcessEmailsSentStatistics(sender)
+	msq.statisticsService.ProcessEmailsSentStatistics(userAddress)
 	// store all recipients in statistics
 	for _, didDoc := range recipientDidMap {
-		msq.statisticsService.ProcessEmailStatistics(sender, didDoc.ID.String())
+		msq.statisticsService.ProcessEmailStatistics(userAddress, didDoc.ID.Value())
 	}
 
 	// delete attachments that client wants to delete
