@@ -122,8 +122,7 @@ func (mqs *MessageQueue) ProcessDIDCommTask(ctx context.Context, t *asynq.Task) 
 
 // SendMessage sends encrypted DIDComm message to recipient
 func (msq *MessageQueue) DidCommReceiveMessage(message *types.DIDCommMessage) error {
-	level.Error(global.Logger).Log("received msg intent", message.Intent, "id", message.ID, "from", message.From)
-	fmt.Printf("received msg intent %s id %s from %s\n", message.Intent, message.ID, message.From)
+	level.Info(global.Logger).Log("received msg intent", message.Intent, "id", message.ID, "from", message.From)
 	switch message.Intent {
 	case types.DIDCommIntentMessage, types.DIDCommIntentHandshake, types.DIDCommIntentHandshakeRequest, types.DIDCommIntentHandshakeResponse:
 		// handle message receive

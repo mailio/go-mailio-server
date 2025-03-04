@@ -74,6 +74,7 @@ func ConfigRoutes(router *gin.Engine, dbSelector *repository.CouchDBSelector, ta
 				return false
 			}
 			if !resolvedDomain.SupportsMailio {
+				level.Error(global.Logger).Log("msg", "CORS Domain does not support Mailio", "domain", parsedUrl.Hostname())
 				return false
 			}
 			return true

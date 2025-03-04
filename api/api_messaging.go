@@ -249,7 +249,7 @@ func (ma *MessagingApi) sendSMTPMessage(c *gin.Context, mailInput *types.SmtpEma
 	if stats != nil {
 		activeSize = stats.ActiveSize
 	}
-	if totalDiskUsageFromHandlers+activeSize >= up.DiskSpace {
+	if totalDiskUsageFromHandlers+activeSize >= global.Conf.Mailio.DiskSpace {
 		return nil, types.ErrQuotaExceeded
 	}
 
