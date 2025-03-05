@@ -193,10 +193,13 @@ func (msq *MessageQueue) handleReceivedDIDCommMessage(message *types.DIDCommMess
 		if message.Intent == types.DIDCommIntentHandshake || message.Intent == types.DIDCommIntentHandshakeRequest || message.Intent == types.DIDCommIntentHandshakeResponse {
 			folder = types.MailioFolderHandshake
 			// also check the nonce and if it is a valid handshake request
-			if !msq.isNonceValid(message.PlainBodyBase64) {
-				// invalid nonce (drop the message)
-				level.Error(global.Logger).Log("invalid nonce for handshake intent", message.Intent, recAddress, "msg id: ", message.ID, "from: ", message.From)
-				continue
+			// skip nonce validation if handshake response
+			if message.Type != "application/mailio-handshake-response+json" {
+				if !msq.isNonceValid(message.PlainBodyBase64) {
+					// invalid nonce (drop the message)
+					level.Error(global.Logger).Log("invalid nonce for handshake intent", message.Intent, recAddress, "msg id: ", message.ID, "from: ", message.From)
+					continue
+				}
 			}
 		} else {
 			// select folder based on the recipient's handshakes and statistics
