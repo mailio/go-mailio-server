@@ -235,9 +235,11 @@ func (msq *MessageQueue) isNonceValid(nonceBase64Object string) bool {
 
 	nc, err := msq.nonceService.GetNonce(nonceMap["nonce"])
 	if err != nil {
+		level.Error(global.Logger).Log(err.Error(), "failed to get nonce")
 		return false
 	}
 	if nc == nil {
+		level.Error(global.Logger).Log("nonce not found", nonceString)
 		return false
 	}
 	return true
