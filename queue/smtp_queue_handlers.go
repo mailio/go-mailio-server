@@ -503,7 +503,25 @@ func isReply(email *smtptypes.Mail) bool {
 //
 //	types.ErrMessageTooLarge - If an attachment is larger than 30MB, the function returns an error.
 func (msq *MessageQueue) processReceiveAttachments(email *smtptypes.Mail, recipientAddress string) error {
+	var totalSize int64 = 0
+	const maxTotalSize int64 = 30 * 1024 * 1024 // 30MB in bytes
+
 	if len(email.Attachments) > 0 {
+		// validate the size of the attachments (total size and each attachment size)
+		for _, att := range email.Attachments {
+			if len(att.Content) > int(maxTotalSize) {
+				level.Warn(global.Logger).Log("attachment content is too large", att.ContentID, "filename:", att.Filename, "messageId", email.MessageId, "size: ", len(att.Content))
+				// deny attachments larger than 30MB
+				return types.ErrMessageTooLarge
+			}
+			totalSize += int64(len(att.Content))
+		}
+		if totalSize > maxTotalSize {
+			// total size of all attachments exceeds limit
+			level.Error(global.Logger).Log("total attachment size exceeds limit", "totalSize", totalSize, "maxSize", maxTotalSize)
+			return types.ErrMessageTooLarge
+		}
+		// if validation passes, upload the attachments
 		uploadedAttachments := make([]*smtptypes.SmtpAttachment, 0)
 		for _, att := range email.Attachments {
 			if att.Content == nil {
@@ -511,12 +529,6 @@ func (msq *MessageQueue) processReceiveAttachments(email *smtptypes.Mail, recipi
 				continue
 			}
 			if att.Content != nil {
-
-				if len(att.Content) > 30*1024*1024 {
-					level.Warn(global.Logger).Log("attachment content is too large", att.ContentID, "filename:", att.Filename, "messageId", email.MessageId, "size: ", len(att.Content))
-					// deny attachments larger than 30MB
-					return types.ErrMessageTooLarge
-				}
 				uploadedAttachment := &smtptypes.SmtpAttachment{
 					ContentType: att.ContentType,
 					ContentID:   att.ContentID,
