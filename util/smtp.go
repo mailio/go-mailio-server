@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	smtptypes "github.com/mailio/go-mailio-server/email/smtp/types"
 	"github.com/mailio/go-mailio-server/types"
+	abi "github.com/mailio/go-mailio-smtp-abi"
 )
 
 func CheckMXRecords(domain string) (bool, error) {
@@ -23,7 +23,7 @@ func CheckMXRecords(domain string) (bool, error) {
 
 // ConvertFromSmtpEmail converts the input email to the required format for the SMTP Mailio interface.
 // It takes an email as a parameter and returns the converted email format or an error.
-func ConvertFromSmtpEmail(email *smtptypes.Mail) (*types.SmtpEmailInput, error) {
+func ConvertFromSmtpEmail(email *abi.Mail) (*types.SmtpEmailInput, error) {
 	// convert to smtp email
 	var subject string
 	var bodyHTML string
@@ -109,7 +109,7 @@ func ConvertFromSmtpEmail(email *smtptypes.Mail) (*types.SmtpEmailInput, error) 
 // Errors:
 // - "invalid email address" if the FROM email address is invalid (ErrInvalidFormat)
 // - "no address" if any invalid addressess are provided for recipients (to, cc, bcc) (ErrInvalidRecipient)
-func ConvertToSmtpEmail(email types.SmtpEmailInput) (*smtptypes.Mail, error) {
+func ConvertToSmtpEmail(email types.SmtpEmailInput) (*abi.Mail, error) {
 	// convert to smtp email
 	from, fErr := mail.ParseAddress(email.From)
 	if fErr != nil {
@@ -163,7 +163,7 @@ func ConvertToSmtpEmail(email types.SmtpEmailInput) (*smtptypes.Mail, error) {
 	}
 
 	// no need to strip unsafe tags and convert html to text since it is done in the email queue service
-	smtpEmail := &smtptypes.Mail{
+	smtpEmail := &abi.Mail{
 		From:        *from,
 		To:          noPointerTos,
 		BodyHTML:    *email.BodyHTML,

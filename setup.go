@@ -17,7 +17,7 @@ import (
 	diskusagehandler "github.com/mailio/go-mailio-diskusage-handler"
 	mailgunhandler "github.com/mailio/go-mailio-mailgun-smtp-handler"
 	"github.com/mailio/go-mailio-server/diskusage"
-	smtpmodule "github.com/mailio/go-mailio-server/email/smtp"
+	smtp "github.com/mailio/go-mailio-server/email"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/repository"
 	"github.com/mailio/go-mailio-server/services"
@@ -32,7 +32,7 @@ func RegisterSmtpHandlers(conf *global.Config) {
 			for _, domain := range wh.Domains {
 				// development api key not needed for now (but prepared for later versions)
 				handler := mailgunhandler.NewMailgunSmtpHandler(wh.Webhookkey, "", domain.SmtpServer, domain.SmtpPort, domain.SmtpUsername, domain.SmtpPassword)
-				smtpmodule.RegisterSmtpHandler(domain.Domain, handler)
+				smtp.RegisterSmtpHandler(domain.Domain, handler)
 			}
 		}
 	}

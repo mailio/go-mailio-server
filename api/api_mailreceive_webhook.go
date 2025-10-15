@@ -11,12 +11,14 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/go-kit/log/level"
 	"github.com/hibiken/asynq"
-	smtpmodule "github.com/mailio/go-mailio-server/email/smtp"
-	smtptypes "github.com/mailio/go-mailio-server/email/smtp/types"
+
+	smtp "github.com/mailio/go-mailio-server/email"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/services"
 	"github.com/mailio/go-mailio-server/types"
 	"github.com/mailio/go-mailio-server/util"
+	abi "github.com/mailio/go-mailio-smtp-abi"
+	helpers "github.com/mailio/go-mailio-smtp-helpers"
 )
 
 var DENIED_FILE_EXTENSIONS = map[string]string{"ade": "ade", "adp": "adp", "apk": "apk", "appx": "appx", "appxbundle": "appxbundle", "bat": "bat", "cab": "cab", "chm": "chm", "cmd": "cmd", "com": "com", "cpl": "cpl", "dll": "dll", "dmg": "dmg", "ex": "ex", "ex_": "ex_", "exe": "exe", "hta": "hta", "ins": "ins", "isp": "isp", "iso": "iso", "jar": "jar", "js": "js", "jse": "jse", "lib": "lib", "lnk": "lnk", "mde": "mde", "msc": "msc", "msi": "msi", "msix": "msix", "msixbundle": "msixbundle", "msp": "msp", "mst": "mst", "nsh": "nsh", "pif": "pif", "ps1": "ps1", "scr": "scr", "sct": "sct", "shb": "shb", "sys": "sys", "vb": "vb", "vbe": "vbe", "vbs": "vbs", "vxd": "vxd", "wsc": "wsc", "wsf": "wsf", "wsh": "wsh"}
@@ -56,7 +58,7 @@ func fullPathToSupportedDomains(fullPath string) []*global.MailDomains {
 // @Router /webhook/mailgun_mime [post]
 func (m *MailReceiveWebhook) ReceiveMail(c *gin.Context) {
 	fullPath := c.FullPath()
-	handlers := smtpmodule.Handlers()
+	handlers := smtp.Handlers()
 	if len(handlers) == 0 {
 		c.JSON(http.StatusNotImplemented, gin.H{"error": "No SMTP handler registered"})
 		return
@@ -68,7 +70,7 @@ func (m *MailReceiveWebhook) ReceiveMail(c *gin.Context) {
 		return
 	}
 	// doesn't matter for which domain is the handler as long as it's for the appropriate provider
-	smtpHandler := smtpmodule.GetHandler(supportedDomains[0].Domain)
+	smtpHandler := smtp.GetHandler(supportedDomains[0].Domain)
 	if smtpHandler == nil {
 		c.JSON(http.StatusNotImplemented, gin.H{"error": fmt.Sprintf("SMTP handler %s not registered", supportedDomains[0].Domain)})
 		return
@@ -167,8 +169,8 @@ func (m *MailReceiveWebhook) ReceiveMail(c *gin.Context) {
 }
 
 // sendBounce sends a bounce email to the sender of the email
-func sendBounce(email *smtptypes.Mail, c *gin.Context, smtpHandler smtpmodule.SmtpHandler, code, message string) {
-	bounceMail, bErr := smtpmodule.ToBounce(email.From, *email, code, message, global.Conf.Mailio.ServerDomain)
+func sendBounce(email *abi.Mail, c *gin.Context, smtpHandler abi.SmtpHandler, code, message string) {
+	bounceMail, bErr := helpers.ToBounce(email.From, *email, code, message, global.Conf.Mailio.ServerDomain)
 	if bErr != nil {
 		level.Error(global.Logger).Log("error creating bounce email", bErr.Error())
 		ApiErrorf(c, 500, "error creating bounce email: %s", bErr.Error())

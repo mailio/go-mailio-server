@@ -4,7 +4,7 @@ import (
 	"sort"
 	"sync"
 
-	mailiosmtp "github.com/mailio/go-mailio-server/email/smtp/types"
+	abi "github.com/mailio/go-mailio-smtp-abi"
 )
 
 var (
@@ -13,7 +13,7 @@ var (
 )
 
 type SmtpValidator interface {
-	Validate(*mailiosmtp.Mail) error
+	Validate(*abi.Mail) error
 }
 
 // RegisterSmtpValidatorHandler makes a smtp handler available by the provided name.

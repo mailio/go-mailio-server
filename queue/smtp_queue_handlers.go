@@ -14,13 +14,14 @@ import (
 
 	"github.com/go-kit/log/level"
 	"github.com/hibiken/asynq"
-	mailiosmtp "github.com/mailio/go-mailio-server/email/smtp"
-	smtptypes "github.com/mailio/go-mailio-server/email/smtp/types"
+	smtp "github.com/mailio/go-mailio-server/email"
 	smtpvalidator "github.com/mailio/go-mailio-server/email/validator"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/services"
 	"github.com/mailio/go-mailio-server/types"
 	"github.com/mailio/go-mailio-server/util"
+	abi "github.com/mailio/go-mailio-smtp-abi"
+	helpers "github.com/mailio/go-mailio-smtp-helpers"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -101,14 +102,14 @@ func (msq *MessageQueue) SendSMTPMessage(fromMailioAddress string, email *types.
 	}
 
 	// finding the supported SMTP email handler from the senders email domain
-	mgHandler := mailiosmtp.GetHandler(sendingDomain)
+	mgHandler := smtp.GetHandler(sendingDomain)
 	if mgHandler == nil {
 		level.Error(global.Logger).Log("msg", "failed retrieving an smtp handler")
 		return fmt.Errorf("failed retrieving an smtp handler: %w", asynq.SkipRetry)
 	}
 
 	// generate message ID
-	rfc2822MessageID, idErr := mailiosmtp.GenerateRFC2822MessageID(domain)
+	rfc2822MessageID, idErr := helpers.GenerateRFC2822MessageID(domain)
 	if idErr != nil {
 		level.Error(global.Logger).Log("msg", "failed to generate message ID", "error", idErr)
 		return fmt.Errorf("failed generating message ID: %v: %w", idErr, asynq.SkipRetry)
@@ -125,7 +126,7 @@ func (msq *MessageQueue) SendSMTPMessage(fromMailioAddress string, email *types.
 	}
 
 	// convert email to mime
-	mime, mErr := mailiosmtp.ToMime(smtpEmail, rfc2822MessageID)
+	mime, mErr := helpers.ToMime(smtpEmail, rfc2822MessageID)
 	if mErr != nil {
 		level.Error(global.Logger).Log("msg", "failed to create mime", "error", mErr)
 		return fmt.Errorf("failed converting email to mime: %v: %w", mErr, asynq.SkipRetry)
@@ -269,7 +270,7 @@ func (msq *MessageQueue) SendSMTPMessage(fromMailioAddress string, email *types.
 // - The email is marshalled into JSON format and a DIDCommMessage is constructed.
 // - The email message is saved to the database using `userService.SaveMessage`.
 // - Errors are logged using `global.Logger.Log` and appropriate bounce messages are sent using `sendBounce`.
-func (msq *MessageQueue) ReceiveSMTPMessage(email *smtptypes.Mail, taskId string) error {
+func (msq *MessageQueue) ReceiveSMTPMessage(email *abi.Mail, taskId string) error {
 	// default folder
 	folder := types.MailioFolderOther
 
@@ -277,7 +278,7 @@ func (msq *MessageQueue) ReceiveSMTPMessage(email *smtptypes.Mail, taskId string
 
 	// Check if the email is market as spam (to spam folder)
 	isSpam := false
-	if email.SpamVerdict != nil && email.SpamVerdict.Status == smtptypes.VerdictStatusFail {
+	if email.SpamVerdict != nil && email.SpamVerdict.Status == abi.VerdictStatusFail {
 		// save to spam folder for all recipients
 		isSpam = true
 		folder = types.MailioFolderSpam
@@ -293,7 +294,7 @@ func (msq *MessageQueue) ReceiveSMTPMessage(email *smtptypes.Mail, taskId string
 	for _, to := range email.To {
 		// get the smtp provider from the recipient domain
 		toDomain := strings.Split(to.Address, "@")[1]
-		smtpHandler := mailiosmtp.GetHandler(toDomain)
+		smtpHandler := smtp.GetHandler(toDomain)
 		if smtpHandler == nil {
 			level.Error(global.Logger).Log("msg", "failed retrieving an smtp handler")
 			return fmt.Errorf("failed retrieving an smtp handler: %w", asynq.SkipRetry)
@@ -438,8 +439,8 @@ func (msq *MessageQueue) ReceiveSMTPMessage(email *smtptypes.Mail, taskId string
 //   - smtpHandler: The SmtpHandler object used to send the bounce email.
 //   - code: The SMTP status code to include in the bounce email.
 //   - message: The message to include in the bounce email.
-func sendBounce(bounceFromEmail mail.Address, email *smtptypes.Mail, smtpHandler mailiosmtp.SmtpHandler, code, message string) error {
-	bounceMail, bErr := mailiosmtp.ToBounce(email.From, *email, code, message, global.Conf.Mailio.ServerDomain)
+func sendBounce(bounceFromEmail mail.Address, email *abi.Mail, smtpHandler abi.SmtpHandler, code, message string) error {
+	bounceMail, bErr := helpers.ToBounce(email.From, *email, code, message, global.Conf.Mailio.ServerDomain)
 	if bErr != nil {
 		level.Error(global.Logger).Log("bounce preparation", bErr.Error())
 		return bErr
@@ -453,7 +454,7 @@ func sendBounce(bounceFromEmail mail.Address, email *smtptypes.Mail, smtpHandler
 }
 
 // simple determination of a forwarded email
-func isForwarded(email *smtptypes.Mail) bool {
+func isForwarded(email *abi.Mail) bool {
 	if email.Headers != nil {
 		for key, values := range email.Headers {
 			if strings.EqualFold(key, "X-Forwarded-For") && len(values) > 0 {
@@ -465,7 +466,7 @@ func isForwarded(email *smtptypes.Mail) bool {
 }
 
 // simple determination of a reply
-func isReply(email *smtptypes.Mail) bool {
+func isReply(email *abi.Mail) bool {
 	if email.Headers != nil {
 		// Check for the In-Reply-To header to identify a direct reply.
 		for key, values := range email.Headers {
@@ -502,7 +503,7 @@ func isReply(email *smtptypes.Mail) bool {
 // Errors:
 //
 //	types.ErrMessageTooLarge - If an attachment is larger than 30MB, the function returns an error.
-func (msq *MessageQueue) processReceiveAttachments(email *smtptypes.Mail, recipientAddress string) error {
+func (msq *MessageQueue) processReceiveAttachments(email *abi.Mail, recipientAddress string) error {
 	var totalSize int64 = 0
 	const maxTotalSize int64 = 30 * 1024 * 1024 // 30MB in bytes
 
@@ -522,14 +523,14 @@ func (msq *MessageQueue) processReceiveAttachments(email *smtptypes.Mail, recipi
 			return types.ErrMessageTooLarge
 		}
 		// if validation passes, upload the attachments
-		uploadedAttachments := make([]*smtptypes.SmtpAttachment, 0)
+		uploadedAttachments := make([]*abi.SmtpAttachment, 0)
 		for _, att := range email.Attachments {
 			if att.Content == nil {
 				level.Error(global.Logger).Log("attachment content is nil", att.ContentID, "filename:", att.Filename, "messageId", email.MessageId)
 				continue
 			}
 			if att.Content != nil {
-				uploadedAttachment := &smtptypes.SmtpAttachment{
+				uploadedAttachment := &abi.SmtpAttachment{
 					ContentType: att.ContentType,
 					ContentID:   att.ContentID,
 					Filename:    att.Filename,
@@ -580,14 +581,14 @@ func (msq *MessageQueue) processReceiveAttachments(email *smtptypes.Mail, recipi
 //
 //	email - A pointer to the Mail object containing the email and its attachments.
 //	mailioAddress - A string representing the mailio address for constructing the attachment path.
-func (msq *MessageQueue) processSendAttachments(email *smtptypes.Mail) error {
-	var newAttachments []*smtptypes.SmtpAttachment
+func (msq *MessageQueue) processSendAttachments(email *abi.Mail) error {
+	var newAttachments []*abi.SmtpAttachment
 	if len(email.Attachments) > 0 {
 		for _, att := range email.Attachments {
 			if att.ContentURL == nil {
 				continue
 			}
-			var newAtt smtptypes.SmtpAttachment
+			var newAtt abi.SmtpAttachment
 			dcErr := util.DeepCopy(att, &newAtt)
 			if dcErr != nil {
 				level.Error(global.Logger).Log(dcErr.Error(), "failed to copy attachment")

@@ -1,2 +1,2 @@
-github.com/mailio/go-mailio-server/email/smtp v0.0.0-20240618164609-bad0c892b0ec h1:0z16+l5J2imVxAsIXv+zXWlX19dOrLuJUrbg9Ei8nVQ=
-github.com/mailio/go-mailio-server/email/smtp v0.0.0-20240618164609-bad0c892b0ec/go.mod h1:cseAAWNn3XRxay0cAUJ5kGh27Rq8dj3Vi0+i9PchqP0=
+github.com/mailio/go-mailio-smtp-abi v1.0.1 h1:NMXhDC+mxZu9twh/EZSL4xJ46du5XMJsNKTFMv5hLwg=
+github.com/mailio/go-mailio-smtp-abi v1.0.1/go.mod h1:V3sKlULgiveuhSbXBN4T8ZG8t3goHkRdsGI4dY19j1k=

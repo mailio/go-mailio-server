@@ -1,5 +1,5 @@
 module github.com/mailio/go-mailio-server/email/validator
 
-go 1.23.2
+go 1.25.2
 
-require github.com/mailio/go-mailio-server/email/smtp v0.0.0-20240618164609-bad0c892b0ec
+require github.com/mailio/go-mailio-smtp-abi v1.0.1

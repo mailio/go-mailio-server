@@ -1,6 +1,6 @@
 module github.com/mailio/go-mailio-server
 
-go 1.25
+go 1.25.2
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.30.3
@@ -27,10 +27,11 @@ require (
 	github.com/lestrrat-go/jwx/v2 v2.0.19
 	github.com/mailio/go-mailio-did v0.0.0-20240219171524-88713f84b09d
 	github.com/mailio/go-mailio-diskusage-handler v1.0.0
-	github.com/mailio/go-mailio-mailgun-smtp-handler v1.2.1
+	github.com/mailio/go-mailio-mailgun-smtp-handler v1.2.2
 	github.com/mailio/go-mailio-server/diskusage v0.0.0-20240531204144-2069ccd8b024
-	github.com/mailio/go-mailio-server/email/smtp v0.0.0-20251015165841-c6307467f1c5
 	github.com/mailio/go-mailio-server/email/validator v0.0.0-20241023192129-f8719177b347
+	github.com/mailio/go-mailio-smtp-abi v1.0.1
+	github.com/mailio/go-mailio-smtp-helpers v1.0.0
 	github.com/mailio/go-web3-kit v0.0.0-20230302165532-057a45112b37
 	github.com/prometheus/client_golang v1.15.0
 	github.com/redis/go-redis/v9 v9.0.5
@@ -96,9 +97,9 @@ require (
 	github.com/google/flatbuffers v2.0.8+incompatible // indirect
 	github.com/google/go-tpm v0.9.0 // indirect
 	github.com/gorilla/css v1.0.1 // indirect
+	github.com/inbucket/html2text v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
-	github.com/jaytaylor/html2text v0.0.0-20230321000545-74c2419ad056 // indirect
-	github.com/jhillyerd/enmime v1.3.0 // indirect
+	github.com/jhillyerd/enmime/v2 v2.2.0 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
@@ -113,6 +114,7 @@ require (
 	github.com/lestrrat-go/option v1.0.1 // indirect
 	github.com/mailgun/errors v0.4.0 // indirect
 	github.com/mailgun/mailgun-go/v4 v4.23.0 // indirect
+	github.com/mailio/go-mailio-server/email/smtp v0.0.0-20251015174448-13ffde0e46b0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
