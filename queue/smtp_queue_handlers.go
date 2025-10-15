@@ -14,8 +14,8 @@ import (
 
 	"github.com/go-kit/log/level"
 	"github.com/hibiken/asynq"
-	smtp "github.com/mailio/go-mailio-server/email"
 	"github.com/mailio/go-mailio-server/global"
+	smtphandlers "github.com/mailio/go-mailio-server/handlers"
 	"github.com/mailio/go-mailio-server/services"
 	"github.com/mailio/go-mailio-server/types"
 	"github.com/mailio/go-mailio-server/util"
@@ -101,7 +101,7 @@ func (msq *MessageQueue) SendSMTPMessage(fromMailioAddress string, email *types.
 	// }
 
 	// finding the supported SMTP email handler from the senders email domain
-	mgHandler := smtp.GetHandler(sendingDomain)
+	mgHandler := smtphandlers.GetHandler(sendingDomain)
 	if mgHandler == nil {
 		level.Error(global.Logger).Log("msg", "failed retrieving an smtp handler")
 		return fmt.Errorf("failed retrieving an smtp handler: %w", asynq.SkipRetry)
@@ -293,7 +293,7 @@ func (msq *MessageQueue) ReceiveSMTPMessage(email *abi.Mail, taskId string) erro
 	for _, to := range email.To {
 		// get the smtp provider from the recipient domain
 		toDomain := strings.Split(to.Address, "@")[1]
-		smtpHandler := smtp.GetHandler(toDomain)
+		smtpHandler := smtphandlers.GetHandler(toDomain)
 		if smtpHandler == nil {
 			level.Error(global.Logger).Log("msg", "failed retrieving an smtp handler")
 			return fmt.Errorf("failed retrieving an smtp handler: %w", asynq.SkipRetry)

@@ -1,4 +1,4 @@
-package smtp
+package smtphandlers
 
 import (
 	"sort"

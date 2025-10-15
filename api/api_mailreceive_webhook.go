@@ -12,8 +12,8 @@ import (
 	"github.com/go-kit/log/level"
 	"github.com/hibiken/asynq"
 
-	smtp "github.com/mailio/go-mailio-server/email"
 	"github.com/mailio/go-mailio-server/global"
+	smtphandlers "github.com/mailio/go-mailio-server/handlers"
 	"github.com/mailio/go-mailio-server/services"
 	"github.com/mailio/go-mailio-server/types"
 	"github.com/mailio/go-mailio-server/util"
@@ -58,7 +58,7 @@ func fullPathToSupportedDomains(fullPath string) []*global.MailDomains {
 // @Router /webhook/mailgun_mime [post]
 func (m *MailReceiveWebhook) ReceiveMail(c *gin.Context) {
 	fullPath := c.FullPath()
-	handlers := smtp.Handlers()
+	handlers := smtphandlers.Handlers()
 	if len(handlers) == 0 {
 		c.JSON(http.StatusNotImplemented, gin.H{"error": "No SMTP handler registered"})
 		return
@@ -70,7 +70,7 @@ func (m *MailReceiveWebhook) ReceiveMail(c *gin.Context) {
 		return
 	}
 	// doesn't matter for which domain is the handler as long as it's for the appropriate provider
-	smtpHandler := smtp.GetHandler(supportedDomains[0].Domain)
+	smtpHandler := smtphandlers.GetHandler(supportedDomains[0].Domain)
 	if smtpHandler == nil {
 		c.JSON(http.StatusNotImplemented, gin.H{"error": fmt.Sprintf("SMTP handler %s not registered", supportedDomains[0].Domain)})
 		return
