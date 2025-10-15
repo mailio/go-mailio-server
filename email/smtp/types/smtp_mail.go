@@ -21,6 +21,7 @@ type Mail struct {
 	To                   []mail.Address      `json:"to"`                // The email addresses of the recipients.
 	Cc                   []*mail.Address     `json:"cc,omitempty"`      // The email addresses of the CC recipients.
 	Bcc                  []*mail.Address     `json:"bcc,omitempty"`     // The email addresses of the BCC recipients.
+	RawMime              []byte              `json:"rawMime,omitempty"` // The raw mime of the email.
 	MessageId            string              `json:"messageId"`         // message id
 	Subject              string              `json:"subject"`
 	BodyText             string              `json:"bodyText,omitempty"`       // The text version of the email.
