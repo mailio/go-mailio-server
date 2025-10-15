@@ -15,7 +15,6 @@ import (
 	"github.com/go-kit/log/level"
 	"github.com/hibiken/asynq"
 	smtp "github.com/mailio/go-mailio-server/email"
-	smtpvalidator "github.com/mailio/go-mailio-server/email/validator"
 	"github.com/mailio/go-mailio-server/global"
 	"github.com/mailio/go-mailio-server/services"
 	"github.com/mailio/go-mailio-server/types"
@@ -89,17 +88,17 @@ func (msq *MessageQueue) SendSMTPMessage(fromMailioAddress string, email *types.
 	}
 
 	// SMTP validation handler (no validators registered at this time)
-	smtpValidatorHandlers := smtpvalidator.Handlers()
-	if len(smtpValidatorHandlers) > 0 {
-		// call each validator handler
-		for _, name := range smtpValidatorHandlers {
-			smtpVErr := smtpvalidator.GetHandler(name).Validate(smtpEmail)
-			if smtpVErr != nil {
-				level.Error(global.Logger).Log("msg", "failed to validate email", "error", smtpVErr)
-				return fmt.Errorf("failed validating email: %v: %w", smtpVErr, asynq.SkipRetry)
-			}
-		}
-	}
+	// smtpValidatorHandlers := smtpvalidator.Handlers()
+	// if len(smtpValidatorHandlers) > 0 {
+	// 	// call each validator handler
+	// 	for _, name := range smtpValidatorHandlers {
+	// 		smtpVErr := smtpvalidator.GetHandler(name).Validate(smtpEmail)
+	// 		if smtpVErr != nil {
+	// 			level.Error(global.Logger).Log("msg", "failed to validate email", "error", smtpVErr)
+	// 			return fmt.Errorf("failed validating email: %v: %w", smtpVErr, asynq.SkipRetry)
+	// 		}
+	// 	}
+	// }
 
 	// finding the supported SMTP email handler from the senders email domain
 	mgHandler := smtp.GetHandler(sendingDomain)

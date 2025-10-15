@@ -29,7 +29,7 @@ require (
 	github.com/mailio/go-mailio-diskusage-handler v1.0.0
 	github.com/mailio/go-mailio-mailgun-smtp-handler v1.2.2
 	github.com/mailio/go-mailio-server/diskusage v0.0.0-20240531204144-2069ccd8b024
-	github.com/mailio/go-mailio-server/email/validator v0.0.0-20241023192129-f8719177b347
+	github.com/mailio/go-mailio-server/email/validator v0.0.0-20251015174448-13ffde0e46b0
 	github.com/mailio/go-mailio-smtp-abi v1.0.1
 	github.com/mailio/go-mailio-smtp-helpers v1.0.0
 	github.com/mailio/go-web3-kit v0.0.0-20230302165532-057a45112b37

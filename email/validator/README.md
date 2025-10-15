@@ -4,7 +4,7 @@ Any type of validation
 
 ```go
 type SmtpValidator interface {
-	Validate(*mailiosmtp.Mail) error
+	Validate(*abi.Mail) error
 }
 ```
 

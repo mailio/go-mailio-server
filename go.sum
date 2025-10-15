@@ -303,8 +303,8 @@ github.com/mailio/go-mailio-server/diskusage v0.0.0-20240531204144-2069ccd8b024 
 github.com/mailio/go-mailio-server/diskusage v0.0.0-20240531204144-2069ccd8b024/go.mod h1:gk/ImjvOfHzamPCzV7Xowu9v1b8YgyDTKVR78qPAZcQ=
 github.com/mailio/go-mailio-server/email/smtp v0.0.0-20251015174448-13ffde0e46b0 h1:CR7adUBd0byS/NQ9a8T7WLWJDu4HpuPjJypWyw1uqGo=
 github.com/mailio/go-mailio-server/email/smtp v0.0.0-20251015174448-13ffde0e46b0/go.mod h1:K3zPCPfuhUtaahMVAvFq/g4Wev30mv520MZ/ps94SoE=
-github.com/mailio/go-mailio-server/email/validator v0.0.0-20241023192129-f8719177b347 h1:ho8cRU+zqiwobTfYXvvBLl1iG73Z+qVKn81u6aG2Djc=
-github.com/mailio/go-mailio-server/email/validator v0.0.0-20241023192129-f8719177b347/go.mod h1:6J55TpvpYwvSv8FgW/tSMadUG6uVSzKrSbKaFqxz1YY=
+github.com/mailio/go-mailio-server/email/validator v0.0.0-20251015174448-13ffde0e46b0 h1:6VID7QClx6OumCKxuzNOjp5T8PzAbLcgaO2npHUEaa0=
+github.com/mailio/go-mailio-server/email/validator v0.0.0-20251015174448-13ffde0e46b0/go.mod h1:6J55TpvpYwvSv8FgW/tSMadUG6uVSzKrSbKaFqxz1YY=
 github.com/mailio/go-mailio-smtp-abi v1.0.1 h1:NMXhDC+mxZu9twh/EZSL4xJ46du5XMJsNKTFMv5hLwg=
 github.com/mailio/go-mailio-smtp-abi v1.0.1/go.mod h1:V3sKlULgiveuhSbXBN4T8ZG8t3goHkRdsGI4dY19j1k=
 github.com/mailio/go-mailio-smtp-helpers v1.0.0 h1:699reRuI7VoINsyprMn92iR7dVg18yCQ0JgxOz8c9kA=
